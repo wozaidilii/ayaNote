@@ -1,0 +1,133 @@
+{
+  "brand": "AyaNote",
+  "tagline": "Remember every student. Prepare every lesson.",
+  "taglineJaHint": "生徒を忘れない。次回を自動で準備。",
+  "nav": {
+    "today": "Today",
+    "calendar": "Calendar",
+    "students": "Students",
+    "prep": "Prep Queue",
+    "availability": "Availability",
+    "settings": "Settings",
+    "home": "Home",
+    "book": "Book / Reschedule",
+    "history": "History",
+    "switchTeacher": "Teacher view",
+    "switchStudent": "Student view"
+  },
+  "common": {
+    "save": "Save",
+    "approve": "Approve",
+    "decline": "Decline",
+    "edit": "Edit",
+    "generate": "Generate",
+    "import": "Import transcript",
+    "openLesson": "Open lesson room",
+    "ready": "Ready",
+    "draft": "Draft",
+    "pending": "Pending",
+    "level": "Level",
+    "goals": "Goals",
+    "nextFocus": "Next focus",
+    "homework": "Homework",
+    "topics": "Topics",
+    "vocab": "Vocabulary",
+    "grammar": "Grammar",
+    "mistakes": "Mistakes",
+    "weaknesses": "Weak points",
+    "strengths": "Strengths",
+    "attendance": "Attendance",
+    "noItems": "Nothing here yet.",
+    "language": "Language"
+  },
+  "landing": {
+    "ctaTeacher": "Enter as Ayano (teacher)",
+    "ctaStudent": "Enter as Alex (student)",
+    "bullets": {
+      "memory": "Student memory from Meet transcripts",
+      "prep": "Auto prep drafts before class",
+      "booking": "Lite booking & progress for students"
+    }
+  },
+  "today": {
+    "title": "Today",
+    "subtitle": "Upcoming lessons with one-line context",
+    "prepStatus": "Prep",
+    "context": "Last focus"
+  },
+  "calendar": {
+    "title": "Google Calendar",
+    "subtitle": "Booked lessons synced from your calendar workspace",
+    "connected": "LINKED · DEMO",
+    "syncNote": "MVP shows seeded calendar lessons. Finished → lesson record. Upcoming → prep draft.",
+    "openGoogle": "Open Google Calendar",
+    "upcoming": "Upcoming bookings",
+    "past": "Finished lessons",
+    "notStarted": "Not started",
+    "finished": "Finished",
+    "prep": "Prep",
+    "openPrep": "Open prep draft",
+    "openRecord": "Open lesson record"
+  },
+  "students": {
+    "title": "Students",
+    "subtitle": "Profiles, timeline, and progress",
+    "timeline": "Lesson timeline",
+    "progress": "Progress",
+    "consent": "Recording consent"
+  },
+  "lessonRoom": {
+    "title": "Lesson Room",
+    "subtitle": "Paste Google Meet transcript → summarize → save memory",
+    "paste": "Meet transcript",
+    "placeholder": "Paste Google Meet transcript here…",
+    "sidebar": "Student context",
+    "tags": "Quick tags",
+    "saveSummary": "Save & approve summary"
+  },
+  "prep": {
+    "title": "Prep Queue",
+    "subtitle": "Review AI drafts before class",
+    "markReady": "Mark ready",
+    "regenerate": "Regenerate draft"
+  },
+  "availability": {
+    "title": "Availability",
+    "subtitle": "Rules for student booking — 1 hour lessons, starts at :00 or :30",
+    "weekdays": "Weekdays",
+    "hours": "Hours",
+    "minNotice": "Min notice (hours)",
+    "maxWeekly": "Max lessons / week",
+    "bookings": "Pending booking requests"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Workspace defaults (demo)",
+    "google": "Use the Calendar page for booked lesson links. Full OAuth sync comes next.",
+    "stt": "Primary capture path: Google Meet transcript import.",
+    "privacy": "Students see summaries only by default."
+  },
+  "studentHome": {
+    "title": "Your lessons",
+    "next": "Next lesson",
+    "progress": "Your progress",
+    "whatNext": "What we'll do"
+  },
+  "studentBook": {
+    "title": "Book / Reschedule",
+    "subtitle": "Pick an open 1-hour slot — Ayano confirms",
+    "request": "Send request",
+    "note": "Note to teacher",
+    "typeBook": "New booking",
+    "typeReschedule": "Reschedule",
+    "pickSlot": "Teacher availability",
+    "slotRule": "1 HOUR · :00 / :30",
+    "slotHint": "Lessons are 60 minutes. You can start at times like 15:00 or 15:30.",
+    "noSlots": "No open slots in the next 2 weeks.",
+    "recent": "Recent requests"
+  },
+  "studentHistory": {
+    "title": "Lesson history",
+    "subtitle": "Summaries only (no full transcripts)"
+  }
+}

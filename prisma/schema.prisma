@@ -1,0 +1,201 @@
+// AyaNote data model — teacher workspace + student lite portal
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Teacher {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  locale    String   @default("ja")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students           Student[]
+  lessons            Lesson[]
+  bookingRequests    BookingRequest[]
+  availabilityRules  AvailabilityRule?
+  blackoutDates      BlackoutDate[]
+}
+
+model Student {
+  id              String   @id @default(cuid())
+  teacherId       String
+  name            String
+  email           String
+  level           String   @default("N4")
+  goals           String   @default("")
+  privateNotes    String   @default("")
+  recordingConsent Boolean @default(false)
+  locale          String   @default("en")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  teacher         Teacher          @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  lessons         Lesson[]
+  bookingRequests BookingRequest[]
+  vocabItems      VocabItem[]
+  grammarItems    GrammarItem[]
+  progress        ProgressSnapshot?
+
+  @@unique([teacherId, email])
+  @@index([teacherId])
+}
+
+model Lesson {
+  id               String   @id @default(cuid())
+  teacherId        String
+  studentId        String
+  startsAt         DateTime
+  endsAt           DateTime
+  status           String   @default("scheduled") // scheduled | in_progress | completed | cancelled
+  prepStatus       String   @default("none") // none | draft | ready
+  calendarEventId  String?
+  meetLink         String?
+  tagsJson         String   @default("[]")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  teacher   Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  transcript Transcript?
+  summary    Summary?
+  prepDraft  PrepDraft?
+
+  @@index([teacherId, startsAt])
+  @@index([studentId, startsAt])
+}
+
+model Transcript {
+  id        String   @id @default(cuid())
+  lessonId  String   @unique
+  source    String   @default("meet_import") // meet_import | upload | manual
+  rawText   String   @default("")
+  editedText String  @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model Summary {
+  id         String   @id @default(cuid())
+  lessonId   String   @unique
+  topicsJson String   @default("[]")
+  vocabJson  String   @default("[]")
+  grammarJson String  @default("[]")
+  mistakesJson String @default("[]")
+  homework   String   @default("")
+  nextFocus  String   @default("")
+  notes      String   @default("")
+  approved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model PrepDraft {
+  id          String   @id @default(cuid())
+  lessonId    String   @unique
+  warmup      String   @default("")
+  review      String   @default("")
+  newFocus    String   @default("")
+  practice    String   @default("")
+  homeworkSeed String  @default("")
+  status      String   @default("draft") // draft | ready
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model VocabItem {
+  id        String   @id @default(cuid())
+  studentId String
+  term      String
+  reading   String   @default("")
+  meaning   String   @default("")
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+model GrammarItem {
+  id        String   @id @default(cuid())
+  studentId String
+  pattern   String
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+model BookingRequest {
+  id            String   @id @default(cuid())
+  teacherId     String
+  studentId     String
+  type          String   // book | reschedule
+  requestedStart DateTime
+  requestedEnd  DateTime
+  lessonId      String?
+  status        String   @default("pending") // pending | approved | declined
+  note          String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId, status])
+  @@index([studentId, status])
+}
+
+model AvailabilityRule {
+  id              String  @id @default(cuid())
+  teacherId       String  @unique
+  timezone        String  @default("Asia/Tokyo")
+  weekdaysJson    String  @default("[1,2,3,4,5]") // 0=Sun
+  startTime       String  @default("09:00")
+  endTime         String  @default("21:00")
+  slotMinutes     Int     @default(60)
+  minNoticeHours  Int     @default(24)
+  maxWeeklyLessons Int    @default(5)
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model BlackoutDate {
+  id        String   @id @default(cuid())
+  teacherId String
+  date      DateTime
+  reason    String   @default("")
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+}
+
+model ProgressSnapshot {
+  id               String   @id @default(cuid())
+  studentId        String   @unique
+  topicsCoveredJson String  @default("[]")
+  strengthsJson    String   @default("[]")
+  weaknessesJson   String   @default("[]")
+  attendanceCount  Int      @default(0)
+  note             String   @default("")
+  updatedAt        DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}

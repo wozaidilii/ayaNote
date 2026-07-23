@@ -1,0 +1,133 @@
+{
+  "brand": "アヤノート",
+  "tagline": "生徒を忘れない。毎回の授業を準備する。",
+  "taglineJaHint": "Remember every student. Prepare every lesson.",
+  "nav": {
+    "today": "今日",
+    "calendar": "カレンダー",
+    "students": "生徒",
+    "prep": "教案キュー",
+    "availability": "空き時間",
+    "settings": "設定",
+    "home": "ホーム",
+    "book": "予約・振替",
+    "history": "履歴",
+    "switchTeacher": "先生ビュー",
+    "switchStudent": "生徒ビュー"
+  },
+  "common": {
+    "save": "保存",
+    "approve": "承認",
+    "decline": "却下",
+    "edit": "編集",
+    "generate": "生成",
+    "import": "書き起こしを取り込む",
+    "openLesson": "レッスンルームを開く",
+    "ready": "準備完了",
+    "draft": "下書き",
+    "pending": "保留",
+    "level": "レベル",
+    "goals": "目標",
+    "nextFocus": "次回フォーカス",
+    "homework": "宿題",
+    "topics": "トピック",
+    "vocab": "語彙",
+    "grammar": "文法",
+    "mistakes": "ミス",
+    "weaknesses": "弱点",
+    "strengths": "強み",
+    "attendance": "出席",
+    "noItems": "まだありません。",
+    "language": "言語"
+  },
+  "landing": {
+    "ctaTeacher": "Ayano（先生）として入る",
+    "ctaStudent": "Alex（生徒）として入る",
+    "bullets": {
+      "memory": "Meet書き起こしから生徒メモリを作る",
+      "prep": "授業前に教案を自動下書き",
+      "booking": "生徒向けの軽い予約と進捗"
+    }
+  },
+  "today": {
+    "title": "今日",
+    "subtitle": "これから始まるレッスンと一行コンテキスト",
+    "prepStatus": "教案",
+    "context": "前回フォーカス"
+  },
+  "calendar": {
+    "title": "Googleカレンダー",
+    "subtitle": "予約済みレッスンをカレンダー連携ビューで表示",
+    "connected": "連携中 · デモ",
+    "syncNote": "MVPはシード予定を表示。終了済み→授業記録、これから→教案へジャンプ。",
+    "openGoogle": "Googleカレンダーを開く",
+    "upcoming": "これから（予約済み）",
+    "past": "終了したレッスン",
+    "notStarted": "未開始",
+    "finished": "終了",
+    "prep": "教案",
+    "openPrep": "教案を開く",
+    "openRecord": "授業記録を開く"
+  },
+  "students": {
+    "title": "生徒",
+    "subtitle": "プロフィール・タイムライン・進捗",
+    "timeline": "レッスンスケジュール",
+    "progress": "進捗",
+    "consent": "録音同意"
+  },
+  "lessonRoom": {
+    "title": "レッスンルーム",
+    "subtitle": "Google Meetの書き起こしを貼って要約→メモリ保存",
+    "paste": "Meet書き起こし",
+    "placeholder": "Google Meetの書き起こしをここに貼り付け…",
+    "sidebar": "生徒コンテキスト",
+    "tags": "クイックタグ",
+    "saveSummary": "要約を保存して承認"
+  },
+  "prep": {
+    "title": "教案キュー",
+    "subtitle": "授業前にAI下書きを確認",
+    "markReady": "準備完了にする",
+    "regenerate": "下書きを再生成"
+  },
+  "availability": {
+    "title": "空き時間",
+    "subtitle": "予約ルール — 1時間レッスン / 開始は :00 または :30",
+    "weekdays": "曜日",
+    "hours": "時間帯",
+    "minNotice": "最低事前通知（時間）",
+    "maxWeekly": "週あたり最大レッスン数",
+    "bookings": "保留中の予約リクエスト"
+  },
+  "settings": {
+    "title": "設定",
+    "subtitle": "ワークスペース設定（デモ）",
+    "google": "予約済みレッスンは「カレンダー」ページで確認。本格OAuth同期は次フェーズ。",
+    "stt": "主な取り込み経路：Google Meet書き起こしのインポート。",
+    "privacy": "生徒にはデフォルトで要約のみ表示します。"
+  },
+  "studentHome": {
+    "title": "あなたのレッスン",
+    "next": "次のレッスン",
+    "progress": "学習の進捗",
+    "whatNext": "次回やること"
+  },
+  "studentBook": {
+    "title": "予約・振替",
+    "subtitle": "空いている1時間枠を選ぶ → Ayanoが確認",
+    "request": "リクエスト送信",
+    "note": "先生へのメモ",
+    "typeBook": "新規予約",
+    "typeReschedule": "振替",
+    "pickSlot": "先生の空き時間",
+    "slotRule": "1時間 · :00 / :30",
+    "slotHint": "レッスンは60分。15:00 や 15:30 など半点開始もOK。",
+    "noSlots": "今後2週間に空き枠がありません。",
+    "recent": "最近のリクエスト"
+  },
+  "studentHistory": {
+    "title": "レッスン履歴",
+    "subtitle": "要約のみ（全文書き起こしは非表示）"
+  }
+}
