@@ -13,15 +13,17 @@ import { parseJsonArray } from "@/lib/utils";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function AvailabilityPage() {
-  const t = await getTranslations("availability");
-  const common = await getTranslations("common");
-  const teacher = await prisma.teacher.findUniqueOrThrow({
-    where: { email: DEMO_TEACHER_EMAIL },
-    include: {
-      availabilityRules: true,
-      blackoutDates: { orderBy: { date: "asc" } },
-    },
-  });
+  const [t, common, teacher] = await Promise.all([
+    getTranslations("availability"),
+    getTranslations("common"),
+    prisma.teacher.findUniqueOrThrow({
+      where: { email: DEMO_TEACHER_EMAIL },
+      include: {
+        availabilityRules: true,
+        blackoutDates: { orderBy: { date: "asc" } },
+      },
+    }),
+  ]);
   const rules = teacher.availabilityRules;
   const bookings = await prisma.bookingRequest.findMany({
     where: { teacherId: teacher.id, status: "pending" },

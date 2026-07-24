@@ -6,26 +6,27 @@ import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
 import { DEMO_STUDENT_EMAIL, DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function StudentBookPage() {
-  const t = await getTranslations("studentBook");
-  const common = await getTranslations("common");
-
-  const teacher = await prisma.teacher.findUniqueOrThrow({
-    where: { email: DEMO_TEACHER_EMAIL },
-    include: {
-      availabilityRules: true,
-      blackoutDates: true,
-    },
-  });
-  const student = await prisma.student.findFirstOrThrow({
-    where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
-    include: {
-      bookingRequests: { orderBy: { createdAt: "desc" }, take: 12 },
-      lessons: {
-        where: { status: { not: "cancelled" } },
-        orderBy: { startsAt: "asc" },
+  const [t, common, teacher, student] = await Promise.all([
+    getTranslations("studentBook"),
+    getTranslations("common"),
+    prisma.teacher.findUniqueOrThrow({
+      where: { email: DEMO_TEACHER_EMAIL },
+      include: {
+        availabilityRules: true,
+        blackoutDates: true,
       },
-    },
-  });
+    }),
+    prisma.student.findFirstOrThrow({
+      where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
+      include: {
+        bookingRequests: { orderBy: { createdAt: "desc" }, take: 12 },
+        lessons: {
+          where: { status: { not: "cancelled" } },
+          orderBy: { startsAt: "asc" },
+        },
+      },
+    }),
+  ]);
 
   const rules = {
     weekdaysJson: teacher.availabilityRules?.weekdaysJson ?? "[1,2,3,4,5,6]",
@@ -36,16 +37,18 @@ export default async function StudentBookPage() {
     maxWeeklyLessons: teacher.availabilityRules?.maxWeeklyLessons ?? 6,
   };
 
-  const busyLessons = await prisma.lesson.findMany({
-    where: {
-      teacherId: teacher.id,
-      status: { not: "cancelled" },
-      startsAt: { gte: new Date(Date.now() - 86400000) },
-    },
-  });
-  const pending = await prisma.bookingRequest.findMany({
-    where: { teacherId: teacher.id, status: "pending" },
-  });
+  const [busyLessons, pending] = await Promise.all([
+    prisma.lesson.findMany({
+      where: {
+        teacherId: teacher.id,
+        status: { not: "cancelled" },
+        startsAt: { gte: new Date(Date.now() - 86400000) },
+      },
+    }),
+    prisma.bookingRequest.findMany({
+      where: { teacherId: teacher.id, status: "pending" },
+    }),
+  ]);
 
   const busy = [
     ...busyLessons.map((l) => ({ start: l.startsAt, end: l.endsAt })),

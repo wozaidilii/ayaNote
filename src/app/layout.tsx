@@ -21,6 +21,9 @@ export const metadata: Metadata = {
   description: "Lesson memory workspace for Japanese 1v1 teachers",
 };
 
+/** Run near JP users + Neon APAC (was iad1 → Singapore round-trip). */
+export const preferredRegion = "hnd1";
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
   const messages = await getMessages();

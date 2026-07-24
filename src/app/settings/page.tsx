@@ -12,11 +12,13 @@ export default async function SettingsPage({
   searchParams: Promise<{ google?: string }>;
 }) {
   const sp = await searchParams;
-  const t = await getTranslations("settings");
+  const [t, teacher] = await Promise.all([
+    getTranslations("settings"),
+    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
+  ]);
   const provider = getAiProvider();
   const hasDeepseek = Boolean(process.env.DEEPSEEK_API_KEY);
   const hasOpenAI = Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
-  const teacher = await prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } });
   const connected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
   const oauthReady = googleConfigured();
 

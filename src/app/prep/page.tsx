@@ -6,9 +6,11 @@ import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function PrepPage() {
-  const t = await getTranslations("prep");
-  const common = await getTranslations("common");
-  const teacher = await prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } });
+  const [t, common, teacher] = await Promise.all([
+    getTranslations("prep"),
+    getTranslations("common"),
+    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
+  ]);
   const lessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.id,

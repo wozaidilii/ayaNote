@@ -12,37 +12,40 @@ export default async function StudentsPage({
   searchParams: Promise<{ q?: string; level?: string; archived?: string }>;
 }) {
   const sp = await searchParams;
-  const t = await getTranslations("students");
-  const common = await getTranslations("common");
-  const teacher = await prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } });
-
   const q = (sp.q ?? "").trim();
   const level = (sp.level ?? "").trim();
   const showArchived = sp.archived === "1";
 
-  const students = await prisma.student.findMany({
-    where: {
-      teacherId: teacher.id,
-      archivedAt: showArchived ? { not: null } : null,
-      ...(level ? { level } : {}),
-      ...(q
-        ? {
-            OR: [
-              { name: { contains: q, mode: "insensitive" } },
-              { email: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    },
-    include: { progress: true },
-    orderBy: { name: "asc" },
-  });
+  const [t, common, teacher] = await Promise.all([
+    getTranslations("students"),
+    getTranslations("common"),
+    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
+  ]);
 
-  const levels = await prisma.student.findMany({
-    where: { teacherId: teacher.id },
-    select: { level: true },
-    distinct: ["level"],
-  });
+  const [students, levels] = await Promise.all([
+    prisma.student.findMany({
+      where: {
+        teacherId: teacher.id,
+        archivedAt: showArchived ? { not: null } : null,
+        ...(level ? { level } : {}),
+        ...(q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { email: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      include: { progress: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.student.findMany({
+      where: { teacherId: teacher.id },
+      select: { level: true },
+      distinct: ["level"],
+    }),
+  ]);
 
   return (
     <AppShell active="students">

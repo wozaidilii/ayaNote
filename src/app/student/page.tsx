@@ -6,25 +6,27 @@ import { DEMO_STUDENT_EMAIL } from "@/lib/session";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentHomePage() {
-  const t = await getTranslations("studentHome");
-  const common = await getTranslations("common");
-  const student = await prisma.student.findFirstOrThrow({
-    where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
-    include: {
-      progress: true,
-      bookingRequests: {
-        where: { status: "pending" },
-        orderBy: { requestedStart: "asc" },
-        take: 3,
+  const [t, common, student] = await Promise.all([
+    getTranslations("studentHome"),
+    getTranslations("common"),
+    prisma.student.findFirstOrThrow({
+      where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
+      include: {
+        progress: true,
+        bookingRequests: {
+          where: { status: "pending" },
+          orderBy: { requestedStart: "asc" },
+          take: 3,
+        },
+        lessons: {
+          where: { status: "scheduled", startsAt: { gte: new Date() } },
+          include: { prepDraft: true, summary: true },
+          orderBy: { startsAt: "asc" },
+          take: 1,
+        },
       },
-      lessons: {
-        where: { status: "scheduled", startsAt: { gte: new Date() } },
-        include: { prepDraft: true, summary: true },
-        orderBy: { startsAt: "asc" },
-        take: 1,
-      },
-    },
-  });
+    }),
+  ]);
   const next = student.lessons[0];
 
   return (

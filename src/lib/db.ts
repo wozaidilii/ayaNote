@@ -19,6 +19,8 @@ function createPrismaClient() {
 
   // Neon serverless driver needs a WebSocket constructor in Node.
   neonConfig.webSocketConstructor = ws;
+  // Prefer HTTP for short serverless queries (avoids WS setup latency on cold paths).
+  neonConfig.poolQueryViaFetch = true;
 
   const adapter = new PrismaNeon({ connectionString });
   return new PrismaClient({ adapter });
@@ -26,6 +28,5 @@ function createPrismaClient() {
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+// Reuse across warm serverless invocations (dev + prod).
+globalForPrisma.prisma = prisma;

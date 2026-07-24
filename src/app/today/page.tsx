@@ -7,13 +7,16 @@ import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function TodayPage() {
-  const t = await getTranslations("today");
-  const common = await getTranslations("common");
-  const teacher = await prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } });
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 2);
+
+  const [t, common, teacher] = await Promise.all([
+    getTranslations("today"),
+    getTranslations("common"),
+    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
+  ]);
 
   const lessons = await prisma.lesson.findMany({
     where: {

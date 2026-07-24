@@ -7,29 +7,33 @@ import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function CalendarPage() {
-  const t = await getTranslations("calendar");
-  const common = await getTranslations("common");
-  const teacher = await prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } });
   const now = new Date();
 
-  const lessons = await prisma.lesson.findMany({
-    where: {
-      teacherId: teacher.id,
-      status: { not: "cancelled" },
-    },
-    include: {
-      student: true,
-      summary: true,
-      prepDraft: true,
-    },
-    orderBy: { startsAt: "asc" },
-  });
+  const [t, common, teacher] = await Promise.all([
+    getTranslations("calendar"),
+    getTranslations("common"),
+    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
+  ]);
 
-  const pending = await prisma.bookingRequest.findMany({
-    where: { teacherId: teacher.id, status: "pending" },
-    include: { student: true },
-    orderBy: { requestedStart: "asc" },
-  });
+  const [lessons, pending] = await Promise.all([
+    prisma.lesson.findMany({
+      where: {
+        teacherId: teacher.id,
+        status: { not: "cancelled" },
+      },
+      include: {
+        student: true,
+        summary: true,
+        prepDraft: true,
+      },
+      orderBy: { startsAt: "asc" },
+    }),
+    prisma.bookingRequest.findMany({
+      where: { teacherId: teacher.id, status: "pending" },
+      include: { student: true },
+      orderBy: { requestedStart: "asc" },
+    }),
+  ]);
 
   const upcoming = lessons.filter((l) => l.status !== "completed" && l.startsAt >= now);
   const past = lessons
