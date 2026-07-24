@@ -29,6 +29,7 @@ export async function AppShell({
   ] as const;
 
   const links = role === "teacher" ? teacherLinks : studentLinks;
+  const spaceLabel = role === "teacher" ? "Teacher space" : "Student space";
 
   return (
     <div className="shell">
@@ -36,23 +37,27 @@ export async function AppShell({
         <Link href="/" className="brand">
           {t("brand")}
         </Link>
-        <p className="muted" style={{ marginTop: "0.35rem", fontSize: "0.92rem" }}>
-          {role === "teacher" ? "Ayano" : "Alex"} · study desk
+        <p className="space-meta">
+          {role === "teacher" ? "Ayano" : "Alex"} · {spaceLabel}
         </p>
-        <nav style={{ marginTop: "1.35rem" }}>
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="nav-link"
-              data-active={active === link.key}
-            >
-              {t(`nav.${link.key}`)}
-            </Link>
-          ))}
-        </nav>
 
-        <div style={{ marginTop: "1.8rem", display: "grid", gap: "0.5rem" }}>
+        <div className="nav-section">
+          <div className="nav-section-label">Pages</div>
+          <nav>
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="nav-link"
+                data-active={active === link.key}
+              >
+                {t(`nav.${link.key}`)}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <div className="sidebar-actions">
           <form action={setLocale.bind(null, locale === "ja" ? "en" : "ja")}>
             <button className="btn secondary" type="submit" style={{ width: "100%" }}>
               {t("common.language")}: {locale.toUpperCase()}
@@ -65,7 +70,9 @@ export async function AppShell({
           </form>
         </div>
       </aside>
-      <main className="main fade-in">{children}</main>
+      <main className="main">
+        <div className="doc-page fade-in">{children}</div>
+      </main>
     </div>
   );
 }

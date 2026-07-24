@@ -7,30 +7,27 @@ export default async function HomePage() {
 
   return (
     <div className="hero">
-      <div className="hero-visual" aria-hidden />
       <div className="hero-card">
-        <p className="muted" style={{ letterSpacing: "0.06em", fontSize: "0.86rem", margin: 0 }}>
-          {brand("brand")} / アヤノート
+        <p className="doc-breadcrumb" style={{ marginBottom: 4 }}>
+          <span>AyaNote</span>
+          <span>/</span>
+          <span>Home</span>
         </p>
         <h1>{brand("brand")}</h1>
-        <p style={{ fontSize: "1.12rem", maxWidth: "28rem", margin: 0, color: "var(--ink-soft)" }}>
+        <p className="muted" style={{ margin: "0 0 16px", maxWidth: "34rem" }}>
           {brand("tagline")}
         </p>
-        <ul
-          style={{
-            listStyle: "none",
-            padding: 0,
-            margin: "1.4rem 0 1.6rem",
-            display: "grid",
-            gap: "0.45rem",
-            color: "var(--ink-soft)",
-          }}
-        >
-          <li>{t("bullets.memory")}</li>
-          <li>{t("bullets.prep")}</li>
-          <li>{t("bullets.booking")}</li>
-        </ul>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.7rem" }}>
+
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Overview</h2>
+          <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "var(--ink-soft)" }}>
+            <li>{t("bullets.memory")}</li>
+            <li>{t("bullets.prep")}</li>
+            <li>{t("bullets.booking")}</li>
+          </ul>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <form action={setRole.bind(null, "teacher")}>
             <button className="btn" type="submit">
               {t("ctaTeacher")}

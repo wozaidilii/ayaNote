@@ -1,23 +1,24 @@
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
-import { Literata, Zen_Maru_Gothic } from "next/font/google";
+import { IBM_Plex_Sans, Noto_Sans_JP } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 
-const display = Literata({
+const plex = IBM_Plex_Sans({
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-plex",
 });
 
-const body = Zen_Maru_Gothic({
+const noto = Noto_Sans_JP({
   weight: ["400", "500", "700"],
   subsets: ["latin"],
-  variable: "--font-body",
+  variable: "--font-noto",
 });
 
 export const metadata: Metadata = {
   title: "AyaNote / アヤノート",
-  description: "Lesson memory and prep desk for Japanese 1v1 teachers",
+  description: "Lesson memory workspace for Japanese 1v1 teachers",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -26,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale}>
-      <body className={`${display.variable} ${body.variable} antialiased`}>
+      <body className={`${plex.variable} ${noto.variable} antialiased`} style={{ fontFamily: "var(--font-plex), var(--font-noto), sans-serif" }}>
         <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
       </body>
     </html>
