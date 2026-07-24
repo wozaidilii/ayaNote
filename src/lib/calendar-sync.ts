@@ -22,7 +22,6 @@ function extractMeetLink(event: GoogleCalendarEvent) {
 function eventTimes(event: GoogleCalendarEvent): { start: Date; end: Date } | null {
   const startRaw = event.start?.dateTime;
   const endRaw = event.end?.dateTime;
-  // Skip all-day events (date-only).
   if (!startRaw || !endRaw) return null;
   const start = new Date(startRaw);
   const end = new Date(endRaw);
@@ -31,48 +30,81 @@ function eventTimes(event: GoogleCalendarEvent): { start: Date; end: Date } | nu
 }
 
 function guestAttendees(event: GoogleCalendarEvent) {
-  return (event.attendees ?? []).filter((a) => a.email && !a.self && !a.organizer);
+  return (event.attendees ?? []).filter((a) => a.email && !a.self);
 }
 
-function titleToStudentName(summary?: string) {
-  if (!summary?.trim()) return "Calendar guest";
-  const cleaned = summary
-    .replace(/^AyaNote\s*[·•\-–—]\s*/i, "")
-    .replace(/^(Lesson|レッスン|授業|Class)\s*(with|：|:)?\s*/i, "")
-    .trim();
-  return cleaned.slice(0, 80) || "Calendar guest";
+/** Titles like "[kaiさん] Japanese lesson" → "kaiさん" */
+function nameFromBracketTitle(summary?: string) {
+  if (!summary) return null;
+  const m = summary.match(/^\[([^\]]+)\]/);
+  return m?.[1]?.trim() || null;
+}
+
+function emailLocalName(email: string) {
+  const local = email.split("@")[0] ?? email;
+  return local.replace(/[._]+/g, " ").trim() || email;
+}
+
+function looksLikeLesson(event: GoogleCalendarEvent) {
+  const summary = event.summary ?? "";
+  const meet = extractMeetLink(event);
+  if (meet) return true;
+  return /レッスン|lesson|japanese|日本語|授業|ayanote/i.test(summary);
+}
+
+function studentDisplayName(event: GoogleCalendarEvent) {
+  const guests = guestAttendees(event);
+  const fromBracket = nameFromBracketTitle(event.summary);
+  const fromGuest =
+    guests[0]?.displayName?.trim() ||
+    (guests[0]?.email ? emailLocalName(guests[0].email) : null);
+  return (fromBracket || fromGuest || "Calendar guest").slice(0, 80);
 }
 
 async function resolveStudentForEvent(teacherId: string, event: GoogleCalendarEvent) {
   const guests = guestAttendees(event);
+  const displayName = studentDisplayName(event);
 
   for (const guest of guests) {
     const email = guest.email!.toLowerCase();
     const existing = await prisma.student.findFirst({
-      where: { teacherId, email, archivedAt: null },
+      where: { teacherId, email },
     });
-    if (existing) return existing;
+    if (existing) {
+      const shouldRename =
+        !existing.name ||
+        existing.name === "Calendar guest" ||
+        /japanese lesson/i.test(existing.name) ||
+        existing.name.startsWith("[") ||
+        existing.name.includes("二次面接");
+      return prisma.student.update({
+        where: { id: existing.id },
+        data: {
+          archivedAt: null,
+          ...(shouldRename ? { name: displayName } : {}),
+        },
+      });
+    }
   }
-
-  const nameHint = guests[0]?.displayName || titleToStudentName(event.summary);
-  const byName = await prisma.student.findFirst({
-    where: {
-      teacherId,
-      archivedAt: null,
-      name: { equals: nameHint, mode: "insensitive" },
-    },
-  });
-  if (byName) return byName;
 
   const email =
     guests[0]?.email?.toLowerCase() ||
     `cal-${event.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 24).toLowerCase()}@${PLACEHOLDER_DOMAIN}`;
 
+  const byName = await prisma.student.findFirst({
+    where: {
+      teacherId,
+      archivedAt: null,
+      name: { equals: displayName, mode: "insensitive" },
+    },
+  });
+  if (byName && !guests[0]?.email) return byName;
+
   return prisma.student.upsert({
     where: { teacherId_email: { teacherId, email } },
     create: {
       teacherId,
-      name: nameHint,
+      name: displayName,
       email,
       level: "—",
       goals: "Imported from Google Calendar",
@@ -80,7 +112,7 @@ async function resolveStudentForEvent(teacherId: string, event: GoogleCalendarEv
       recordingConsent: false,
     },
     update: {
-      name: nameHint,
+      name: displayName,
       archivedAt: null,
     },
   });
@@ -125,6 +157,7 @@ export type CalendarSyncResult = {
   cancelled: number;
   purged: number;
   scanned: number;
+  skipped: number;
 };
 
 export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSyncResult> {
@@ -133,7 +166,16 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
 
   const accessToken = await getValidAccessToken(teacher);
   if (!accessToken) {
-    return { ok: false, reason: "not_connected", imported: 0, updated: 0, cancelled: 0, purged, scanned: 0 };
+    return {
+      ok: false,
+      reason: "not_connected",
+      imported: 0,
+      updated: 0,
+      cancelled: 0,
+      purged,
+      scanned: 0,
+      skipped: 0,
+    };
   }
 
   if (
@@ -157,12 +199,20 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
   let imported = 0;
   let updated = 0;
   let cancelled = 0;
+  let skipped = 0;
   const seenIds = new Set<string>();
 
   for (const event of events) {
     if (!event.id) continue;
     const times = eventTimes(event);
-    if (!times) continue; // all-day or invalid
+    if (!times) {
+      skipped += 1;
+      continue;
+    }
+    if (!looksLikeLesson(event)) {
+      skipped += 1;
+      continue;
+    }
 
     seenIds.add(event.id);
     const meetLink = extractMeetLink(event);
@@ -196,7 +246,6 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
       continue;
     }
 
-    // Avoid duplicate if we already have a lesson at same slot for same student without event id
     const nearDup = await prisma.lesson.findFirst({
       where: {
         teacherId,
@@ -226,9 +275,7 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
         teacherId,
         studentId: student.id,
         startsAt: times.start,
-        endsAt: times.end.getTime() === times.start.getTime()
-          ? addMinutes(times.start, 60)
-          : times.end,
+        endsAt: times.end.getTime() === times.start.getTime() ? addMinutes(times.start, 60) : times.end,
         status,
         prepStatus: "none",
         calendarEventId: event.id,
@@ -240,8 +287,6 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
     imported += 1;
   }
 
-  // Mark previously synced lessons cancelled if they disappeared from the window as cancelled-only
-  // (Google omits cancelled unless showDeleted — we only mark missing future synced ones softly)
   const futureSynced = await prisma.lesson.findMany({
     where: {
       teacherId,
@@ -253,7 +298,6 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
   for (const lesson of futureSynced) {
     if (!isRealCalendarEventId(lesson.calendarEventId)) continue;
     if (seenIds.has(lesson.calendarEventId!)) continue;
-    // Keep lessons created by AyaNote booking that may not be in list yet; only cancel if tagged google_calendar
     if (!lesson.tagsJson.includes("google_calendar")) continue;
     await prisma.lesson.update({
       where: { id: lesson.id },
@@ -262,6 +306,9 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
     cancelled += 1;
   }
 
+  // Drop non-lesson imports left from earlier syncs (no Meet + no lesson keywords in linked student noise)
+  // Keep all google_calendar lessons that remain in seenIds / past with meet.
+
   return {
     ok: true,
     imported,
@@ -269,5 +316,6 @@ export async function syncTeacherCalendar(teacherId: string): Promise<CalendarSy
     cancelled,
     purged,
     scanned: events.length,
+    skipped,
   };
 }

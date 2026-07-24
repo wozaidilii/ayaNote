@@ -14,13 +14,29 @@ import {
 import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
 import { LESSON_MINUTES } from "@/lib/scheduling";
-import { DEMO_STUDENT_EMAIL, DEMO_TEACHER_EMAIL, type AppRole } from "@/lib/session";
+import { DEMO_TEACHER_EMAIL, type AppRole } from "@/lib/session";
+import { getActiveStudent } from "@/lib/active-student";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
 export async function setRole(role: AppRole) {
   const jar = await cookies();
   jar.set("ayanote_role", role, { path: "/" });
   redirect(role === "teacher" ? "/today" : "/student");
+}
+
+export async function setActiveStudent(formData: FormData) {
+  const studentId = String(formData.get("studentId") ?? "");
+  if (!studentId) throw new Error("Student required");
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, archivedAt: null },
+  });
+  if (!student) throw new Error("Student not found");
+  const jar = await cookies();
+  jar.set("ayanote_student_id", student.id, { path: "/" });
+  revalidatePath("/student");
+  revalidatePath("/student/book");
+  revalidatePath("/student/history");
+  redirect("/student");
 }
 
 export async function setLocale(locale: "ja" | "en") {
@@ -34,9 +50,7 @@ async function getTeacher() {
 }
 
 async function getDemoStudent() {
-  return prisma.student.findFirstOrThrow({
-    where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
-  });
+  return getActiveStudent();
 }
 
 async function teacherAccessToken(teacherId: string) {

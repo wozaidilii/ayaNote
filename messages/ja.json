@@ -164,7 +164,10 @@
     "whatNext": "次回やること",
     "joinMeet": "Meetに入る",
     "status": "ステータス",
-    "pending": "保留中のリクエスト"
+    "pending": "保留中のリクエスト",
+    "switchStudent": "表示する生徒",
+    "noUpcoming": "次回レッスンがまだありません。先生がGoogleカレンダーを同期するか、予約してください。",
+    "noMeetYet": "この予定にMeetリンクがまだありません。"
   },
   "studentBook": {
     "title": "予約・振替",

@@ -1,37 +1,56 @@
 import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
+import { StudentSwitcher } from "@/components/student-switcher";
+import { getActiveStudent, listActiveStudentsForTeacher } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
-import { DEMO_STUDENT_EMAIL } from "@/lib/session";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentHomePage() {
-  const [t, common, student] = await Promise.all([
+  const [t, common, active, roster] = await Promise.all([
     getTranslations("studentHome"),
     getTranslations("common"),
-    prisma.student.findFirstOrThrow({
-      where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
-      include: {
-        progress: true,
-        bookingRequests: {
-          where: { status: "pending" },
-          orderBy: { requestedStart: "asc" },
-          take: 3,
-        },
-        lessons: {
-          where: { status: "scheduled", startsAt: { gte: new Date() } },
-          include: { prepDraft: true, summary: true },
-          orderBy: { startsAt: "asc" },
-          take: 1,
-        },
-      },
-    }),
+    getActiveStudent(),
+    listActiveStudentsForTeacher(),
   ]);
+
+  const student = await prisma.student.findFirstOrThrow({
+    where: { id: active.id },
+    include: {
+      progress: true,
+      bookingRequests: {
+        where: { status: "pending" },
+        orderBy: { requestedStart: "asc" },
+        take: 3,
+      },
+      lessons: {
+        where: { status: "scheduled", startsAt: { gte: new Date() } },
+        include: { prepDraft: true, summary: true },
+        orderBy: { startsAt: "asc" },
+        take: 1,
+      },
+    },
+  });
   const next = student.lessons[0];
 
   return (
-    <AppShell active="home">
+    <AppShell active="home" personName={student.name}>
       <h1 className="h1">{t("title")}</h1>
+      <p className="muted">
+        {student.name} · {student.email}
+      </p>
+
+      <StudentSwitcher
+        activeId={student.id}
+        label={t("switchStudent")}
+        students={roster.map((s) => ({
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          nextLabel: s.lessons[0] ? format(s.lessons[0].startsAt, "MMM d HH:mm") : undefined,
+        }))}
+      />
+
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>{t("next")}</h2>
@@ -39,6 +58,10 @@ export default async function StudentHomePage() {
             <>
               <p style={{ fontSize: "1.2rem", fontWeight: 700 }}>
                 {format(next.startsAt, "yyyy-MM-dd HH:mm")}
+                <span className="muted" style={{ fontWeight: 500 }}>
+                  {" "}
+                  – {format(next.endsAt, "HH:mm")}
+                </span>
               </p>
               <p>
                 <strong>{t("status")}:</strong> {next.status}
@@ -47,16 +70,18 @@ export default async function StudentHomePage() {
                 <strong>{t("whatNext")}:</strong>{" "}
                 {next.prepDraft?.newFocus || next.summary?.nextFocus || "—"}
               </p>
-              {next.meetLink && (
+              {next.meetLink ? (
                 <p>
                   <a className="btn" href={next.meetLink} target="_blank" rel="noreferrer">
                     {t("joinMeet")}
                   </a>
                 </p>
+              ) : (
+                <p className="muted">{t("noMeetYet")}</p>
               )}
             </>
           ) : (
-            <p className="muted">{common("noItems")}</p>
+            <p className="muted">{t("noUpcoming")}</p>
           )}
           {student.bookingRequests.length > 0 && (
             <div style={{ marginTop: "1rem" }}>

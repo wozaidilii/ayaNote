@@ -23,7 +23,13 @@ export default async function CalendarPage({
 
   const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
 
-  let syncMeta: { imported: number; updated: number; purged: number; scanned: number } | null = null;
+  let syncMeta: {
+    imported: number;
+    updated: number;
+    purged: number;
+    scanned: number;
+    skipped: number;
+  } | null = null;
   if (googleConnected) {
     const result = await syncTeacherCalendar(teacher.id);
     if (result.ok) {
@@ -32,6 +38,7 @@ export default async function CalendarPage({
         updated: result.updated,
         purged: result.purged,
         scanned: result.scanned,
+        skipped: result.skipped,
       };
     }
   }

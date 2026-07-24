@@ -6,9 +6,11 @@ import { getSession } from "@/lib/session";
 export async function AppShell({
   children,
   active,
+  personName,
 }: {
   children: React.ReactNode;
   active?: string;
+  personName?: string;
 }) {
   const t = await getTranslations();
   const { role, locale } = await getSession();
@@ -30,6 +32,7 @@ export async function AppShell({
 
   const links = role === "teacher" ? teacherLinks : studentLinks;
   const spaceLabel = role === "teacher" ? "Teacher space" : "Student space";
+  const who = personName || (role === "teacher" ? "Ayano" : "Student");
 
   return (
     <div className="shell">
@@ -38,7 +41,7 @@ export async function AppShell({
           {t("brand")}
         </Link>
         <p className="space-meta">
-          {role === "teacher" ? "Ayano" : "Alex"} · {spaceLabel}
+          {who} · {spaceLabel}
         </p>
 
         <div className="nav-section">

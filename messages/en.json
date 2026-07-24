@@ -164,7 +164,10 @@
     "whatNext": "What we'll do",
     "joinMeet": "Join Meet",
     "status": "Status",
-    "pending": "Pending requests"
+    "pending": "Pending requests",
+    "switchStudent": "Viewing as student",
+    "noUpcoming": "No upcoming lesson synced yet. Ask your teacher to connect Google Calendar, or book a slot.",
+    "noMeetYet": "Meet link not on this calendar event yet."
   },
   "studentBook": {
     "title": "Book / Reschedule",

@@ -1,11 +1,13 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { SlotPicker } from "@/components/slot-picker";
+import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
-import { DEMO_STUDENT_EMAIL, DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function StudentBookPage() {
+  const active = await getActiveStudent();
   const [t, common, teacher, student] = await Promise.all([
     getTranslations("studentBook"),
     getTranslations("common"),
@@ -17,7 +19,7 @@ export default async function StudentBookPage() {
       },
     }),
     prisma.student.findFirstOrThrow({
-      where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
+      where: { id: active.id },
       include: {
         bookingRequests: { orderBy: { createdAt: "desc" }, take: 12 },
         lessons: {
@@ -75,9 +77,11 @@ export default async function StudentBookPage() {
   }));
 
   return (
-    <AppShell active="book">
+    <AppShell active="book" personName={student.name}>
       <h1 className="h1">{t("title")}</h1>
-      <p className="muted">{t("subtitle")}</p>
+      <p className="muted">
+        {t("subtitle")} · {student.name}
+      </p>
 
       <div className="panel" style={{ marginTop: "1.1rem" }}>
         <span className="pixel-banner">{t("slotRule")}</span>

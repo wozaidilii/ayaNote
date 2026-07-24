@@ -124,6 +124,9 @@ export async function listCalendarEvents(opts: {
     singleEvents: "true",
     orderBy: "startTime",
     maxResults: String(opts.maxResults ?? 100),
+    conferenceDataVersion: "1",
+    fields:
+      "items(id,status,summary,description,hangoutLink,htmlLink,start,end,attendees(email,displayName,self,organizer),conferenceData)",
   });
 
   const res = await fetch(
