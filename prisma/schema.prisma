@@ -65,7 +65,7 @@ model Lesson {
   endsAt           DateTime
   status           String   @default("scheduled") // scheduled | in_progress | completed | cancelled
   prepStatus       String   @default("none") // none | draft | ready
-  calendarEventId  String?
+  calendarEventId  String?  @unique
   meetLink         String?
   transcriptStatus String   @default("none") // none | waiting_drive | imported | manual
   driveFileId      String?

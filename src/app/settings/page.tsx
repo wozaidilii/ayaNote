@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { disconnectGoogle } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
@@ -33,7 +34,9 @@ export default async function SettingsPage({
         {sp.google === "connected" && <p className="chip done">{t("googleConnectedBanner")}</p>}
         {sp.google === "missing_creds" && <p className="chip">{t("googleMissingCreds")}</p>}
         {sp.google && sp.google !== "connected" && sp.google !== "missing_creds" && (
-          <p className="chip">{t("googleError")}: {sp.google}</p>
+          <p className="chip">
+            {t("googleError")}: {sp.google}
+          </p>
         )}
         {connected ? (
           <>
@@ -41,11 +44,16 @@ export default async function SettingsPage({
               <span className="chip done">{t("connectedAs")}</span>{" "}
               {teacher.googleConnectedEmail || "Workspace"}
             </p>
-            <form action={disconnectGoogle}>
-              <button className="btn danger" type="submit">
-                {t("disconnectGoogle")}
-              </button>
-            </form>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <Link className="btn" href="/calendar">
+                Open Calendar sync
+              </Link>
+              <form action={disconnectGoogle}>
+                <button className="btn danger" type="submit">
+                  {t("disconnectGoogle")}
+                </button>
+              </form>
+            </div>
           </>
         ) : (
           <>

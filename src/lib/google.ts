@@ -5,6 +5,7 @@
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
   "openid",
   "email",
@@ -96,6 +97,46 @@ export type MeetCreateResult = {
   meetLink: string;
   calendarEventId: string;
 };
+
+export type GoogleCalendarEvent = {
+  id: string;
+  status?: string;
+  summary?: string;
+  description?: string;
+  hangoutLink?: string;
+  htmlLink?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+  attendees?: Array<{ email?: string; displayName?: string; self?: boolean; organizer?: boolean }>;
+  conferenceData?: { entryPoints?: Array<{ entryPointType: string; uri: string }> };
+};
+
+/** List timed events on primary calendar (singleEvents expanded). */
+export async function listCalendarEvents(opts: {
+  accessToken: string;
+  timeMin: Date;
+  timeMax: Date;
+  maxResults?: number;
+}): Promise<GoogleCalendarEvent[]> {
+  const params = new URLSearchParams({
+    timeMin: opts.timeMin.toISOString(),
+    timeMax: opts.timeMax.toISOString(),
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: String(opts.maxResults ?? 100),
+  });
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+    { headers: { Authorization: `Bearer ${opts.accessToken}` } },
+  );
+  if (!res.ok) {
+    console.error("Calendar list failed", await res.text());
+    return [];
+  }
+  const data = (await res.json()) as { items?: GoogleCalendarEvent[] };
+  return data.items ?? [];
+}
 
 /** Create Calendar event with Google Meet. Falls back to demo link if OAuth missing. */
 export async function createCalendarMeetEvent(opts: {

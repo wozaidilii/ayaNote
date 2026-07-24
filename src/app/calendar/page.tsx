@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
-import { decideBooking } from "@/app/actions";
+import { decideBooking, syncGoogleCalendar } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
-export default async function CalendarPage() {
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ synced?: string }>;
+}) {
+  const sp = await searchParams;
   const now = new Date();
 
   const [t, common, teacher] = await Promise.all([
@@ -14,6 +20,21 @@ export default async function CalendarPage() {
     getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
+
+  const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
+
+  let syncMeta: { imported: number; updated: number; purged: number; scanned: number } | null = null;
+  if (googleConnected) {
+    const result = await syncTeacherCalendar(teacher.id);
+    if (result.ok) {
+      syncMeta = {
+        imported: result.imported,
+        updated: result.updated,
+        purged: result.purged,
+        scanned: result.scanned,
+      };
+    }
+  }
 
   const [lessons, pending] = await Promise.all([
     prisma.lesson.findMany({
@@ -40,8 +61,6 @@ export default async function CalendarPage() {
     .filter((l) => l.status === "completed" || l.startsAt < now)
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
 
-  const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
-
   return (
     <AppShell active="calendar">
       <h1 className="h1">{t("title")}</h1>
@@ -53,13 +72,32 @@ export default async function CalendarPage() {
             <span className="pixel-banner">
               {googleConnected ? t("connected") : t("notConnected")}
             </span>
-            <p style={{ margin: "0.7rem 0 0" }}>{t("syncNote")}</p>
+            <p style={{ margin: "0.7rem 0 0" }}>
+              {googleConnected ? t("syncNoteConnected") : t("syncNote")}
+            </p>
+            {sp.synced === "1" && <p className="chip done">{t("justSynced")}</p>}
+            {syncMeta && (
+              <p className="muted" style={{ marginTop: "0.5rem", fontSize: "0.85rem" }}>
+                {t("syncStats", {
+                  scanned: syncMeta.scanned,
+                  imported: syncMeta.imported,
+                  updated: syncMeta.updated,
+                  purged: syncMeta.purged,
+                })}
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-            {!googleConnected && (
+            {!googleConnected ? (
               <a className="btn" href="/api/google/connect">
                 {t("connectGoogle")}
               </a>
+            ) : (
+              <form action={syncGoogleCalendar}>
+                <button className="btn" type="submit">
+                  {t("syncNow")}
+                </button>
+              </form>
             )}
             <a className="btn sky" href="https://calendar.google.com/" target="_blank" rel="noreferrer">
               {t("openGoogle")}
@@ -102,7 +140,9 @@ export default async function CalendarPage() {
 
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>{t("upcoming")}</h2>
-        {upcoming.length === 0 && <p className="muted">{common("noItems")}</p>}
+        {upcoming.length === 0 && (
+          <p className="muted">{googleConnected ? t("emptySynced") : t("emptyNeedConnect")}</p>
+        )}
         {upcoming.map((lesson) => (
           <div className="list-row" key={lesson.id} id={`cal-${lesson.id}`}>
             <div>
@@ -114,6 +154,7 @@ export default async function CalendarPage() {
               </div>
               <div style={{ marginTop: "0.35rem", display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
                 <span className="chip soon">{t("notStarted")}</span>
+                {lesson.calendarEventId && <span className="chip sky">{t("fromGoogle")}</span>}
                 <span className="chip">
                   {t("prep")}: {lesson.prepStatus}
                 </span>

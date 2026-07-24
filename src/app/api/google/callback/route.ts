@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { exchangeCodeForTokens } from "@/lib/google";
+import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { prisma } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
@@ -45,7 +46,14 @@ export async function GET(req: NextRequest) {
     });
 
     jar.delete("google_oauth_state");
-    return NextResponse.redirect(`${base}/settings?google=connected`);
+
+    try {
+      await syncTeacherCalendar(state);
+    } catch (syncErr) {
+      console.error("Initial calendar sync failed", syncErr);
+    }
+
+    return NextResponse.redirect(`${base}/calendar?synced=1`);
   } catch (e) {
     console.error(e);
     return NextResponse.redirect(`${base}/settings?google=token_failed`);

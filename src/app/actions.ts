@@ -11,6 +11,7 @@ import {
   getValidAccessToken,
   updateCalendarEvent,
 } from "@/lib/google";
+import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
 import { LESSON_MINUTES } from "@/lib/scheduling";
 import { DEMO_STUDENT_EMAIL, DEMO_TEACHER_EMAIL, type AppRole } from "@/lib/session";
@@ -594,4 +595,14 @@ export async function disconnectGoogle() {
   });
   revalidatePath("/settings");
   revalidatePath("/calendar");
+}
+
+export async function syncGoogleCalendar() {
+  const teacher = await getTeacher();
+  await syncTeacherCalendar(teacher.id);
+  revalidatePath("/calendar");
+  revalidatePath("/today");
+  revalidatePath("/students");
+  revalidatePath("/prep");
+  revalidatePath("/student");
 }
