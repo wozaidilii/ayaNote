@@ -53,37 +53,68 @@
     "title": "今日",
     "subtitle": "これから始まるレッスンと一行コンテキスト",
     "prepStatus": "教案",
-    "context": "前回フォーカス"
+    "context": "前回フォーカス",
+    "joinMeet": "Meetに入る"
   },
   "calendar": {
     "title": "Googleカレンダー",
-    "subtitle": "予約済みレッスンをカレンダー連携ビューで表示",
-    "connected": "連携中 · デモ",
-    "syncNote": "MVPはシード予定を表示。終了済み→授業記録、これから→教案へジャンプ。",
+    "subtitle": "予約済みレッスンとMeetリンク",
+    "connected": "GOOGLE連携済み",
+    "notConnected": "GOOGLE未連携",
+    "syncNote": "予約承認でCalendarにMeet付きイベントを作成。ここからJoinできます。",
     "openGoogle": "Googleカレンダーを開く",
+    "connectGoogle": "Googleを接続",
     "upcoming": "これから（予約済み）",
     "past": "終了したレッスン",
+    "pending": "保留中のリクエスト",
     "notStarted": "未開始",
     "finished": "終了",
     "prep": "教案",
     "openPrep": "教案を開く",
-    "openRecord": "授業記録を開く"
+    "openRecord": "授業記録を開く",
+    "joinMeet": "Meetに入る"
   },
   "students": {
     "title": "生徒",
     "subtitle": "プロフィール・タイムライン・進捗",
     "timeline": "レッスンスケジュール",
     "progress": "進捗",
-    "consent": "録音同意"
+    "consent": "録音同意",
+    "addStudent": "生徒を追加",
+    "name": "名前",
+    "email": "メール",
+    "create": "作成",
+    "search": "検索",
+    "filterLevel": "レベル絞り込み",
+    "allLevels": "すべてのレベル",
+    "showArchived": "アーカイブを表示",
+    "applyFilters": "絞り込み",
+    "archived": "アーカイブ済み",
+    "archive": "アーカイブ",
+    "restore": "復元",
+    "invite": "招待リンク",
+    "inviteHint": "生徒ログイン用マジックリンク（デモ：生徒ポータルへ）。",
+    "inviteExpires": "有効期限",
+    "regenerateInvite": "招待を再発行",
+    "nextLesson": "次回レッスン",
+    "openPrep": "教案を開く",
+    "openRoom": "レッスンルーム",
+    "noUpcoming": "予定なし"
   },
   "lessonRoom": {
     "title": "レッスンルーム",
-    "subtitle": "Google Meetの書き起こしを貼って要約→メモリ保存",
+    "subtitle": "Meet書き起こし → 要約 → メモリ保存",
     "paste": "Meet書き起こし",
     "placeholder": "Google Meetの書き起こしをここに貼り付け…",
     "sidebar": "生徒コンテキスト",
     "tags": "クイックタグ",
-    "saveSummary": "要約を保存して承認"
+    "saveSummary": "要約を保存して承認",
+    "joinMeet": "Meetに入る",
+    "statusNone": "書き起こしなし",
+    "statusWaiting": "Drive転写を待機中",
+    "statusImported": "Driveから取り込み済み",
+    "statusManual": "手動貼り付け",
+    "manualFallback": "Google連携時は授業後に自動取り込み。手動貼り付けも可能です。"
   },
   "prep": {
     "title": "教案キュー",
@@ -98,20 +129,35 @@
     "hours": "時間帯",
     "minNotice": "最低事前通知（時間）",
     "maxWeekly": "週あたり最大レッスン数",
-    "bookings": "保留中の予約リクエスト"
+    "bookings": "保留中の予約リクエスト",
+    "blackouts": "休講日",
+    "blackoutReason": "理由（任意）",
+    "addBlackout": "休講日を追加",
+    "remove": "削除"
   },
   "settings": {
     "title": "設定",
-    "subtitle": "ワークスペース設定（デモ）",
-    "google": "予約済みレッスンは「カレンダー」ページで確認。本格OAuth同期は次フェーズ。",
-    "stt": "主な取り込み経路：Google Meet書き起こしのインポート。",
+    "subtitle": "ワークスペース設定",
+    "googleTitle": "Google Workspace",
+    "google": "Calendar + Driveを接続してMeet作成と転写の自動取り込みを有効にします。",
+    "googleReady": "OAuth設定を検出。Workspaceアカウントを接続してください。",
+    "googleMissingCreds": "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI（または NEXT_PUBLIC_APP_URL）を設定してください。",
+    "googleConnectedBanner": "Google連携完了。",
+    "googleError": "Google連携失敗",
+    "connectGoogle": "Googleを接続",
+    "disconnectGoogle": "Google連携を解除",
+    "connectedAs": "接続中",
+    "stt": "主な取り込み経路：Google Meet書き起こし（Drive自動 + 手動貼り付け）。",
     "privacy": "生徒にはデフォルトで要約のみ表示します。"
   },
   "studentHome": {
     "title": "あなたのレッスン",
     "next": "次のレッスン",
     "progress": "学習の進捗",
-    "whatNext": "次回やること"
+    "whatNext": "次回やること",
+    "joinMeet": "Meetに入る",
+    "status": "ステータス",
+    "pending": "保留中のリクエスト"
   },
   "studentBook": {
     "title": "予約・振替",
@@ -122,9 +168,13 @@
     "typeReschedule": "振替",
     "pickSlot": "先生の空き時間",
     "slotRule": "1時間 · :00 / :30",
-    "slotHint": "レッスンは60分。15:00 や 15:30 など半点開始もOK。",
+    "slotHint": "レッスンは60分。休講日と週上限が適用されます。",
     "noSlots": "今後2週間に空き枠がありません。",
-    "recent": "最近のリクエスト"
+    "recent": "最近のリクエスト",
+    "confirm": "この枠で確定",
+    "duration": "時間",
+    "cancel": "キャンセル",
+    "myBookings": "自分の予約"
   },
   "studentHistory": {
     "title": "レッスン履歴",

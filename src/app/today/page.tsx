@@ -22,7 +22,17 @@ export default async function TodayPage() {
       status: { not: "cancelled" },
     },
     include: {
-      student: { include: { progress: true, lessons: { where: { status: "completed" }, include: { summary: true }, orderBy: { startsAt: "desc" }, take: 1 } } },
+      student: {
+        include: {
+          progress: true,
+          lessons: {
+            where: { status: "completed" },
+            include: { summary: true },
+            orderBy: { startsAt: "desc" },
+            take: 1,
+          },
+        },
+      },
       prepDraft: true,
     },
     orderBy: { startsAt: "asc" },
@@ -36,7 +46,8 @@ export default async function TodayPage() {
         {lessons.length === 0 && <p className="muted">{common("noItems")}</p>}
         {lessons.map((lesson) => {
           const last = lesson.student.lessons[0]?.summary;
-          const focus = last?.nextFocus || parseJsonArray(lesson.student.progress?.topicsCoveredJson)[0] || "—";
+          const focus =
+            last?.nextFocus || parseJsonArray(lesson.student.progress?.topicsCoveredJson)[0] || "—";
           return (
             <div className="list-row" key={lesson.id}>
               <div>
@@ -45,15 +56,24 @@ export default async function TodayPage() {
                   {format(lesson.startsAt, "MMM d · HH:mm")} · {lesson.student.level}
                 </div>
                 <div style={{ marginTop: "0.35rem" }}>
-                  <span className="chip">{t("context")}: {focus}</span>{" "}
+                  <span className="chip">
+                    {t("context")}: {focus}
+                  </span>{" "}
                   <span className="chip">
                     {t("prepStatus")}: {lesson.prepStatus}
                   </span>
                 </div>
               </div>
-              <Link className="btn secondary" href={`/lessons/${lesson.id}`}>
-                {common("openLesson")}
-              </Link>
+              <div style={{ display: "grid", gap: "0.4rem" }}>
+                {lesson.meetLink && (
+                  <a className="btn" href={lesson.meetLink} target="_blank" rel="noreferrer">
+                    {t("joinMeet")}
+                  </a>
+                )}
+                <Link className="btn secondary" href={`/lessons/${lesson.id}`}>
+                  {common("openLesson")}
+                </Link>
+              </div>
             </div>
           );
         })}

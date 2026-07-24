@@ -4,7 +4,6 @@ import { SlotPicker } from "@/components/slot-picker";
 import { prisma } from "@/lib/db";
 import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
 import { DEMO_STUDENT_EMAIL, DEMO_TEACHER_EMAIL } from "@/lib/session";
-import { format } from "date-fns";
 
 export default async function StudentBookPage() {
   const t = await getTranslations("studentBook");
@@ -12,26 +11,29 @@ export default async function StudentBookPage() {
 
   const teacher = await prisma.teacher.findUniqueOrThrow({
     where: { email: DEMO_TEACHER_EMAIL },
-    include: { availabilityRules: true },
+    include: {
+      availabilityRules: true,
+      blackoutDates: true,
+    },
   });
   const student = await prisma.student.findFirstOrThrow({
-    where: { email: DEMO_STUDENT_EMAIL },
+    where: { email: DEMO_STUDENT_EMAIL, archivedAt: null },
     include: {
-      bookingRequests: { orderBy: { createdAt: "desc" }, take: 8 },
+      bookingRequests: { orderBy: { createdAt: "desc" }, take: 12 },
       lessons: {
-        where: { status: "scheduled", startsAt: { gte: new Date() } },
+        where: { status: { not: "cancelled" } },
         orderBy: { startsAt: "asc" },
-        take: 1,
       },
     },
   });
 
-  const rules = teacher.availabilityRules ?? {
-    weekdaysJson: "[1,2,3,4,5,6]",
-    startTime: "10:00",
-    endTime: "20:00",
-    minNoticeHours: 24,
+  const rules = {
+    weekdaysJson: teacher.availabilityRules?.weekdaysJson ?? "[1,2,3,4,5,6]",
+    startTime: teacher.availabilityRules?.startTime ?? "10:00",
+    endTime: teacher.availabilityRules?.endTime ?? "20:00",
+    minNoticeHours: teacher.availabilityRules?.minNoticeHours ?? 24,
     slotMinutes: 60,
+    maxWeeklyLessons: teacher.availabilityRules?.maxWeeklyLessons ?? 6,
   };
 
   const busyLessons = await prisma.lesson.findMany({
@@ -50,7 +52,19 @@ export default async function StudentBookPage() {
     ...pending.map((b) => ({ start: b.requestedStart, end: b.requestedEnd })),
   ];
 
-  const slots = generateAvailableSlots({ rules, busy, days: 14 });
+  const studentUpcoming = student.lessons.filter(
+    (l) => l.status === "scheduled" && l.startsAt >= new Date(),
+  );
+
+  const slots = generateAvailableSlots({
+    rules,
+    busy,
+    blackoutDates: teacher.blackoutDates.map((b) => b.date),
+    studentLessonStarts: student.lessons
+      .filter((l) => l.status !== "cancelled")
+      .map((l) => l.startsAt),
+    days: 14,
+  });
   const days = groupSlotsByDay(slots).map((d) => ({
     dayKey: d.dayKey,
     label: d.label,
@@ -69,7 +83,14 @@ export default async function StudentBookPage() {
 
       <SlotPicker
         days={days}
-        nextLessonId={student.lessons[0]?.id}
+        nextLessonId={studentUpcoming[0]?.id}
+        bookings={student.bookingRequests.map((b) => ({
+          id: b.id,
+          type: b.type,
+          status: b.status,
+          note: b.note,
+          requestedStart: b.requestedStart.toISOString(),
+        }))}
         labels={{
           pickSlot: t("pickSlot"),
           request: t("request"),
@@ -77,24 +98,19 @@ export default async function StudentBookPage() {
           typeBook: t("typeBook"),
           typeReschedule: t("typeReschedule"),
           noSlots: t("noSlots"),
+          confirm: t("confirm"),
+          duration: t("duration"),
+          cancel: t("cancel"),
+          myBookings: t("myBookings"),
         }}
       />
 
-      <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("recent")}</h2>
-        {student.bookingRequests.map((b) => (
-          <div className="list-row" key={b.id}>
-            <div>
-              <div style={{ fontWeight: 800 }}>
-                {b.type} · {format(b.requestedStart, "yyyy-MM-dd HH:mm")} (+1h)
-              </div>
-              <div className="muted">{b.note || "—"}</div>
-            </div>
-            <span className="chip">{b.status}</span>
-          </div>
-        ))}
-        {student.bookingRequests.length === 0 && <p className="muted">{common("noItems")}</p>}
-      </div>
+      {student.bookingRequests.length === 0 && (
+        <div className="panel">
+          <h2 style={{ marginTop: 0 }}>{t("myBookings")}</h2>
+          <p className="muted">{common("noItems")}</p>
+        </div>
+      )}
     </AppShell>
   );
 }

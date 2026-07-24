@@ -6,16 +6,21 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Teacher {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  locale    String   @default("ja")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  name                 String
+  email                String    @unique
+  locale               String    @default("ja")
+  googleRefreshToken   String?
+  googleAccessToken    String?
+  googleTokenExpiry    DateTime?
+  googleConnectedEmail String?
+  googleTranscriptFolderId String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   students           Student[]
   lessons            Lesson[]
@@ -25,17 +30,20 @@ model Teacher {
 }
 
 model Student {
-  id              String   @id @default(cuid())
-  teacherId       String
-  name            String
-  email           String
-  level           String   @default("N4")
-  goals           String   @default("")
-  privateNotes    String   @default("")
-  recordingConsent Boolean @default(false)
-  locale          String   @default("en")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  teacherId          String
+  name               String
+  email              String
+  level              String    @default("N4")
+  goals              String    @default("")
+  privateNotes       String    @default("")
+  recordingConsent   Boolean   @default(false)
+  locale             String    @default("en")
+  archivedAt         DateTime?
+  inviteToken        String?   @unique
+  inviteTokenExpiresAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   teacher         Teacher          @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   lessons         Lesson[]
@@ -46,6 +54,7 @@ model Student {
 
   @@unique([teacherId, email])
   @@index([teacherId])
+  @@index([teacherId, archivedAt])
 }
 
 model Lesson {
@@ -58,6 +67,8 @@ model Lesson {
   prepStatus       String   @default("none") // none | draft | ready
   calendarEventId  String?
   meetLink         String?
+  transcriptStatus String   @default("none") // none | waiting_drive | imported | manual
+  driveFileId      String?
   tagsJson         String   @default("[]")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -70,12 +81,13 @@ model Lesson {
 
   @@index([teacherId, startsAt])
   @@index([studentId, startsAt])
+  @@index([transcriptStatus, endsAt])
 }
 
 model Transcript {
   id        String   @id @default(cuid())
   lessonId  String   @unique
-  source    String   @default("meet_import") // meet_import | upload | manual
+  source    String   @default("meet_import") // meet_import | drive_import | upload | manual
   rawText   String   @default("")
   editedText String  @default("")
   createdAt DateTime @default(now())
@@ -150,7 +162,7 @@ model BookingRequest {
   requestedStart DateTime
   requestedEnd  DateTime
   lessonId      String?
-  status        String   @default("pending") // pending | approved | declined
+  status        String   @default("pending") // pending | approved | declined | cancelled
   note          String   @default("")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

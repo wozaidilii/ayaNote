@@ -53,37 +53,68 @@
     "title": "Today",
     "subtitle": "Upcoming lessons with one-line context",
     "prepStatus": "Prep",
-    "context": "Last focus"
+    "context": "Last focus",
+    "joinMeet": "Join Meet"
   },
   "calendar": {
     "title": "Google Calendar",
-    "subtitle": "Booked lessons synced from your calendar workspace",
-    "connected": "LINKED · DEMO",
-    "syncNote": "MVP shows seeded calendar lessons. Finished → lesson record. Upcoming → prep draft.",
+    "subtitle": "Booked lessons and Meet links from your Workspace",
+    "connected": "GOOGLE CONNECTED",
+    "notConnected": "GOOGLE NOT CONNECTED",
+    "syncNote": "Approve bookings to create Calendar events with Meet. Join from here when ready.",
     "openGoogle": "Open Google Calendar",
+    "connectGoogle": "Connect Google",
     "upcoming": "Upcoming bookings",
     "past": "Finished lessons",
+    "pending": "Pending requests",
     "notStarted": "Not started",
     "finished": "Finished",
     "prep": "Prep",
     "openPrep": "Open prep draft",
-    "openRecord": "Open lesson record"
+    "openRecord": "Open lesson record",
+    "joinMeet": "Join Meet"
   },
   "students": {
     "title": "Students",
     "subtitle": "Profiles, timeline, and progress",
     "timeline": "Lesson timeline",
     "progress": "Progress",
-    "consent": "Recording consent"
+    "consent": "Recording consent",
+    "addStudent": "Add student",
+    "name": "Name",
+    "email": "Email",
+    "create": "Create student",
+    "search": "Search",
+    "filterLevel": "Level filter",
+    "allLevels": "All levels",
+    "showArchived": "Show archived",
+    "applyFilters": "Apply filters",
+    "archived": "Archived",
+    "archive": "Archive student",
+    "restore": "Restore student",
+    "invite": "Invite link",
+    "inviteHint": "One-time magic link for student login (demo: opens student portal).",
+    "inviteExpires": "Expires",
+    "regenerateInvite": "Regenerate invite",
+    "nextLesson": "Next lesson",
+    "openPrep": "Open prep",
+    "openRoom": "Lesson room",
+    "noUpcoming": "No upcoming lesson"
   },
   "lessonRoom": {
     "title": "Lesson Room",
-    "subtitle": "Paste Google Meet transcript → summarize → save memory",
+    "subtitle": "Meet transcript → summarize → save memory",
     "paste": "Meet transcript",
     "placeholder": "Paste Google Meet transcript here…",
     "sidebar": "Student context",
     "tags": "Quick tags",
-    "saveSummary": "Save & approve summary"
+    "saveSummary": "Save & approve summary",
+    "joinMeet": "Join Meet",
+    "statusNone": "No transcript yet",
+    "statusWaiting": "Waiting for Drive transcript",
+    "statusImported": "Imported from Drive",
+    "statusManual": "Manual paste",
+    "manualFallback": "Auto-import runs after class when Google is connected. You can still paste manually."
   },
   "prep": {
     "title": "Prep Queue",
@@ -98,20 +129,35 @@
     "hours": "Hours",
     "minNotice": "Min notice (hours)",
     "maxWeekly": "Max lessons / week",
-    "bookings": "Pending booking requests"
+    "bookings": "Pending booking requests",
+    "blackouts": "Blackout dates",
+    "blackoutReason": "Reason (optional)",
+    "addBlackout": "Add blackout",
+    "remove": "Remove"
   },
   "settings": {
     "title": "Settings",
-    "subtitle": "Workspace defaults (demo)",
-    "google": "Use the Calendar page for booked lesson links. Full OAuth sync comes next.",
-    "stt": "Primary capture path: Google Meet transcript import.",
+    "subtitle": "Workspace defaults",
+    "googleTitle": "Google Workspace",
+    "google": "Connect Calendar + Drive to create Meet links and auto-import transcripts.",
+    "googleReady": "OAuth credentials detected. Connect your Workspace account.",
+    "googleMissingCreds": "Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI (or NEXT_PUBLIC_APP_URL).",
+    "googleConnectedBanner": "Google connected.",
+    "googleError": "Google connect failed",
+    "connectGoogle": "Connect Google",
+    "disconnectGoogle": "Disconnect Google",
+    "connectedAs": "Connected as",
+    "stt": "Primary capture path: Google Meet transcript (Drive auto-import + manual paste).",
     "privacy": "Students see summaries only by default."
   },
   "studentHome": {
     "title": "Your lessons",
     "next": "Next lesson",
     "progress": "Your progress",
-    "whatNext": "What we'll do"
+    "whatNext": "What we'll do",
+    "joinMeet": "Join Meet",
+    "status": "Status",
+    "pending": "Pending requests"
   },
   "studentBook": {
     "title": "Book / Reschedule",
@@ -122,9 +168,13 @@
     "typeReschedule": "Reschedule",
     "pickSlot": "Teacher availability",
     "slotRule": "1 HOUR · :00 / :30",
-    "slotHint": "Lessons are 60 minutes. You can start at times like 15:00 or 15:30.",
+    "slotHint": "Lessons are 60 minutes. Blackouts and weekly limits apply.",
     "noSlots": "No open slots in the next 2 weeks.",
-    "recent": "Recent requests"
+    "recent": "Recent requests",
+    "confirm": "Confirm this slot",
+    "duration": "Duration",
+    "cancel": "Cancel",
+    "myBookings": "My bookings"
   },
   "studentHistory": {
     "title": "Lesson history",

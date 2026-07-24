@@ -1,8 +1,15 @@
 import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
-import { decideBooking, updateAvailability } from "@/app/actions";
+import {
+  addBlackoutDate,
+  decideBooking,
+  removeBlackoutDate,
+  updateAvailability,
+} from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { AvailabilityForm } from "@/components/availability-form";
 import { prisma } from "@/lib/db";
+import { parseJsonArray } from "@/lib/utils";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function AvailabilityPage() {
@@ -10,7 +17,10 @@ export default async function AvailabilityPage() {
   const common = await getTranslations("common");
   const teacher = await prisma.teacher.findUniqueOrThrow({
     where: { email: DEMO_TEACHER_EMAIL },
-    include: { availabilityRules: true },
+    include: {
+      availabilityRules: true,
+      blackoutDates: { orderBy: { date: "asc" } },
+    },
   });
   const rules = teacher.availabilityRules;
   const bookings = await prisma.bookingRequest.findMany({
@@ -24,49 +34,53 @@ export default async function AvailabilityPage() {
       <h1 className="h1">{t("title")}</h1>
       <p className="muted">{t("subtitle")}</p>
 
-      <form className="panel" action={updateAvailability} style={{ marginTop: "1.2rem" }}>
-        <div className="grid-2">
-          <div className="field">
-            <label htmlFor="startTime">{t("hours")} start</label>
-            <input id="startTime" name="startTime" defaultValue={rules?.startTime ?? "10:00"} />
+      <AvailabilityForm
+        action={updateAvailability}
+        defaults={{
+          startTime: rules?.startTime ?? "10:00",
+          endTime: rules?.endTime ?? "20:00",
+          minNoticeHours: rules?.minNoticeHours ?? 24,
+          maxWeeklyLessons: rules?.maxWeeklyLessons ?? 6,
+          weekdays: parseJsonArray(rules?.weekdaysJson ?? "[1,2,3,4,5,6]").map(Number),
+        }}
+        labels={{
+          hours: t("hours"),
+          weekdays: t("weekdays"),
+          minNotice: t("minNotice"),
+          maxWeekly: t("maxWeekly"),
+          save: common("save"),
+        }}
+      />
+
+      <div className="panel">
+        <h2 style={{ marginTop: 0 }}>{t("blackouts")}</h2>
+        <form action={addBlackoutDate} style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+          <input name="date" type="date" required />
+          <input name="reason" placeholder={t("blackoutReason")} style={{ flex: 1, minWidth: 160 }} />
+          <button className="btn secondary" type="submit">
+            {t("addBlackout")}
+          </button>
+        </form>
+        {teacher.blackoutDates.length === 0 && (
+          <p className="muted" style={{ marginTop: "0.8rem" }}>
+            {common("noItems")}
+          </p>
+        )}
+        {teacher.blackoutDates.map((b) => (
+          <div className="list-row" key={b.id}>
+            <div>
+              <div style={{ fontWeight: 700 }}>{format(b.date, "yyyy-MM-dd")}</div>
+              <div className="muted">{b.reason || "—"}</div>
+            </div>
+            <form action={removeBlackoutDate}>
+              <input type="hidden" name="id" value={b.id} />
+              <button className="btn danger" type="submit">
+                {t("remove")}
+              </button>
+            </form>
           </div>
-          <div className="field">
-            <label htmlFor="endTime">{t("hours")} end</label>
-            <input id="endTime" name="endTime" defaultValue={rules?.endTime ?? "20:00"} />
-          </div>
-        </div>
-        <div className="grid-2">
-          <div className="field">
-            <label htmlFor="minNoticeHours">{t("minNotice")}</label>
-            <input
-              id="minNoticeHours"
-              name="minNoticeHours"
-              type="number"
-              defaultValue={rules?.minNoticeHours ?? 24}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="maxWeeklyLessons">{t("maxWeekly")}</label>
-            <input
-              id="maxWeeklyLessons"
-              name="maxWeeklyLessons"
-              type="number"
-              defaultValue={rules?.maxWeeklyLessons ?? 6}
-            />
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="weekdaysJson">{t("weekdays")} (JSON 0=Sun)</label>
-          <input
-            id="weekdaysJson"
-            name="weekdaysJson"
-            defaultValue={rules?.weekdaysJson ?? "[1,2,3,4,5,6]"}
-          />
-        </div>
-        <button className="btn" type="submit">
-          {common("save")}
-        </button>
-      </form>
+        ))}
+      </div>
 
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>{t("bookings")}</h2>

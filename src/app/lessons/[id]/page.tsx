@@ -6,6 +6,13 @@ import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { parseJsonArray } from "@/lib/utils";
 
+const TRANSCRIPT_STATUS_KEY: Record<string, "statusNone" | "statusWaiting" | "statusImported" | "statusManual"> = {
+  none: "statusNone",
+  waiting_drive: "statusWaiting",
+  imported: "statusImported",
+  manual: "statusManual",
+};
+
 export default async function LessonRoomPage({
   params,
 }: {
@@ -40,6 +47,7 @@ export default async function LessonRoomPage({
   const lastFocus = lesson.student.lessons[0]?.summary?.nextFocus;
   const topics = lesson.summary ? parseJsonArray(lesson.summary.topicsJson) : [];
   const mistakes = lesson.summary ? parseJsonArray(lesson.summary.mistakesJson) : [];
+  const statusKey = TRANSCRIPT_STATUS_KEY[lesson.transcriptStatus] ?? "statusNone";
 
   return (
     <AppShell active="today">
@@ -48,10 +56,16 @@ export default async function LessonRoomPage({
         {lesson.student.name} · {format(lesson.startsAt, "yyyy-MM-dd HH:mm")} · {t("subtitle")}
       </p>
 
+      <div style={{ marginTop: "0.8rem" }}>
+        <span className="chip">{t(statusKey)}</span>
+        {lesson.driveFileId && <span className="chip sky">Drive: {lesson.driveFileId.slice(0, 8)}…</span>}
+      </div>
+
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div>
           <form className="panel" action={importTranscriptAndSummarize}>
             <input type="hidden" name="lessonId" value={lesson.id} />
+            <p className="muted">{t("manualFallback")}</p>
             <div className="field">
               <label htmlFor="transcript">{t("paste")}</label>
               <textarea
@@ -130,8 +144,8 @@ export default async function LessonRoomPage({
           </ul>
           {lesson.meetLink && (
             <p>
-              <a href={lesson.meetLink} target="_blank" rel="noreferrer" className="btn ghost">
-                Google Meet
+              <a href={lesson.meetLink} target="_blank" rel="noreferrer" className="btn">
+                {t("joinMeet")}
               </a>
             </p>
           )}

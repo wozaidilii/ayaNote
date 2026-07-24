@@ -8,7 +8,7 @@ export async function AppShell({
   active,
 }: {
   children: React.ReactNode;
-  active: string;
+  active?: string;
 }) {
   const t = await getTranslations();
   const { role, locale } = await getSession();

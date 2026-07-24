@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
+import { decideBooking } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
@@ -24,10 +25,18 @@ export default async function CalendarPage() {
     orderBy: { startsAt: "asc" },
   });
 
+  const pending = await prisma.bookingRequest.findMany({
+    where: { teacherId: teacher.id, status: "pending" },
+    include: { student: true },
+    orderBy: { requestedStart: "asc" },
+  });
+
   const upcoming = lessons.filter((l) => l.status !== "completed" && l.startsAt >= now);
   const past = lessons
     .filter((l) => l.status === "completed" || l.startsAt < now)
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+
+  const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
 
   return (
     <AppShell active="calendar">
@@ -37,14 +46,55 @@ export default async function CalendarPage() {
       <div className="panel" style={{ marginTop: "1.1rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "0.8rem", flexWrap: "wrap" }}>
           <div>
-            <span className="pixel-banner">{t("connected")}</span>
+            <span className="pixel-banner">
+              {googleConnected ? t("connected") : t("notConnected")}
+            </span>
             <p style={{ margin: "0.7rem 0 0" }}>{t("syncNote")}</p>
           </div>
-          <a className="btn sky" href="https://calendar.google.com/" target="_blank" rel="noreferrer">
-            {t("openGoogle")}
-          </a>
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            {!googleConnected && (
+              <a className="btn" href="/api/google/connect">
+                {t("connectGoogle")}
+              </a>
+            )}
+            <a className="btn sky" href="https://calendar.google.com/" target="_blank" rel="noreferrer">
+              {t("openGoogle")}
+            </a>
+          </div>
         </div>
       </div>
+
+      {pending.length > 0 && (
+        <div className="panel">
+          <h2 style={{ marginTop: 0 }}>{t("pending")}</h2>
+          {pending.map((b) => (
+            <div className="list-row" key={b.id}>
+              <div>
+                <div style={{ fontWeight: 800 }}>
+                  {b.student.name} · {b.type}
+                </div>
+                <div className="muted">{format(b.requestedStart, "yyyy-MM-dd HH:mm")}</div>
+              </div>
+              <div style={{ display: "flex", gap: "0.4rem" }}>
+                <form action={decideBooking}>
+                  <input type="hidden" name="id" value={b.id} />
+                  <input type="hidden" name="decision" value="approve" />
+                  <button className="btn" type="submit">
+                    {common("approve")}
+                  </button>
+                </form>
+                <form action={decideBooking}>
+                  <input type="hidden" name="id" value={b.id} />
+                  <input type="hidden" name="decision" value="decline" />
+                  <button className="btn danger" type="submit">
+                    {common("decline")}
+                  </button>
+                </form>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>{t("upcoming")}</h2>
@@ -69,6 +119,11 @@ export default async function CalendarPage() {
               </div>
             </div>
             <div style={{ display: "grid", gap: "0.4rem" }}>
+              {lesson.meetLink && (
+                <a className="btn" href={lesson.meetLink} target="_blank" rel="noreferrer">
+                  {t("joinMeet")}
+                </a>
+              )}
               <Link className="btn secondary" href={`/prep#lesson-${lesson.id}`}>
                 {t("openPrep")}
               </Link>
