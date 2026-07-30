@@ -169,6 +169,8 @@ export async function approveSummary(formData: FormData) {
   const homework = String(formData.get("homework") ?? "");
   const nextFocus = String(formData.get("nextFocus") ?? "");
   const notes = String(formData.get("notes") ?? "");
+  const todaySummary = String(formData.get("todaySummary") ?? "");
+  const priorReview = String(formData.get("priorReview") ?? "");
 
   const lesson = await prisma.lesson.findUniqueOrThrow({
     where: { id: lessonId },
@@ -179,7 +181,14 @@ export async function approveSummary(formData: FormData) {
 
   await prisma.summary.update({
     where: { lessonId },
-    data: { homework, nextFocus, notes, approved: true },
+    data: {
+      homework,
+      nextFocus,
+      notes,
+      todaySummary,
+      priorReview,
+      approved: true,
+    },
   });
 
   const vocab = (() => {
@@ -293,6 +302,7 @@ export async function generateLessonPrep(lessonId: string) {
   const draft = await generatePrepDraft({
     studentName: lesson.student.name,
     level: lesson.student.level,
+    courseType: lesson.student.courseType,
     goals: lesson.student.goals,
     lastTopics,
     weaknesses,
@@ -521,6 +531,7 @@ export async function createStudent(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const level = String(formData.get("level") ?? "N4");
+  const courseType = String(formData.get("courseType") ?? "jlpt_n4");
   const goals = String(formData.get("goals") ?? "");
   const recordingConsent = formData.get("recordingConsent") === "on";
 
@@ -533,6 +544,7 @@ export async function createStudent(formData: FormData) {
       name,
       email,
       level,
+      courseType,
       goals,
       recordingConsent,
       inviteToken: token,
@@ -554,6 +566,7 @@ export async function updateStudent(formData: FormData) {
       goals: String(formData.get("goals") ?? ""),
       privateNotes: String(formData.get("privateNotes") ?? ""),
       level: String(formData.get("level") ?? "N4"),
+      courseType: String(formData.get("courseType") ?? "jlpt_n4"),
       recordingConsent: formData.get("recordingConsent") === "on",
     },
   });
@@ -622,4 +635,5 @@ export async function syncGoogleCalendar() {
   revalidatePath("/students");
   revalidatePath("/prep");
   revalidatePath("/student");
+  redirect("/calendar?synced=1");
 }

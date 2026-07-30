@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createStudent } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 import { parseJsonArray } from "@/lib/utils";
@@ -97,13 +98,23 @@ export default async function StudentsPage({
         </div>
         <div className="grid-2">
           <div className="field">
+            <label htmlFor="courseType">{common("course")}</label>
+            <select id="courseType" name="courseType" defaultValue="jlpt_n4">
+              {COURSE_TYPES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
             <label htmlFor="levelNew">{common("level")}</label>
             <input id="levelNew" name="level" defaultValue="N4" />
           </div>
-          <div className="field">
-            <label htmlFor="goals">{common("goals")}</label>
-            <input id="goals" name="goals" />
-          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="goals">{common("goals")}</label>
+          <input id="goals" name="goals" />
         </div>
         <label style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.8rem" }}>
           <input type="checkbox" name="recordingConsent" />
@@ -128,8 +139,8 @@ export default async function StudentsPage({
                 )}
               </div>
               <div className="muted" style={{ fontSize: "0.9rem" }}>
-                {student.email} · {common("level")}: {student.level} · {common("attendance")}:{" "}
-                {student.progress?.attendanceCount ?? 0}
+                {student.email} · {courseTypeLabel(student.courseType)} · {common("level")}:{" "}
+                {student.level} · {common("attendance")}: {student.progress?.attendanceCount ?? 0}
               </div>
               <div style={{ marginTop: "0.4rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
                 {parseJsonArray(student.progress?.weaknessesJson)

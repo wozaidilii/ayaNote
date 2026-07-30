@@ -107,6 +107,7 @@ async function resolveStudentForEvent(teacherId: string, event: GoogleCalendarEv
       name: displayName,
       email,
       level: "—",
+      courseType: "custom",
       goals: "Imported from Google Calendar",
       privateNotes: "Auto-created from a Calendar event. Edit profile as needed.",
       recordingConsent: false,

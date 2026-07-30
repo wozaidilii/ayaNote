@@ -7,7 +7,7 @@ import {
   importTranscriptAndSummarize,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
-import { getAiProvider } from "@/lib/ai";
+import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -20,6 +20,20 @@ const TRANSCRIPT_STATUS_KEY: Record<
   imported: "statusImported",
   manual: "statusManual",
 };
+
+type VocabRow = { term: string; reading?: string; meaning?: string };
+type GrammarRow = { pattern: string; notes?: string };
+type ExampleRow = { pattern: string; examples: string[] };
+
+function parseObjectArray<T>(raw: string | null | undefined): T[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw) as unknown;
+    return Array.isArray(v) ? (v as T[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export default async function LessonRoomPage({
   params,
@@ -39,7 +53,7 @@ export default async function LessonRoomPage({
       student: {
         include: {
           progress: true,
-          vocabItems: { take: 5, orderBy: { createdAt: "desc" } },
+          vocabItems: { take: 8, orderBy: { createdAt: "desc" } },
           lessons: {
             where: { status: "completed" },
             include: { summary: true },
@@ -59,6 +73,9 @@ export default async function LessonRoomPage({
   const lastFocus = lesson.student.lessons[0]?.summary?.nextFocus;
   const topics = lesson.summary ? parseJsonArray(lesson.summary.topicsJson) : [];
   const mistakes = lesson.summary ? parseJsonArray(lesson.summary.mistakesJson) : [];
+  const vocab = lesson.summary ? parseObjectArray<VocabRow>(lesson.summary.vocabJson) : [];
+  const grammar = lesson.summary ? parseObjectArray<GrammarRow>(lesson.summary.grammarJson) : [];
+  const examples = lesson.summary ? parseObjectArray<ExampleRow>(lesson.summary.examplesJson) : [];
   const statusKey = TRANSCRIPT_STATUS_KEY[lesson.transcriptStatus] ?? "statusNone";
   const provider = getAiProvider();
   const hasAiKey =
@@ -78,8 +95,9 @@ export default async function LessonRoomPage({
 
       <div style={{ marginTop: "0.8rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
         <span className="chip">{t(statusKey)}</span>
+        <span className="chip sky">{courseTypeLabel(lesson.student.courseType)}</span>
         {lesson.driveFileId && (
-          <span className="chip sky">Drive: {lesson.driveFileId.slice(0, 8)}…</span>
+          <span className="chip">Drive: {lesson.driveFileId.slice(0, 8)}…</span>
         )}
         <span className="chip">{hasAiKey ? t("aiReady", { provider }) : t("aiMissing", { provider })}</span>
       </div>
@@ -156,11 +174,88 @@ export default async function LessonRoomPage({
           {lesson.summary && (
             <form className="panel" action={approveSummary}>
               <input type="hidden" name="lessonId" value={lesson.id} />
-              <h2 style={{ marginTop: 0 }}>{common("topics")}</h2>
-              <p>{topics.join(" · ") || "—"}</p>
+
+              <h2 style={{ marginTop: 0 }}>{t("todayContent")}</h2>
+              <div className="field">
+                <label htmlFor="todaySummary">{t("todaySummary")}</label>
+                <textarea
+                  id="todaySummary"
+                  name="todaySummary"
+                  rows={5}
+                  defaultValue={lesson.summary.todaySummary}
+                />
+              </div>
               <p>
-                <strong>{common("mistakes")}:</strong> {mistakes.join(" · ") || "—"}
+                <strong>{common("topics")}:</strong> {topics.join(" · ") || "—"}
               </p>
+
+              <h3>{t("priorReview")}</h3>
+              <div className="field">
+                <label htmlFor="priorReview">{t("priorReview")}</label>
+                <textarea
+                  id="priorReview"
+                  name="priorReview"
+                  rows={3}
+                  defaultValue={lesson.summary.priorReview}
+                />
+              </div>
+
+              <h3>{common("vocab")}</h3>
+              {vocab.length === 0 ? (
+                <p className="muted">—</p>
+              ) : (
+                <ul>
+                  {vocab.map((v, i) => (
+                    <li key={`${v.term}-${i}`}>
+                      <strong>{v.term}</strong>
+                      {v.reading ? ` (${v.reading})` : ""}
+                      {v.meaning ? ` — ${v.meaning}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <h3>{common("grammar")}</h3>
+              {grammar.length === 0 ? (
+                <p className="muted">—</p>
+              ) : (
+                <ul>
+                  {grammar.map((g, i) => (
+                    <li key={`${g.pattern}-${i}`}>
+                      <strong>{g.pattern}</strong>
+                      {g.notes ? ` — ${g.notes}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <h3>{t("examples")}</h3>
+              {examples.length === 0 ? (
+                <p className="muted">{t("noExamples")}</p>
+              ) : (
+                examples.map((ex, i) => (
+                  <div key={`${ex.pattern}-${i}`} style={{ marginBottom: "0.85rem" }}>
+                    <div style={{ fontWeight: 650 }}>{ex.pattern}</div>
+                    <ul style={{ margin: "0.35rem 0 0" }}>
+                      {(ex.examples ?? []).map((line, j) => (
+                        <li key={j}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+
+              <h3>{common("mistakes")}</h3>
+              {mistakes.length === 0 ? (
+                <p className="muted">—</p>
+              ) : (
+                <ul>
+                  {mistakes.map((m, i) => (
+                    <li key={i}>{m}</li>
+                  ))}
+                </ul>
+              )}
+
               <div className="field">
                 <label htmlFor="homework">{common("homework")}</label>
                 <textarea id="homework" name="homework" defaultValue={lesson.summary.homework} />
@@ -170,7 +265,7 @@ export default async function LessonRoomPage({
                 <textarea id="nextFocus" name="nextFocus" defaultValue={lesson.summary.nextFocus} />
               </div>
               <div className="field">
-                <label htmlFor="notes">Notes</label>
+                <label htmlFor="notes">{t("notes")}</label>
                 <textarea id="notes" name="notes" defaultValue={lesson.summary.notes} />
               </div>
               <button className="btn" type="submit">
@@ -187,6 +282,9 @@ export default async function LessonRoomPage({
 
         <aside className="panel">
           <h2 style={{ marginTop: 0 }}>{t("sidebar")}</h2>
+          <p>
+            <strong>{common("course")}:</strong> {courseTypeLabel(lesson.student.courseType)}
+          </p>
           <p>
             <strong>{common("level")}:</strong> {lesson.student.level}
           </p>

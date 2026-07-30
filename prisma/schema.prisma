@@ -35,6 +35,8 @@ model Student {
   name               String
   email              String
   level              String    @default("N4")
+  /** Course track: jlpt_n1 | jlpt_n2 | jlpt_n3 | jlpt_n4 | jlpt_n5 | business | casual | travel | custom */
+  courseType         String    @default("jlpt_n4")
   goals              String    @default("")
   privateNotes       String    @default("")
   recordingConsent   Boolean   @default(false)
@@ -97,18 +99,21 @@ model Transcript {
 }
 
 model Summary {
-  id         String   @id @default(cuid())
-  lessonId   String   @unique
-  topicsJson String   @default("[]")
-  vocabJson  String   @default("[]")
-  grammarJson String  @default("[]")
-  mistakesJson String @default("[]")
-  homework   String   @default("")
-  nextFocus  String   @default("")
-  notes      String   @default("")
-  approved   Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(cuid())
+  lessonId     String   @unique
+  topicsJson   String   @default("[]")
+  vocabJson    String   @default("[]")
+  grammarJson  String   @default("[]")
+  mistakesJson String   @default("[]")
+  examplesJson String   @default("[]") // [{ pattern, examples: string[] }]
+  todaySummary String   @default("") // narrative of today's lesson
+  priorReview  String   @default("") // recycle last lesson vocab/grammar
+  homework     String   @default("")
+  nextFocus    String   @default("")
+  notes        String   @default("")
+  approved     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 }

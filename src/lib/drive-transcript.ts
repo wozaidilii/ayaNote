@@ -1,4 +1,4 @@
-import { summarizeTranscript } from "@/lib/ai";
+import { summarizeTranscript, type LessonSummaryPayload } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import {
   exportDriveDocText,
@@ -132,6 +132,104 @@ async function persistRefreshedToken(
   }
 }
 
+function summaryPersistData(summary: LessonSummaryPayload) {
+  return {
+    topicsJson: toJson(summary.topics),
+    vocabJson: toJson(summary.vocab),
+    grammarJson: toJson(summary.grammar),
+    mistakesJson: toJson(summary.mistakes),
+    examplesJson: toJson(summary.examples),
+    todaySummary: summary.todaySummary,
+    priorReview: summary.priorReview,
+    homework: summary.homework,
+    nextFocus: summary.nextFocus,
+    notes: summary.notes,
+    approved: false,
+  };
+}
+
+async function buildSummarizeContext(lessonId: string) {
+  const lesson = await prisma.lesson.findUniqueOrThrow({
+    where: { id: lessonId },
+    include: {
+      student: {
+        include: {
+          vocabItems: { orderBy: { createdAt: "desc" }, take: 20 },
+          grammarItems: { orderBy: { createdAt: "desc" }, take: 12 },
+          lessons: {
+            where: {
+              status: "completed",
+              id: { not: lessonId },
+            },
+            include: { summary: true },
+            orderBy: { startsAt: "desc" },
+            take: 2,
+          },
+        },
+      },
+    },
+  });
+
+  const priorSummaries = lesson.student.lessons
+    .map((l) => l.summary)
+    .filter(Boolean);
+
+  const priorTopics = priorSummaries.flatMap((s) => {
+    try {
+      return JSON.parse(s!.topicsJson) as string[];
+    } catch {
+      return [];
+    }
+  });
+
+  const priorVocabFromSummary = priorSummaries.flatMap((s) => {
+    try {
+      return JSON.parse(s!.vocabJson) as Array<{
+        term: string;
+        reading?: string;
+        meaning?: string;
+      }>;
+    } catch {
+      return [];
+    }
+  });
+
+  const priorGrammarFromSummary = priorSummaries.flatMap((s) => {
+    try {
+      return JSON.parse(s!.grammarJson) as Array<{
+        pattern: string;
+        notes?: string;
+      }>;
+    } catch {
+      return [];
+    }
+  });
+
+  return {
+    studentName: lesson.student.name,
+    level: lesson.student.level,
+    courseType: lesson.student.courseType,
+    goals: lesson.student.goals,
+    priorTopics,
+    priorVocab:
+      priorVocabFromSummary.length > 0
+        ? priorVocabFromSummary
+        : lesson.student.vocabItems.map((v) => ({
+            term: v.term,
+            reading: v.reading,
+            meaning: v.meaning,
+          })),
+    priorGrammar:
+      priorGrammarFromSummary.length > 0
+        ? priorGrammarFromSummary
+        : lesson.student.grammarItems.map((g) => ({
+            pattern: g.pattern,
+            notes: g.notes,
+          })),
+    priorNextFocus: priorSummaries[0]?.nextFocus,
+  };
+}
+
 /** Import a Drive Doc into a lesson and generate summary. */
 export async function applyTranscriptToLesson(opts: {
   lessonId: string;
@@ -140,7 +238,10 @@ export async function applyTranscriptToLesson(opts: {
   driveFileId?: string | null;
   tags?: string[];
 }) {
-  const summary = await summarizeTranscript(opts.rawText);
+  const context = await buildSummarizeContext(opts.lessonId);
+  const summary = await summarizeTranscript(opts.rawText, context);
+  const data = summaryPersistData(summary);
+
   await prisma.lesson.update({
     where: { id: opts.lessonId },
     data: {
@@ -164,26 +265,8 @@ export async function applyTranscriptToLesson(opts: {
       },
       summary: {
         upsert: {
-          create: {
-            topicsJson: toJson(summary.topics),
-            vocabJson: toJson(summary.vocab),
-            grammarJson: toJson(summary.grammar),
-            mistakesJson: toJson(summary.mistakes),
-            homework: summary.homework,
-            nextFocus: summary.nextFocus,
-            notes: summary.notes,
-            approved: false,
-          },
-          update: {
-            topicsJson: toJson(summary.topics),
-            vocabJson: toJson(summary.vocab),
-            grammarJson: toJson(summary.grammar),
-            mistakesJson: toJson(summary.mistakes),
-            homework: summary.homework,
-            nextFocus: summary.nextFocus,
-            notes: summary.notes,
-            approved: false,
-          },
+          create: data,
+          update: data,
         },
       },
     },

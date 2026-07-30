@@ -10,7 +10,7 @@ import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ synced?: string }>;
+  searchParams: Promise<{ synced?: string; sync?: string }>;
 }) {
   const sp = await searchParams;
   const now = new Date();
@@ -23,6 +23,8 @@ export default async function CalendarPage({
 
   const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
 
+  // Do NOT sync Google on every navigation — that blocks the page for seconds.
+  // Sync only via "Sync now" action (or ?sync=1 after connect).
   let syncMeta: {
     imported: number;
     updated: number;
@@ -30,7 +32,7 @@ export default async function CalendarPage({
     scanned: number;
     skipped: number;
   } | null = null;
-  if (googleConnected) {
+  if (googleConnected && sp.sync === "1") {
     const result = await syncTeacherCalendar(teacher.id);
     if (result.ok) {
       syncMeta = {

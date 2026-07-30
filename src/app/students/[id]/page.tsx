@@ -9,6 +9,7 @@ import {
   updateStudent,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -47,7 +48,8 @@ export default async function StudentDetailPage({
     <AppShell active="students">
       <h1 className="h1">{student.name}</h1>
       <p className="muted">
-        {common("level")}: {student.level} · {student.email}
+        {common("course")}: {courseTypeLabel(student.courseType)} · {common("level")}:{" "}
+        {student.level} · {student.email}
         {student.archivedAt && ` · ${t("archived")}`}
       </p>
 
@@ -89,6 +91,16 @@ export default async function StudentDetailPage({
           <div className="field">
             <label htmlFor="email">{t("email")}</label>
             <input id="email" name="email" type="email" defaultValue={student.email} required />
+          </div>
+          <div className="field">
+            <label htmlFor="courseType">{common("course")}</label>
+            <select id="courseType" name="courseType" defaultValue={student.courseType}>
+              {COURSE_TYPES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="field">
             <label htmlFor="level">{common("level")}</label>
