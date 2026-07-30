@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { disconnectGoogle } from "@/app/actions";
+import { disconnectGoogle, saveTranscriptFolderId } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { getAiProvider } from "@/lib/ai";
 import { googleConfigured } from "@/lib/google";
@@ -32,12 +32,16 @@ export default async function SettingsPage({
         <h2 style={{ marginTop: 0 }}>{t("googleTitle")}</h2>
         <p>{t("google")}</p>
         {sp.google === "connected" && <p className="chip done">{t("googleConnectedBanner")}</p>}
+        {sp.google === "folder_saved" && <p className="chip done">{t("googleFolderSaved")}</p>}
         {sp.google === "missing_creds" && <p className="chip">{t("googleMissingCreds")}</p>}
-        {sp.google && sp.google !== "connected" && sp.google !== "missing_creds" && (
-          <p className="chip">
-            {t("googleError")}: {sp.google}
-          </p>
-        )}
+        {sp.google &&
+          sp.google !== "connected" &&
+          sp.google !== "missing_creds" &&
+          sp.google !== "folder_saved" && (
+            <p className="chip">
+              {t("googleError")}: {sp.google}
+            </p>
+          )}
         {connected ? (
           <>
             <p>
@@ -65,6 +69,25 @@ export default async function SettingsPage({
         )}
         <p style={{ marginTop: "1rem" }}>{t("stt")}</p>
         <p>{t("privacy")}</p>
+      </div>
+
+      <div className="panel">
+        <h2 style={{ marginTop: 0 }}>{t("driveTitle")}</h2>
+        <p className="muted">{t("driveExplain")}</p>
+        <form action={saveTranscriptFolderId}>
+          <div className="field">
+            <label htmlFor="googleTranscriptFolderId">{t("driveFolderLabel")}</label>
+            <input
+              id="googleTranscriptFolderId"
+              name="googleTranscriptFolderId"
+              placeholder={t("driveFolderPlaceholder")}
+              defaultValue={teacher.googleTranscriptFolderId ?? ""}
+            />
+          </div>
+          <button className="btn secondary" type="submit" disabled={!connected}>
+            {t("saveFolder")}
+          </button>
+        </form>
       </div>
 
       <div className="panel">

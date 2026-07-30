@@ -231,14 +231,27 @@ export async function updateCalendarEvent(opts: {
 export async function listRecentDriveDocs(opts: {
   accessToken: string;
   query?: string;
+  /** Prefer filename match (OR with fullText when both set). */
+  nameContains?: string;
   folderId?: string | null;
+  pageSize?: number;
 }) {
   const qParts = ["mimeType = 'application/vnd.google-apps.document'", "trashed = false"];
   if (opts.folderId) qParts.push(`'${opts.folderId}' in parents`);
-  if (opts.query) qParts.push(`fullText contains '${opts.query.replace(/'/g, "\\'")}'`);
+
+  const textFilters: string[] = [];
+  if (opts.nameContains) {
+    textFilters.push(`name contains '${opts.nameContains.replace(/'/g, "\\'")}'`);
+  }
+  if (opts.query) {
+    textFilters.push(`fullText contains '${opts.query.replace(/'/g, "\\'")}'`);
+  }
+  if (textFilters.length === 1) qParts.push(textFilters[0]);
+  else if (textFilters.length > 1) qParts.push(`(${textFilters.join(" or ")})`);
+
   const params = new URLSearchParams({
     q: qParts.join(" and "),
-    pageSize: "20",
+    pageSize: String(opts.pageSize ?? 25),
     fields: "files(id,name,createdTime,modifiedTime)",
     orderBy: "modifiedTime desc",
   });

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
-import { generatePrepDraft, summarizeTranscript } from "@/lib/ai";
+import { generatePrepDraft, getAiProvider } from "@/lib/ai";
+import { applyTranscriptToLesson, fetchAndImportDriveTranscript } from "@/lib/drive-transcript";
 import { prisma } from "@/lib/db";
 import {
   createCalendarMeetEvent,
@@ -111,54 +112,56 @@ export async function importTranscriptAndSummarize(formData: FormData) {
     .map((t) => t.trim())
     .filter(Boolean);
 
-  if (!lessonId || !rawText.trim()) {
-    throw new Error("Lesson and transcript are required");
+  if (!lessonId) {
+    redirect("/today?err=missing_lesson");
+  }
+  if (!rawText.trim()) {
+    redirect(`/lessons/${lessonId}?err=empty_transcript`);
   }
 
-  const summary = await summarizeTranscript(rawText);
-
-  await prisma.lesson.update({
-    where: { id: lessonId },
-    data: {
-      status: "completed",
-      transcriptStatus: "manual",
-      tagsJson: toJson(tags),
-      transcript: {
-        upsert: {
-          create: { source: "meet_import", rawText, editedText: rawText },
-          update: { source: "meet_import", rawText, editedText: rawText },
-        },
-      },
-      summary: {
-        upsert: {
-          create: {
-            topicsJson: toJson(summary.topics),
-            vocabJson: toJson(summary.vocab),
-            grammarJson: toJson(summary.grammar),
-            mistakesJson: toJson(summary.mistakes),
-            homework: summary.homework,
-            nextFocus: summary.nextFocus,
-            notes: summary.notes,
-            approved: false,
-          },
-          update: {
-            topicsJson: toJson(summary.topics),
-            vocabJson: toJson(summary.vocab),
-            grammarJson: toJson(summary.grammar),
-            mistakesJson: toJson(summary.mistakes),
-            homework: summary.homework,
-            nextFocus: summary.nextFocus,
-            notes: summary.notes,
-            approved: false,
-          },
-        },
-      },
-    },
+  await applyTranscriptToLesson({
+    lessonId,
+    rawText,
+    source: "meet_import",
+    tags,
   });
 
   revalidatePath(`/lessons/${lessonId}`);
   revalidatePath("/students");
   revalidatePath("/today");
+
+  const provider = getAiProvider();
+  const hasKey =
+    provider === "deepseek"
+      ? Boolean(process.env.DEEPSEEK_API_KEY)
+      : Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
+  redirect(`/lessons/${lessonId}?ok=summary${hasKey ? "" : "&warn=no_ai_key"}`);
+}
+
+export async function fetchDriveTranscriptForLesson(formData: FormData) {
+  const lessonId = String(formData.get("lessonId") ?? "");
+  if (!lessonId) redirect("/today?err=missing_lesson");
+
+  const result = await fetchAndImportDriveTranscript(lessonId);
+  revalidatePath(`/lessons/${lessonId}`);
+  revalidatePath("/students");
+  revalidatePath("/today");
+
+  if (result.status === "imported") {
+    redirect(`/lessons/${lessonId}?ok=drive&file=${encodeURIComponent(result.fileName ?? "")}`);
+  }
+  redirect(`/lessons/${lessonId}?err=drive_${result.status}`);
+}
+
+export async function saveTranscriptFolderId(formData: FormData) {
+  const teacher = await getTeacher();
+  const folderId = String(formData.get("googleTranscriptFolderId") ?? "").trim() || null;
+  await prisma.teacher.update({
+    where: { id: teacher.id },
+    data: { googleTranscriptFolderId: folderId },
+  });
+  revalidatePath("/settings");
+  redirect("/settings?google=folder_saved");
 }
 
 export async function approveSummary(formData: FormData) {
