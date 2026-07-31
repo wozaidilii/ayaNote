@@ -14,6 +14,8 @@ model Teacher {
   name                 String
   email                String    @unique
   locale               String    @default("ja")
+  /** IANA timezone for display & scheduling, e.g. Asia/Tokyo */
+  timezone             String    @default("Asia/Tokyo")
   googleRefreshToken   String?
   googleAccessToken    String?
   googleTokenExpiry    DateTime?

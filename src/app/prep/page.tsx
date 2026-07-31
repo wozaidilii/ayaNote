@@ -1,9 +1,9 @@
-import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { generateLessonPrep, savePrepDraft } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 
 export default async function PrepPage() {
   const [t, common, teacher] = await Promise.all([
@@ -11,6 +11,7 @@ export default async function PrepPage() {
     getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
+  const timeZone = normalizeTimezone(teacher.timezone);
   const lessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.id,
@@ -31,7 +32,7 @@ export default async function PrepPage() {
           <div className="list-row" style={{ borderBottom: 0, paddingTop: 0 }}>
             <div>
               <div style={{ fontWeight: 700 }}>
-                {lesson.student.name} · {format(lesson.startsAt, "MMM d HH:mm")}
+                {lesson.student.name} · {formatInTz(lesson.startsAt, "MMM d HH:mm", timeZone)}
               </div>
               <span className="chip">{lesson.prepStatus}</span>
             </div>

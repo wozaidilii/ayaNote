@@ -59,7 +59,7 @@
   },
   "calendar": {
     "title": "Google Calendar",
-    "subtitle": "Classes imported from your connected Google Calendar",
+    "subtitle": "Month view in your timezone — past and upcoming lessons",
     "connected": "GOOGLE CONNECTED",
     "notConnected": "GOOGLE NOT CONNECTED",
     "syncNote": "Connect Google to pull booked classes from your calendar into AyaNote.",
@@ -72,7 +72,7 @@
     "fromGoogle": "From Google",
     "openGoogle": "Open Google Calendar",
     "connectGoogle": "Connect Google",
-    "upcoming": "Upcoming bookings",
+    "upcoming": "Upcoming",
     "past": "Finished lessons",
     "pending": "Pending requests",
     "notStarted": "Not started",
@@ -80,7 +80,10 @@
     "prep": "Prep",
     "openPrep": "Open prep draft",
     "openRecord": "Open lesson record",
-    "joinMeet": "Join Meet"
+    "joinMeet": "Join Meet",
+    "timezone": "Timezone",
+    "todayBtn": "Today",
+    "noLessonsDay": "No lessons on this day."
   },
   "students": {
     "title": "Students",
@@ -161,6 +164,7 @@
     "hours": "Hours",
     "minNotice": "Min notice (hours)",
     "maxWeekly": "Max lessons / week",
+    "timezone": "Timezone",
     "bookings": "Pending booking requests",
     "blackouts": "Blackout dates",
     "blackoutReason": "Reason (optional)",
@@ -185,6 +189,11 @@
     "driveFolderLabel": "Transcript folder ID (optional)",
     "driveFolderPlaceholder": "e.g. 1abc… from drive.google.com/drive/folders/…",
     "saveFolder": "Save folder",
+    "timezoneTitle": "Timezone",
+    "timezoneExplain": "All lesson times are shown and booked in this timezone (default Asia/Tokyo). Vercel runs in UTC — without this, clocks look wrong.",
+    "timezoneLabel": "Your timezone",
+    "saveTimezone": "Save timezone",
+    "timezoneSaved": "Timezone saved.",
     "stt": "Primary capture: Drive auto-fetch (Lesson Room button or daily cron) + manual paste.",
     "privacy": "Students see summaries only by default."
   },

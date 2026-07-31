@@ -148,6 +148,7 @@ export async function createCalendarMeetEvent(opts: {
   description?: string;
   start: Date;
   end: Date;
+  timeZone?: string;
   attendeeEmail?: string;
   fallbackId: string;
 }): Promise<MeetCreateResult> {
@@ -158,11 +159,12 @@ export async function createCalendarMeetEvent(opts: {
     };
   }
 
+  const timeZone = opts.timeZone || "Asia/Tokyo";
   const body = {
     summary: opts.summary,
     description: opts.description ?? "AyaNote lesson",
-    start: { dateTime: opts.start.toISOString() },
-    end: { dateTime: opts.end.toISOString() },
+    start: { dateTime: opts.start.toISOString(), timeZone },
+    end: { dateTime: opts.end.toISOString(), timeZone },
     attendees: opts.attendeeEmail ? [{ email: opts.attendeeEmail }] : [],
     conferenceData: {
       createRequest: {
@@ -210,8 +212,10 @@ export async function updateCalendarEvent(opts: {
   eventId: string;
   start: Date;
   end: Date;
+  timeZone?: string;
 }) {
   if (opts.eventId.startsWith("demo-") || opts.eventId.startsWith("fallback-")) return;
+  const timeZone = opts.timeZone || "Asia/Tokyo";
   await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(opts.eventId)}`,
     {
@@ -221,8 +225,8 @@ export async function updateCalendarEvent(opts: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        start: { dateTime: opts.start.toISOString() },
-        end: { dateTime: opts.end.toISOString() },
+        start: { dateTime: opts.start.toISOString(), timeZone },
+        end: { dateTime: opts.end.toISOString(), timeZone },
       }),
     },
   );

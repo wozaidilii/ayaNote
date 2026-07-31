@@ -1,9 +1,9 @@
-import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { StudentSwitcher } from "@/components/student-switcher";
 import { getActiveStudent, listActiveStudentsForTeacher } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
+import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentHomePage() {
@@ -17,6 +17,7 @@ export default async function StudentHomePage() {
   const student = await prisma.student.findFirstOrThrow({
     where: { id: active.id },
     include: {
+      teacher: { select: { timezone: true } },
       progress: true,
       bookingRequests: {
         where: { status: "pending" },
@@ -32,12 +33,13 @@ export default async function StudentHomePage() {
     },
   });
   const next = student.lessons[0];
+  const timeZone = normalizeTimezone(student.teacher.timezone);
 
   return (
     <AppShell active="home" personName={student.name}>
       <h1 className="h1">{t("title")}</h1>
       <p className="muted">
-        {student.name} · {student.email}
+        {student.name} · {student.email} · {timeZone}
       </p>
 
       <StudentSwitcher
@@ -47,7 +49,9 @@ export default async function StudentHomePage() {
           id: s.id,
           name: s.name,
           email: s.email,
-          nextLabel: s.lessons[0] ? format(s.lessons[0].startsAt, "MMM d HH:mm") : undefined,
+          nextLabel: s.lessons[0]
+            ? formatInTz(s.lessons[0].startsAt, "MMM d HH:mm", timeZone)
+            : undefined,
         }))}
       />
 
@@ -57,10 +61,10 @@ export default async function StudentHomePage() {
           {next ? (
             <>
               <p style={{ fontSize: "1.2rem", fontWeight: 700 }}>
-                {format(next.startsAt, "yyyy-MM-dd HH:mm")}
+                {formatInTz(next.startsAt, "yyyy-MM-dd HH:mm", timeZone)}
                 <span className="muted" style={{ fontWeight: 500 }}>
                   {" "}
-                  – {format(next.endsAt, "HH:mm")}
+                  – {formatInTz(next.endsAt, "HH:mm", timeZone)}
                 </span>
               </p>
               <p>
@@ -88,7 +92,7 @@ export default async function StudentHomePage() {
               <h3>{t("pending")}</h3>
               {student.bookingRequests.map((b) => (
                 <p key={b.id} className="muted" style={{ margin: "0.3rem 0" }}>
-                  {format(b.requestedStart, "MMM d HH:mm")} · {b.status}
+                  {formatInTz(b.requestedStart, "MMM d HH:mm", timeZone)} · {b.status}
                 </p>
               ))}
             </div>
@@ -103,7 +107,10 @@ export default async function StudentHomePage() {
             <strong>{common("topics")}:</strong>{" "}
             {parseJsonArray(student.progress?.topicsCoveredJson).join(" · ") || "—"}
           </p>
-          <p className="muted">{student.progress?.note}</p>
+          <p>
+            <strong>{common("weaknesses")}:</strong>{" "}
+            {parseJsonArray(student.progress?.weaknessesJson).join(" · ") || "—"}
+          </p>
         </div>
       </div>
     </AppShell>

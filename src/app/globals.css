@@ -401,6 +401,152 @@ a {
   font-weight: 700;
 }
 
+/* —— Month calendar (Google-like) —— */
+
+.month-cal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.month-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.month-cal-title {
+  margin: 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  min-width: 7.5rem;
+  text-align: center;
+}
+
+.month-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--page);
+}
+
+.month-cal-head {
+  padding: 8px 6px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-align: center;
+  background: var(--canvas);
+}
+
+.month-cal-cell {
+  min-height: 96px;
+  padding: 6px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--page);
+  color: inherit;
+  transition: background 0.12s ease;
+}
+
+.month-cal-cell:hover {
+  background: var(--blue-soft);
+}
+
+.month-cal-cell.is-out {
+  background: #fafbfc;
+  color: var(--ink-subtle);
+}
+
+.month-cal-cell.is-today .month-cal-daynum {
+  background: var(--blue);
+  color: #fff;
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.month-cal-cell.is-selected {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.month-cal-daynum {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.month-cal-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+}
+
+.month-cal-event {
+  font-size: 11px;
+  line-height: 1.25;
+  padding: 2px 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-cal-event.is-upcoming {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.month-cal-event.is-past {
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+
+.month-cal-event-time {
+  font-weight: 700;
+}
+
+.month-cal-more {
+  font-size: 10px;
+  color: var(--ink-soft);
+  padding-left: 4px;
+}
+
+.month-cal-detail {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 720px) {
+  .month-cal-cell {
+    min-height: 72px;
+    padding: 4px;
+  }
+
+  .month-cal-event {
+    font-size: 10px;
+  }
+
+  .month-cal-event-time {
+    display: block;
+  }
+}
+
 .pixel-banner {
   display: inline-flex;
   align-items: center;

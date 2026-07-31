@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import {
@@ -11,6 +10,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { formatInTz, normalizeTimezone, ymdInTz } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentDetailPage({
@@ -24,6 +24,7 @@ export default async function StudentDetailPage({
   const student = await prisma.student.findUnique({
     where: { id },
     include: {
+      teacher: { select: { timezone: true } },
       progress: true,
       vocabItems: { orderBy: { createdAt: "desc" }, take: 8 },
       grammarItems: { orderBy: { createdAt: "desc" }, take: 8 },
@@ -35,6 +36,8 @@ export default async function StudentDetailPage({
     },
   });
   if (!student) notFound();
+
+  const timeZone = normalizeTimezone(student.teacher.timezone);
 
   const nextLesson = student.lessons
     .filter((l) => l.status === "scheduled" && l.startsAt >= new Date())
@@ -64,7 +67,7 @@ export default async function StudentDetailPage({
         {nextLesson && (
           <>
             <Link className="btn" href={`/lessons/${nextLesson.id}`}>
-              {t("nextLesson")}: {format(nextLesson.startsAt, "MMM d HH:mm")}
+              {t("nextLesson")}: {formatInTz(nextLesson.startsAt, "MMM d HH:mm", timeZone)}
             </Link>
             {nextLesson.prepDraft && (
               <Link className="btn secondary" href={`/prep#lesson-${nextLesson.id}`}>
@@ -155,7 +158,7 @@ export default async function StudentDetailPage({
           )}
           {student.inviteTokenExpiresAt && (
             <p className="muted" style={{ fontSize: "0.85rem" }}>
-              {t("inviteExpires")}: {format(student.inviteTokenExpiresAt, "yyyy-MM-dd")}
+              {t("inviteExpires")}: {ymdInTz(student.inviteTokenExpiresAt, timeZone)}
             </p>
           )}
           <form action={regenerateInviteToken} style={{ marginTop: "0.6rem" }}>
@@ -190,7 +193,9 @@ export default async function StudentDetailPage({
         {student.lessons.map((lesson) => (
           <div className="list-row" key={lesson.id}>
             <div>
-              <div style={{ fontWeight: 650 }}>{format(lesson.startsAt, "yyyy-MM-dd HH:mm")}</div>
+              <div style={{ fontWeight: 650 }}>
+                {formatInTz(lesson.startsAt, "yyyy-MM-dd HH:mm", timeZone)}
+              </div>
               <div className="muted">{lesson.summary?.nextFocus || lesson.status}</div>
             </div>
             <Link className="btn ghost" href={`/lessons/${lesson.id}`}>

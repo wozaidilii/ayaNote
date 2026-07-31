@@ -37,6 +37,7 @@ export default async function StudentBookPage() {
     minNoticeHours: teacher.availabilityRules?.minNoticeHours ?? 24,
     slotMinutes: 60,
     maxWeeklyLessons: teacher.availabilityRules?.maxWeeklyLessons ?? 6,
+    timezone: teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
   };
 
   const [busyLessons, pending] = await Promise.all([
@@ -70,7 +71,7 @@ export default async function StudentBookPage() {
       .map((l) => l.startsAt),
     days: 14,
   });
-  const days = groupSlotsByDay(slots).map((d) => ({
+  const days = groupSlotsByDay(slots, rules.timezone).map((d) => ({
     dayKey: d.dayKey,
     label: d.label,
     slots: d.slots.map((s) => s.toISOString()),
@@ -90,6 +91,7 @@ export default async function StudentBookPage() {
 
       <SlotPicker
         days={days}
+        timeZone={rules.timezone}
         nextLessonId={studentUpcoming[0]?.id}
         bookings={student.bookingRequests.map((b) => ({
           id: b.id,

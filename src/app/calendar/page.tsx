@@ -1,16 +1,25 @@
-import Link from "next/link";
-import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { decideBooking, syncGoogleCalendar } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { MonthCalendar, type CalendarLessonItem } from "@/components/month-calendar";
 import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import {
+  dayBoundsInTz,
+  formatInTz,
+  monthGridYm,
+  normalizeTimezone,
+  parseMonthParam,
+  shiftMonth,
+  wallTimeToUtc,
+  ymdInTz,
+} from "@/lib/timezone";
 
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ synced?: string; sync?: string }>;
+  searchParams: Promise<{ synced?: string; sync?: string; month?: string; day?: string }>;
 }) {
   const sp = await searchParams;
   const now = new Date();
@@ -18,13 +27,23 @@ export default async function CalendarPage({
   const [t, common, teacher] = await Promise.all([
     getTranslations("calendar"),
     getTranslations("common"),
-    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
+    prisma.teacher.findUniqueOrThrow({
+      where: { email: DEMO_TEACHER_EMAIL },
+      include: { availabilityRules: true },
+    }),
   ]);
+
+  const timeZone = normalizeTimezone(
+    teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
+  );
+  const month = parseMonthParam(sp.month, timeZone, now, teacher.locale || "ja");
+  const todayYmd = ymdInTz(now, timeZone);
+  const weeks = monthGridYm(month.year, month.monthIndex0, timeZone);
+  const prevMonth = shiftMonth(month.year, month.monthIndex0, -1);
+  const nextMonth = shiftMonth(month.year, month.monthIndex0, 1);
 
   const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
 
-  // Do NOT sync Google on every navigation — that blocks the page for seconds.
-  // Sync only via "Sync now" action (or ?sync=1 after connect).
   let syncMeta: {
     imported: number;
     updated: number;
@@ -45,11 +64,26 @@ export default async function CalendarPage({
     }
   }
 
+  // Load a wide window around the visible month (±8 days padding for week spill)
+  const monthStartYmd = `${month.year}-${String(month.monthIndex0 + 1).padStart(2, "0")}-01`;
+  const nextMonthKey = shiftMonth(month.year, month.monthIndex0, 1);
+  const monthStartNoon = wallTimeToUtc(monthStartYmd, "12:00", timeZone);
+  const monthEndNoon = wallTimeToUtc(`${nextMonthKey}-01`, "12:00", timeZone);
+  const paddedStart = dayBoundsInTz(
+    ymdInTz(new Date(monthStartNoon.getTime() - 8 * 86400000), timeZone),
+    timeZone,
+  ).start;
+  const paddedEnd = dayBoundsInTz(
+    ymdInTz(new Date(monthEndNoon.getTime() + 8 * 86400000), timeZone),
+    timeZone,
+  ).end;
+
   const [lessons, pending] = await Promise.all([
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
         status: { not: "cancelled" },
+        startsAt: { gte: paddedStart, lt: paddedEnd },
       },
       include: {
         student: true,
@@ -65,10 +99,19 @@ export default async function CalendarPage({
     }),
   ]);
 
-  const upcoming = lessons.filter((l) => l.status !== "completed" && l.startsAt >= now);
-  const past = lessons
-    .filter((l) => l.status === "completed" || l.startsAt < now)
-    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  const calendarLessons: CalendarLessonItem[] = lessons.map((lesson) => ({
+    id: lesson.id,
+    startsAt: lesson.startsAt.toISOString(),
+    endsAt: lesson.endsAt.toISOString(),
+    studentName: lesson.student.name,
+    status: lesson.status,
+    meetLink: lesson.meetLink,
+    prepStatus: lesson.prepStatus,
+    hasSummary: Boolean(lesson.summary),
+    fromGoogle: Boolean(lesson.calendarEventId && !lesson.calendarEventId.startsWith("demo-")),
+  }));
+
+  const locale = teacher.locale || "ja";
 
   return (
     <AppShell active="calendar">
@@ -124,7 +167,9 @@ export default async function CalendarPage({
                 <div style={{ fontWeight: 800 }}>
                   {b.student.name} · {b.type}
                 </div>
-                <div className="muted">{format(b.requestedStart, "yyyy-MM-dd HH:mm")}</div>
+                <div className="muted">
+                  {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)} ({timeZone})
+                </div>
               </div>
               <div style={{ display: "flex", gap: "0.4rem" }}>
                 <form action={decideBooking}>
@@ -148,68 +193,28 @@ export default async function CalendarPage({
       )}
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("upcoming")}</h2>
-        {upcoming.length === 0 && (
-          <p className="muted">{googleConnected ? t("emptySynced") : t("emptyNeedConnect")}</p>
-        )}
-        {upcoming.map((lesson) => (
-          <div className="list-row" key={lesson.id} id={`cal-${lesson.id}`}>
-            <div>
-              <div style={{ fontWeight: 800 }}>
-                {format(lesson.startsAt, "yyyy-MM-dd HH:mm")} – {format(lesson.endsAt, "HH:mm")}
-              </div>
-              <div className="muted">
-                {lesson.student.name} · {lesson.student.level}
-              </div>
-              <div style={{ marginTop: "0.35rem", display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
-                <span className="chip soon">{t("notStarted")}</span>
-                {lesson.calendarEventId && <span className="chip sky">{t("fromGoogle")}</span>}
-                <span className="chip">
-                  {t("prep")}: {lesson.prepStatus}
-                </span>
-                {lesson.prepDraft?.newFocus && (
-                  <span className="chip sky">{lesson.prepDraft.newFocus.slice(0, 42)}</span>
-                )}
-              </div>
-            </div>
-            <div style={{ display: "grid", gap: "0.4rem" }}>
-              {lesson.meetLink && (
-                <a className="btn" href={lesson.meetLink} target="_blank" rel="noreferrer">
-                  {t("joinMeet")}
-                </a>
-              )}
-              <Link className="btn secondary" href={`/prep#lesson-${lesson.id}`}>
-                {t("openPrep")}
-              </Link>
-              <Link className="btn ghost" href={`/lessons/${lesson.id}`}>
-                {common("openLesson")}
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("past")}</h2>
-        {past.length === 0 && <p className="muted">{common("noItems")}</p>}
-        {past.map((lesson) => (
-          <div className="list-row" key={lesson.id}>
-            <div>
-              <div style={{ fontWeight: 800 }}>
-                {format(lesson.startsAt, "yyyy-MM-dd HH:mm")} – {format(lesson.endsAt, "HH:mm")}
-              </div>
-              <div className="muted">
-                {lesson.student.name} · {lesson.summary?.nextFocus || lesson.status}
-              </div>
-              <div style={{ marginTop: "0.35rem" }}>
-                <span className="chip done">{t("finished")}</span>
-              </div>
-            </div>
-            <Link className="btn" href={`/lessons/${lesson.id}`}>
-              {t("openRecord")}
-            </Link>
-          </div>
-        ))}
+        <MonthCalendar
+          weeks={weeks}
+          lessons={calendarLessons}
+          timeZone={timeZone}
+          monthLabel={month.label}
+          prevMonth={prevMonth}
+          nextMonth={nextMonth}
+          todayYmd={todayYmd}
+          selectedYmd={sp.day}
+          locale={locale}
+          labels={{
+            timezone: t("timezone"),
+            today: t("todayBtn"),
+            openRecord: t("openRecord"),
+            openLesson: common("openLesson"),
+            joinMeet: t("joinMeet"),
+            openPrep: t("openPrep"),
+            finished: t("finished"),
+            upcoming: t("upcoming"),
+            noLessonsDay: t("noLessonsDay"),
+          }}
+        />
       </div>
     </AppShell>
   );

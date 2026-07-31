@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import {
@@ -9,6 +8,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 const TRANSCRIPT_STATUS_KEY: Record<
@@ -90,7 +90,9 @@ export default async function LessonRoomPage({
     <AppShell active="today">
       <h1 className="h1">{t("title")}</h1>
       <p className="muted">
-        {lesson.student.name} · {format(lesson.startsAt, "yyyy-MM-dd HH:mm")} · {t("subtitle")}
+        {lesson.student.name} ·{" "}
+        {formatInTz(lesson.startsAt, "yyyy-MM-dd HH:mm", normalizeTimezone(lesson.teacher.timezone))} ·{" "}
+        {t("subtitle")}
       </p>
 
       <div style={{ marginTop: "0.8rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>

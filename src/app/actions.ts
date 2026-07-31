@@ -14,9 +14,10 @@ import {
 } from "@/lib/google";
 import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
-import { LESSON_MINUTES } from "@/lib/scheduling";
+import { LESSON_MINUTES, blackoutDateFromYmd } from "@/lib/scheduling";
 import { DEMO_TEACHER_EMAIL, type AppRole } from "@/lib/session";
 import { getActiveStudent } from "@/lib/active-student";
+import { formatInTz, normalizeTimezone, parseIsoOrLocal } from "@/lib/timezone";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
 export async function setRole(role: AppRole) {
@@ -82,6 +83,7 @@ async function attachMeetToLesson(opts: {
   studentEmail: string;
   startsAt: Date;
   endsAt: Date;
+  timeZone?: string;
 }) {
   const accessToken = await teacherAccessToken(opts.teacherId);
   const meet = await createCalendarMeetEvent({
@@ -90,6 +92,7 @@ async function attachMeetToLesson(opts: {
     description: "Japanese lesson via AyaNote",
     start: opts.startsAt,
     end: opts.endsAt,
+    timeZone: opts.timeZone,
     attendeeEmail: opts.studentEmail,
     fallbackId: opts.lessonId,
   });
@@ -355,6 +358,9 @@ export async function savePrepDraft(formData: FormData) {
 
 export async function updateAvailability(formData: FormData) {
   const teacher = await getTeacher();
+  const timezone = normalizeTimezone(
+    String(formData.get("timezone") ?? teacher.timezone ?? "Asia/Tokyo"),
+  );
   await prisma.availabilityRule.upsert({
     where: { teacherId: teacher.id },
     create: {
@@ -365,6 +371,7 @@ export async function updateAvailability(formData: FormData) {
       maxWeeklyLessons: Number(formData.get("maxWeeklyLessons") ?? 6),
       weekdaysJson: String(formData.get("weekdaysJson") ?? "[1,2,3,4,5,6]"),
       slotMinutes: LESSON_MINUTES,
+      timezone,
     },
     update: {
       startTime: String(formData.get("startTime") ?? "10:00"),
@@ -373,17 +380,44 @@ export async function updateAvailability(formData: FormData) {
       maxWeeklyLessons: Number(formData.get("maxWeeklyLessons") ?? 6),
       weekdaysJson: String(formData.get("weekdaysJson") ?? "[1,2,3,4,5,6]"),
       slotMinutes: LESSON_MINUTES,
+      timezone,
     },
+  });
+  await prisma.teacher.update({
+    where: { id: teacher.id },
+    data: { timezone },
   });
   revalidatePath("/availability");
   revalidatePath("/student/book");
+  revalidatePath("/calendar");
+  revalidatePath("/today");
+}
+
+export async function saveTeacherTimezone(formData: FormData) {
+  const teacher = await getTeacher();
+  const timezone = normalizeTimezone(String(formData.get("timezone") ?? "Asia/Tokyo"));
+  await prisma.teacher.update({
+    where: { id: teacher.id },
+    data: { timezone },
+  });
+  await prisma.availabilityRule.upsert({
+    where: { teacherId: teacher.id },
+    create: { teacherId: teacher.id, timezone },
+    update: { timezone },
+  });
+  revalidatePath("/settings");
+  revalidatePath("/calendar");
+  revalidatePath("/today");
+  revalidatePath("/availability");
+  revalidatePath("/student/book");
+  redirect("/settings?google=timezone_saved");
 }
 
 export async function addBlackoutDate(formData: FormData) {
   const teacher = await getTeacher();
   const dateStr = String(formData.get("date") ?? "");
   const reason = String(formData.get("reason") ?? "");
-  const date = new Date(`${dateStr}T00:00:00`);
+  const date = blackoutDateFromYmd(dateStr, teacher.timezone);
   if (Number.isNaN(date.getTime())) throw new Error("Invalid blackout date");
 
   await prisma.blackoutDate.create({
@@ -424,6 +458,12 @@ export async function decideBooking(formData: FormData) {
 
     await prisma.bookingRequest.update({ where: { id }, data: { status: "approved" } });
 
+    const teacherTz = await prisma.teacher.findUnique({
+      where: { id: request.teacherId },
+      select: { timezone: true },
+    });
+    const timeZone = normalizeTimezone(teacherTz?.timezone);
+
     if (request.type === "reschedule" && request.lessonId) {
       const lesson = await prisma.lesson.update({
         where: { id: request.lessonId },
@@ -439,6 +479,7 @@ export async function decideBooking(formData: FormData) {
           eventId: lesson.calendarEventId,
           start: request.requestedStart,
           end: request.requestedEnd,
+          timeZone,
         });
       } else {
         await attachMeetToLesson({
@@ -448,6 +489,7 @@ export async function decideBooking(formData: FormData) {
           studentEmail: request.student.email,
           startsAt: request.requestedStart,
           endsAt: request.requestedEnd,
+          timeZone,
         });
       }
     } else if (request.type === "book") {
@@ -469,6 +511,7 @@ export async function decideBooking(formData: FormData) {
         studentEmail: request.student.email,
         startsAt: request.requestedStart,
         endsAt: request.requestedEnd,
+        timeZone,
       });
     }
   } else {
@@ -486,12 +529,13 @@ export async function createBookingRequest(formData: FormData) {
   const teacher = await getTeacher();
   const student = await getDemoStudent();
   const type = String(formData.get("type") ?? "book");
-  const start = new Date(String(formData.get("requestedStart") ?? ""));
+  const start = parseIsoOrLocal(String(formData.get("requestedStart") ?? ""));
   const note = String(formData.get("note") ?? "");
   if (Number.isNaN(start.getTime())) throw new Error("Invalid start time");
 
-  const minutes = start.getMinutes();
-  if (minutes !== 0 && minutes !== 30) {
+  const tz = normalizeTimezone(teacher.timezone);
+  const minute = formatInTz(start, "mm", tz);
+  if (minute !== "00" && minute !== "30") {
     throw new Error("Lessons must start on the hour or half-hour (e.g. 15:00 / 15:30)");
   }
 

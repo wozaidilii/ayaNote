@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import {
   addBlackoutDate,
@@ -9,8 +8,9 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { AvailabilityForm } from "@/components/availability-form";
 import { prisma } from "@/lib/db";
-import { parseJsonArray } from "@/lib/utils";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { formatInTz, normalizeTimezone, ymdInTz } from "@/lib/timezone";
+import { parseJsonArray } from "@/lib/utils";
 
 export default async function AvailabilityPage() {
   const [t, common, teacher] = await Promise.all([
@@ -25,6 +25,7 @@ export default async function AvailabilityPage() {
     }),
   ]);
   const rules = teacher.availabilityRules;
+  const timeZone = normalizeTimezone(teacher.timezone || rules?.timezone);
   const bookings = await prisma.bookingRequest.findMany({
     where: { teacherId: teacher.id, status: "pending" },
     include: { student: true },
@@ -34,7 +35,9 @@ export default async function AvailabilityPage() {
   return (
     <AppShell active="availability">
       <h1 className="h1">{t("title")}</h1>
-      <p className="muted">{t("subtitle")}</p>
+      <p className="muted">
+        {t("subtitle")} · {timeZone}
+      </p>
 
       <AvailabilityForm
         action={updateAvailability}
@@ -44,12 +47,14 @@ export default async function AvailabilityPage() {
           minNoticeHours: rules?.minNoticeHours ?? 24,
           maxWeeklyLessons: rules?.maxWeeklyLessons ?? 6,
           weekdays: parseJsonArray(rules?.weekdaysJson ?? "[1,2,3,4,5,6]").map(Number),
+          timezone: timeZone,
         }}
         labels={{
           hours: t("hours"),
           weekdays: t("weekdays"),
           minNotice: t("minNotice"),
           maxWeekly: t("maxWeekly"),
+          timezone: t("timezone"),
           save: common("save"),
         }}
       />
@@ -71,7 +76,7 @@ export default async function AvailabilityPage() {
         {teacher.blackoutDates.map((b) => (
           <div className="list-row" key={b.id}>
             <div>
-              <div style={{ fontWeight: 700 }}>{format(b.date, "yyyy-MM-dd")}</div>
+              <div style={{ fontWeight: 700 }}>{ymdInTz(b.date, timeZone)}</div>
               <div className="muted">{b.reason || "—"}</div>
             </div>
             <form action={removeBlackoutDate}>
@@ -94,7 +99,7 @@ export default async function AvailabilityPage() {
                 {b.student.name} · {b.type}
               </div>
               <div className="muted">
-                {format(b.requestedStart, "yyyy-MM-dd HH:mm")} — {b.note || "—"}
+                {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)} — {b.note || "—"}
               </div>
             </div>
             <div style={{ display: "flex", gap: "0.4rem" }}>

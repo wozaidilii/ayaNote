@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { format } from "date-fns";
 import { cancelBookingRequest, createBookingRequest } from "@/app/actions";
 import { LESSON_MINUTES, toDatetimeLocalValue } from "@/lib/scheduling";
+import { DEFAULT_TIMEZONE, formatInTz } from "@/lib/timezone";
 
 type DayGroup = {
   dayKey: string;
@@ -24,6 +24,7 @@ export function SlotPicker({
   labels,
   nextLessonId,
   bookings,
+  timeZone = DEFAULT_TIMEZONE,
 }: {
   days: DayGroup[];
   labels: {
@@ -40,6 +41,7 @@ export function SlotPicker({
   };
   nextLessonId?: string;
   bookings?: BookingRow[];
+  timeZone?: string;
 }) {
   const [selected, setSelected] = useState<string>(days[0]?.slots[0] ?? "");
   const [type, setType] = useState<"book" | "reschedule">("book");
@@ -88,7 +90,12 @@ export function SlotPicker({
           </div>
         </div>
 
-        <p style={{ fontWeight: 700, marginBottom: "0.6rem" }}>{labels.pickSlot}</p>
+        <p style={{ fontWeight: 700, marginBottom: "0.6rem" }}>
+          {labels.pickSlot}{" "}
+          <span className="chip sky" style={{ fontWeight: 600 }}>
+            {timeZone}
+          </span>
+        </p>
         {days.length === 0 && <p className="muted">{labels.noSlots}</p>}
 
         {days.map((day) => (
@@ -108,7 +115,7 @@ export function SlotPicker({
                       setConfirming(false);
                     }}
                   >
-                    {format(d, "HH:mm")}
+                    {formatInTz(d, "HH:mm", timeZone)}
                     <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>+1h</div>
                   </button>
                 );
@@ -121,11 +128,15 @@ export function SlotPicker({
           <div className="panel" style={{ marginTop: "0.9rem", background: "var(--paper)" }}>
             <p style={{ margin: 0, fontWeight: 700 }}>{labels.confirm}</p>
             <p style={{ margin: "0.4rem 0 0" }}>
-              {format(selectedDate, "EEE · yyyy-MM-dd HH:mm")} →{" "}
-              {format(new Date(selectedDate.getTime() + LESSON_MINUTES * 60_000), "HH:mm")}
+              {formatInTz(selectedDate, "EEE · yyyy-MM-dd HH:mm", timeZone)} →{" "}
+              {formatInTz(
+                new Date(selectedDate.getTime() + LESSON_MINUTES * 60_000),
+                "HH:mm",
+                timeZone,
+              )}
             </p>
             <p className="muted" style={{ margin: "0.25rem 0 0" }}>
-              {labels.duration}: {LESSON_MINUTES} min
+              {labels.duration}: {LESSON_MINUTES} min · {timeZone}
             </p>
           </div>
         )}
@@ -158,7 +169,7 @@ export function SlotPicker({
             <div className="list-row" key={b.id}>
               <div>
                 <div style={{ fontWeight: 800 }}>
-                  {b.type} · {format(new Date(b.requestedStart), "yyyy-MM-dd HH:mm")} (+1h)
+                  {b.type} · {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)} (+1h)
                 </div>
                 <div className="muted">{b.note || "—"}</div>
               </div>

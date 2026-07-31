@@ -59,7 +59,7 @@
   },
   "calendar": {
     "title": "Googleカレンダー",
-    "subtitle": "連携したGoogleカレンダーから授業を取り込みます",
+    "subtitle": "タイムゾーン基準の月カレンダー — 過去・これから両方",
     "connected": "GOOGLE連携済み",
     "notConnected": "GOOGLE未連携",
     "syncNote": "Googleを接続すると、カレンダー上の予約済み授業がAyaNoteに入ります。",
@@ -72,7 +72,7 @@
     "fromGoogle": "Googleから",
     "openGoogle": "Googleカレンダーを開く",
     "connectGoogle": "Googleを接続",
-    "upcoming": "これから（予約済み）",
+    "upcoming": "予定",
     "past": "終了したレッスン",
     "pending": "保留中のリクエスト",
     "notStarted": "未開始",
@@ -80,7 +80,10 @@
     "prep": "教案",
     "openPrep": "教案を開く",
     "openRecord": "授業記録を開く",
-    "joinMeet": "Meetに入る"
+    "joinMeet": "Meetに入る",
+    "timezone": "タイムゾーン",
+    "todayBtn": "今日",
+    "noLessonsDay": "この日のレッスンはありません。"
   },
   "students": {
     "title": "生徒",
@@ -161,6 +164,7 @@
     "hours": "時間帯",
     "minNotice": "最低事前通知（時間）",
     "maxWeekly": "週あたり最大レッスン数",
+    "timezone": "タイムゾーン",
     "bookings": "保留中の予約リクエスト",
     "blackouts": "休講日",
     "blackoutReason": "理由（任意）",
@@ -185,6 +189,11 @@
     "driveFolderLabel": "転写フォルダID（任意）",
     "driveFolderPlaceholder": "例: drive.google.com/drive/folders/ の後ろのID",
     "saveFolder": "フォルダを保存",
+    "timezoneTitle": "タイムゾーン",
+    "timezoneExplain": "レッスン時刻の表示・予約はこのタイムゾーンで統一します（既定: Asia/Tokyo）。サーバーはUTCのため、未設定だと時間がずれて見えます。",
+    "timezoneLabel": "タイムゾーン",
+    "saveTimezone": "タイムゾーンを保存",
+    "timezoneSaved": "タイムゾーンを保存しました。",
     "stt": "主な取り込み：Drive取得（レッスンルームのボタン or 日次cron）+ 手動貼り付け。",
     "privacy": "生徒にはデフォルトで要約のみ表示します。"
   },

@@ -1,22 +1,20 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { formatInTz, normalizeTimezone, rollingDayWindowInTz } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function TodayPage() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 2);
-
   const [t, common, teacher] = await Promise.all([
     getTranslations("today"),
     getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
+
+  const timeZone = normalizeTimezone(teacher.timezone);
+  const { start, end } = rollingDayWindowInTz(timeZone, 2);
 
   const lessons = await prisma.lesson.findMany({
     where: {
@@ -44,7 +42,9 @@ export default async function TodayPage() {
   return (
     <AppShell active="today">
       <h1 className="h1">{t("title")}</h1>
-      <p className="muted">{t("subtitle")}</p>
+      <p className="muted">
+        {t("subtitle")} · {timeZone}
+      </p>
       <div className="panel" style={{ marginTop: "1.2rem" }}>
         {lessons.length === 0 && <p className="muted">{common("noItems")}</p>}
         {lessons.map((lesson) => {
@@ -56,7 +56,7 @@ export default async function TodayPage() {
               <div>
                 <div style={{ fontWeight: 700 }}>{lesson.student.name}</div>
                 <div className="muted" style={{ fontSize: "0.9rem" }}>
-                  {format(lesson.startsAt, "MMM d · HH:mm")} · {lesson.student.level}
+                  {formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone)} · {lesson.student.level}
                 </div>
                 <div style={{ marginTop: "0.35rem" }}>
                   <span className="chip">

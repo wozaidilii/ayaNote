@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { WEEKDAY_OPTIONS } from "@/lib/scheduling";
+import { TIMEZONE_OPTIONS } from "@/lib/timezone";
 
 export function AvailabilityForm({
   action,
@@ -15,12 +16,14 @@ export function AvailabilityForm({
     minNoticeHours: number;
     maxWeeklyLessons: number;
     weekdays: number[];
+    timezone: string;
   };
   labels: {
     hours: string;
     weekdays: string;
     minNotice: string;
     maxWeekly: string;
+    timezone: string;
     save: string;
   };
 }) {
@@ -34,6 +37,16 @@ export function AvailabilityForm({
   return (
     <form className="panel" action={action} style={{ marginTop: "1.2rem" }}>
       <input type="hidden" name="weekdaysJson" value={weekdaysJson} />
+      <div className="field">
+        <label htmlFor="timezone">{labels.timezone}</label>
+        <select id="timezone" name="timezone" defaultValue={defaults.timezone}>
+          {TIMEZONE_OPTIONS.map((z) => (
+            <option key={z.value} value={z.value}>
+              {z.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="grid-2">
         <div className="field">
           <label htmlFor="startTime">{labels.hours} start</label>
@@ -79,7 +92,7 @@ export function AvailabilityForm({
                 onClick={() => toggle(d.value)}
                 style={
                   on
-                    ? { background: "var(--sky)", color: "white", borderColor: "var(--sky)" }
+                    ? { background: "var(--blue)", color: "white", borderColor: "var(--blue)" }
                     : undefined
                 }
               >
