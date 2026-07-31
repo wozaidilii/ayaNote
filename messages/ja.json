@@ -173,7 +173,10 @@
     "sectionHomework": "宿題ネタ",
     "lastFocus": "前回フォーカス",
     "noDraft": "下書きを生成するか、このセクションにメモを書いてください…",
-    "sections": "教案セクション"
+    "sections": "教案セクション",
+    "generating": "下書き生成中… {done}/{total}",
+    "generateMissing": "未生成 {count} 件を生成",
+    "generateDone": "下書きの準備ができました。授業前に確認して完了にしてください。"
   },
   "availability": {
     "title": "空き時間",

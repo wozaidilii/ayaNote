@@ -276,7 +276,7 @@ export async function approveSummary(formData: FormData) {
   revalidatePath("/student/history");
 }
 
-export async function generateLessonPrep(lessonId: string) {
+async function writePrepDraftForLesson(lessonId: string) {
   const lesson = await prisma.lesson.findUniqueOrThrow({
     where: { id: lessonId },
     include: {
@@ -323,10 +323,71 @@ export async function generateLessonPrep(lessonId: string) {
     data: { prepStatus: "draft" },
   });
 
+  return { lessonId, draft };
+}
+
+function revalidatePrepSurfaces(lessonIds: string[] = []) {
   revalidatePath("/prep");
   revalidatePath("/today");
-  revalidatePath(`/lessons/${lessonId}`);
   revalidatePath("/calendar");
+  for (const id of lessonIds) {
+    revalidatePath(`/lessons/${id}`);
+  }
+}
+
+export async function generateLessonPrep(lessonId: string) {
+  await writePrepDraftForLesson(lessonId);
+  revalidatePrepSurfaces([lessonId]);
+}
+
+/** Fill missing prep drafts for upcoming lessons. Processes a small batch to stay within serverless time limits. */
+export async function generateMissingPrepBatch(lessonIds: string[]) {
+  const teacher = await getTeacher();
+  const uniqueIds = [...new Set(lessonIds.filter(Boolean))].slice(0, 4);
+  if (uniqueIds.length === 0) {
+    return { generated: [] as Awaited<ReturnType<typeof writePrepDraftForLesson>>[], skipped: 0 };
+  }
+
+  const owned = await prisma.lesson.findMany({
+    where: { id: { in: uniqueIds }, teacherId: teacher.id },
+    include: { prepDraft: true },
+  });
+  const byId = new Map(owned.map((l) => [l.id, l]));
+
+  const generated: Awaited<ReturnType<typeof writePrepDraftForLesson>>[] = [];
+  let skipped = 0;
+
+  for (const id of uniqueIds) {
+    const lesson = byId.get(id);
+    if (!lesson) {
+      skipped += 1;
+      continue;
+    }
+    const existing = lesson.prepDraft;
+    const hasContent = Boolean(
+      existing &&
+        (existing.warmup.trim() ||
+          existing.review.trim() ||
+          existing.newFocus.trim() ||
+          existing.practice.trim() ||
+          existing.homeworkSeed.trim()),
+    );
+    if (hasContent) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      generated.push(await writePrepDraftForLesson(id));
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  if (generated.length > 0) {
+    revalidatePrepSurfaces(generated.map((g) => g.lessonId));
+  }
+
+  return { generated, skipped };
 }
 
 export async function savePrepDraft(formData: FormData) {

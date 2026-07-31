@@ -173,7 +173,10 @@
     "sectionHomework": "Homework seed",
     "lastFocus": "Last focus",
     "noDraft": "Generate a draft or write notes for this section…",
-    "sections": "Prep sections"
+    "sections": "Prep sections",
+    "generating": "Generating drafts… {done}/{total}",
+    "generateMissing": "Generate {count} missing",
+    "generateDone": "Drafts ready — review and mark ready before class."
   },
   "availability": {
     "title": "Availability",

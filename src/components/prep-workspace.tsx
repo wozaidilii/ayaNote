@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { generateLessonPrep, savePrepDraft } from "@/app/actions";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  generateLessonPrep,
+  generateMissingPrepBatch,
+  savePrepDraft,
+} from "@/app/actions";
 
 export type PrepLessonItem = {
   id: string;
@@ -30,6 +35,26 @@ const SECTIONS = [
 ] as const;
 
 type SectionKey = (typeof SECTIONS)[number]["key"];
+type DraftFields = PrepLessonItem["draft"];
+
+function hasDraftContent(draft: DraftFields) {
+  return Boolean(
+    draft.warmup.trim() ||
+      draft.review.trim() ||
+      draft.newFocus.trim() ||
+      draft.practice.trim() ||
+      draft.homeworkSeed.trim(),
+  );
+}
+
+function missingDraftIds(
+  lessons: PrepLessonItem[],
+  drafts: Record<string, DraftFields>,
+) {
+  return lessons
+    .filter((l) => !hasDraftContent(drafts[l.id] ?? l.draft))
+    .map((l) => l.id);
+}
 
 export function PrepWorkspace({
   lessons,
@@ -50,16 +75,31 @@ export function PrepWorkspace({
     lastFocus: string;
     noDraft: string;
     sections: string;
+    generating: string;
+    generateMissing: string;
+    generateDone: string;
   };
 }) {
+  const router = useRouter();
   const [selectedId, setSelectedId] = useState(lessons[0]?.id ?? "");
   const [section, setSection] = useState<SectionKey>("warmup");
   const [drafts, setDrafts] = useState(() =>
     Object.fromEntries(lessons.map((l) => [l.id, { ...l.draft }])),
   );
+  const [statuses, setStatuses] = useState(() =>
+    Object.fromEntries(lessons.map((l) => [l.id, l.prepStatus])),
+  );
+  const [batchTotal, setBatchTotal] = useState(0);
+  const [batchDone, setBatchDone] = useState(0);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchMessage, setBatchMessage] = useState("");
+  const autoStarted = useRef(false);
+  const batchInFlight = useRef(false);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     setDrafts(Object.fromEntries(lessons.map((l) => [l.id, { ...l.draft }])));
+    setStatuses(Object.fromEntries(lessons.map((l) => [l.id, l.prepStatus])));
   }, [lessons]);
 
   useEffect(() => {
@@ -84,12 +124,57 @@ export function PrepWorkspace({
     return () => window.removeEventListener("hashchange", fromHash);
   }, [lessons]);
 
+  async function runBatch(ids: string[]) {
+    if (ids.length === 0 || batchInFlight.current) return;
+    batchInFlight.current = true;
+    setBatchRunning(true);
+    setBatchTotal(ids.length);
+    setBatchDone(0);
+    setBatchMessage("");
+
+    let queue = [...ids];
+    let completed = 0;
+
+    try {
+      while (queue.length > 0) {
+        const chunk = queue.slice(0, 4);
+        queue = queue.slice(4);
+        const result = await generateMissingPrepBatch(chunk);
+        for (const item of result.generated) {
+          setDrafts((prev) => ({
+            ...prev,
+            [item.lessonId]: { ...item.draft },
+          }));
+          setStatuses((prev) => ({ ...prev, [item.lessonId]: "draft" }));
+        }
+        completed += chunk.length;
+        setBatchDone(Math.min(completed, ids.length));
+      }
+      setBatchMessage(labels.generateDone);
+      startTransition(() => router.refresh());
+    } catch {
+      setBatchMessage(labels.generateDone);
+    } finally {
+      batchInFlight.current = false;
+      setBatchRunning(false);
+    }
+  }
+
+  useEffect(() => {
+    if (autoStarted.current || lessons.length === 0) return;
+    const missing = lessons.filter((l) => !hasDraftContent(l.draft)).map((l) => l.id);
+    if (missing.length === 0) return;
+    autoStarted.current = true;
+    void runBatch(missing);
+  }, [lessons]);
+
   const selected = useMemo(
     () => lessons.find((l) => l.id === selectedId) ?? lessons[0],
     [lessons, selectedId],
   );
 
   const currentDraft = selected ? drafts[selected.id] : null;
+  const missingCount = missingDraftIds(lessons, drafts).length;
 
   function selectLesson(id: string) {
     setSelectedId(id);
@@ -135,9 +220,37 @@ export function PrepWorkspace({
           <h2>{labels.queue}</h2>
           <span className="chip">{lessons.length}</span>
         </div>
+
+        {(batchRunning || batchMessage || missingCount > 0) && (
+          <div className="prep-batch-status">
+            {batchRunning ? (
+              <p className="muted">
+                {labels.generating
+                  .replace("{done}", String(batchDone))
+                  .replace("{total}", String(batchTotal))}
+              </p>
+            ) : batchMessage ? (
+              <p className="muted">{batchMessage}</p>
+            ) : null}
+            {!batchRunning && missingCount > 0 && (
+              <button
+                type="button"
+                className="btn secondary sm"
+                onClick={() => void runBatch(missingDraftIds(lessons, drafts))}
+              >
+                {labels.generateMissing.replace("{count}", String(missingCount))}
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="prep-queue-list">
           {lessons.map((lesson) => {
             const active = lesson.id === selected.id;
+            const status = statuses[lesson.id] ?? lesson.prepStatus;
+            const filling =
+              batchRunning &&
+              !hasDraftContent(drafts[lesson.id] ?? lesson.draft);
             return (
               <button
                 key={lesson.id}
@@ -149,8 +262,12 @@ export function PrepWorkspace({
                 <div className="prep-queue-name">{lesson.studentName}</div>
                 <div className="prep-queue-meta">{lesson.startsAtLabel}</div>
                 <div className="prep-queue-tags">
-                  <span className={`chip ${lesson.prepStatus === "ready" ? "done" : "soon"}`}>
-                    {lesson.prepStatus}
+                  <span
+                    className={`chip ${
+                      status === "ready" ? "done" : filling ? "soon" : status === "draft" ? "done" : "soon"
+                    }`}
+                  >
+                    {filling ? "…" : status}
                   </span>
                   <span className="chip">{lesson.courseLabel}</span>
                 </div>
@@ -177,7 +294,7 @@ export function PrepWorkspace({
           </div>
           <div className="list-row-actions">
             <form action={generateLessonPrep.bind(null, selected.id)}>
-              <button className="btn secondary sm" type="submit">
+              <button className="btn secondary sm" type="submit" disabled={batchRunning}>
                 {labels.regenerate}
               </button>
             </form>
@@ -217,7 +334,13 @@ export function PrepWorkspace({
               id={`prep-${selected.id}-${section}`}
               value={currentDraft[section]}
               onChange={(e) => updateField(section, e.target.value)}
-              placeholder={labels.noDraft}
+              placeholder={
+                batchRunning && !hasDraftContent(currentDraft)
+                  ? labels.generating
+                      .replace("{done}", String(batchDone))
+                      .replace("{total}", String(batchTotal))
+                  : labels.noDraft
+              }
               rows={14}
             />
           </div>

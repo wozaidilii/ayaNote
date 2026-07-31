@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 
+export const maxDuration = 60;
+
 export default async function PrepPage({
   searchParams,
 }: {
@@ -104,6 +106,9 @@ export default async function PrepPage({
           lastFocus: t("lastFocus"),
           noDraft: t("noDraft"),
           sections: t("sections"),
+          generating: t("generating"),
+          generateMissing: t("generateMissing"),
+          generateDone: t("generateDone"),
         }}
       />
     </AppShell>
