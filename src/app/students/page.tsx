@@ -62,15 +62,18 @@ export default async function StudentsPage({
 
   return (
     <AppShell active="students">
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
-        <div>
+      <header className="page-header">
+        <div className="page-header-text">
           <h1 className="h1">{t("title")}</h1>
           <p className="muted">{t("subtitle")}</p>
         </div>
-      </div>
+        <div className="page-header-actions">
+          <span className="chip">{students.length}</span>
+        </div>
+      </header>
 
       {sp.seeded === "1" && (
-        <p className="chip done" style={{ marginTop: "1rem" }}>
+        <p className="chip done" style={{ marginBottom: "1rem" }}>
           {t("seedDone", {
             created: sp.created ?? "0",
             students: sp.students ?? "0",
@@ -80,22 +83,28 @@ export default async function StudentsPage({
         </p>
       )}
       {sp.seedErr && (
-        <p className="chip" style={{ marginTop: "0.5rem" }}>
+        <p className="chip" style={{ marginBottom: "1rem" }}>
           {t("seedError")}: {decodeURIComponent(sp.seedErr)}
         </p>
       )}
 
-      <div className="panel" style={{ marginTop: "1.2rem" }}>
-        <h2 style={{ marginTop: 0 }}>{t("seedDriveTitle")}</h2>
-        <p className="muted">{t("seedDriveHint")}</p>
+      <div className="panel">
+        <div className="panel-header">
+          <h2>{t("seedDriveTitle")}</h2>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          {t("seedDriveHint")}
+        </p>
         {googleConnected ? (
-          <form action={seedMemoryFromDrive}>
+          <form action={seedMemoryFromDrive} style={{ marginTop: "12px" }}>
             <label
               style={{
                 display: "flex",
                 gap: "0.5rem",
                 alignItems: "center",
                 marginBottom: "0.8rem",
+                color: "var(--ink-soft)",
+                fontSize: "13px",
               }}
             >
               <input type="checkbox" name="force" value="1" />
@@ -113,6 +122,9 @@ export default async function StudentsPage({
       </div>
 
       <form className="panel" method="get">
+        <div className="panel-header">
+          <h2>{t("search")}</h2>
+        </div>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="q">{t("search")}</label>
@@ -130,7 +142,16 @@ export default async function StudentsPage({
             </select>
           </div>
         </div>
-        <label style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.8rem" }}>
+        <label
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "center",
+            marginBottom: "0.8rem",
+            color: "var(--ink-soft)",
+            fontSize: "13px",
+          }}
+        >
           <input type="checkbox" name="archived" value="1" defaultChecked={showArchived} />
           {t("showArchived")}
         </label>
@@ -140,7 +161,9 @@ export default async function StudentsPage({
       </form>
 
       <form className="panel" action={createStudent}>
-        <h2 style={{ marginTop: 0 }}>{t("addStudent")}</h2>
+        <div className="panel-header">
+          <h2>{t("addStudent")}</h2>
+        </div>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="name">{t("name")}</label>
@@ -171,7 +194,16 @@ export default async function StudentsPage({
           <label htmlFor="goals">{common("goals")}</label>
           <input id="goals" name="goals" />
         </div>
-        <label style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.8rem" }}>
+        <label
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "center",
+            marginBottom: "0.8rem",
+            color: "var(--ink-soft)",
+            fontSize: "13px",
+          }}
+        >
           <input type="checkbox" name="recordingConsent" />
           {t("consent")}
         </label>
@@ -181,37 +213,48 @@ export default async function StudentsPage({
       </form>
 
       <div className="panel">
-        {students.length === 0 && <p className="muted">{common("noItems")}</p>}
-        {students.map((student) => (
-          <div className="list-row" key={student.id}>
-            <div>
-              <div style={{ fontWeight: 700 }}>
-                {student.name}
-                {student.archivedAt && (
-                  <span className="chip" style={{ marginLeft: "0.4rem" }}>
-                    {t("archived")}
-                  </span>
-                )}
-              </div>
-              <div className="muted" style={{ fontSize: "0.9rem" }}>
-                {student.email} · {courseTypeLabel(student.courseType)} · {common("level")}:{" "}
-                {student.level} · {common("attendance")}: {student.progress?.attendanceCount ?? 0}
-              </div>
-              <div style={{ marginTop: "0.4rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
-                {parseJsonArray(student.progress?.weaknessesJson)
-                  .slice(0, 3)
-                  .map((w) => (
-                    <span className="chip" key={w}>
-                      {w}
+        <div className="panel-header">
+          <h2>{t("title")}</h2>
+          <span className="chip">{students.length}</span>
+        </div>
+        {students.length === 0 ? (
+          <div className="empty-state">
+            <p>{common("noItems")}</p>
+          </div>
+        ) : (
+          students.map((student) => (
+            <div className="list-row" key={student.id}>
+              <div className="list-row-main">
+                <div className="list-row-title">
+                  {student.name}
+                  {student.archivedAt && (
+                    <span className="chip" style={{ marginLeft: "0.4rem" }}>
+                      {t("archived")}
                     </span>
-                  ))}
+                  )}
+                </div>
+                <div className="list-row-meta">
+                  {student.email} · {courseTypeLabel(student.courseType)} · {common("level")}:{" "}
+                  {student.level} · {common("attendance")}: {student.progress?.attendanceCount ?? 0}
+                </div>
+                <div className="list-row-tags">
+                  {parseJsonArray(student.progress?.weaknessesJson)
+                    .slice(0, 3)
+                    .map((w) => (
+                      <span className="chip" key={w}>
+                        {w}
+                      </span>
+                    ))}
+                </div>
+              </div>
+              <div className="list-row-actions">
+                <Link className="btn secondary sm" href={`/students/${student.id}`}>
+                  Open
+                </Link>
               </div>
             </div>
-            <Link className="btn secondary" href={`/students/${student.id}`}>
-              Open
-            </Link>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </AppShell>
   );

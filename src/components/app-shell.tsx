@@ -31,13 +31,16 @@ export async function AppShell({
   ] as const;
 
   const links = role === "teacher" ? teacherLinks : studentLinks;
-  const spaceLabel = role === "teacher" ? "Teacher space" : "Student space";
+  const spaceLabel = role === "teacher" ? "Teacher" : "Student";
   const who = personName || (role === "teacher" ? "Ayano" : "Student");
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Primary">
         <Link href="/" className="brand">
+          <span className="brand-mark" aria-hidden>
+            あ
+          </span>
           {t("brand")}
         </Link>
         <p className="space-meta">
@@ -45,36 +48,40 @@ export async function AppShell({
         </p>
 
         <div className="nav-section">
-          <div className="nav-section-label">Pages</div>
-          <nav>
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="nav-link"
-                data-active={active === link.key}
-              >
-                {t(`nav.${link.key}`)}
-              </Link>
-            ))}
+          <div className="nav-section-label">Workspace</div>
+          <nav aria-label="Pages">
+            {links.map((link) => {
+              const isActive = active === link.key;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="nav-link"
+                  data-active={isActive}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  {t(`nav.${link.key}`)}
+                </Link>
+              );
+            })}
           </nav>
         </div>
 
         <div className="sidebar-actions">
           <form action={setLocale.bind(null, locale === "ja" ? "en" : "ja")}>
-            <button className="btn secondary" type="submit" style={{ width: "100%" }}>
+            <button className="btn secondary sm" type="submit" style={{ width: "100%" }}>
               {t("common.language")}: {locale.toUpperCase()}
             </button>
           </form>
           <form action={setRole.bind(null, role === "teacher" ? "student" : "teacher")}>
-            <button className="btn ghost" type="submit" style={{ width: "100%" }}>
+            <button className="btn ghost sm" type="submit" style={{ width: "100%" }}>
               {role === "teacher" ? t("nav.switchStudent") : t("nav.switchTeacher")}
             </button>
           </form>
         </div>
       </aside>
       <main className="main">
-        <div className="doc-page fade-in">{children}</div>
+        <div className="doc-page">{children}</div>
       </main>
     </div>
   );

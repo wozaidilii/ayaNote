@@ -139,74 +139,80 @@ export default async function CalendarPage({
 
   return (
     <AppShell active="calendar">
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">{t("subtitle")}</p>
-
-      <div className="panel" style={{ marginTop: "1.1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "0.8rem", flexWrap: "wrap" }}>
-          <div>
-            <span className="pixel-banner">
-              {googleConnected ? t("connected") : t("notConnected")}
-            </span>
-            <p style={{ margin: "0.7rem 0 0" }}>
-              {googleConnected ? t("syncNoteConnected") : t("syncNote")}
-            </p>
-            {sp.synced === "1" && <p className="chip done">{t("justSynced")}</p>}
-            {syncMeta && (
-              <p className="muted" style={{ marginTop: "0.5rem", fontSize: "0.85rem" }}>
-                {t("syncStats", {
-                  scanned: syncMeta.scanned,
-                  imported: syncMeta.imported,
-                  updated: syncMeta.updated,
-                  purged: syncMeta.purged,
-                })}
-              </p>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-            {!googleConnected ? (
-              <a className="btn" href="/api/google/connect">
-                {t("connectGoogle")}
-              </a>
-            ) : (
-              <form action={syncGoogleCalendar}>
-                <button className="btn" type="submit">
-                  {t("syncNow")}
-                </button>
-              </form>
-            )}
-            <a className="btn sky" href="https://calendar.google.com/" target="_blank" rel="noreferrer">
-              {t("openGoogle")}
-            </a>
-          </div>
+      <header className="page-header">
+        <div className="page-header-text">
+          <h1 className="h1">{t("title")}</h1>
+          <p className="muted">{t("subtitle")}</p>
         </div>
+        <div className="page-header-actions">
+          {!googleConnected ? (
+            <a className="btn" href="/api/google/connect">
+              {t("connectGoogle")}
+            </a>
+          ) : (
+            <form action={syncGoogleCalendar}>
+              <button className="btn" type="submit">
+                {t("syncNow")}
+              </button>
+            </form>
+          )}
+          <a className="btn secondary" href="https://calendar.google.com/" target="_blank" rel="noreferrer">
+            {t("openGoogle")}
+          </a>
+        </div>
+      </header>
+
+      <div className="panel">
+        <div className="panel-header">
+          <h2>{googleConnected ? t("connected") : t("notConnected")}</h2>
+          <span className={`chip ${googleConnected ? "done" : "soon"}`}>
+            {timeZone}
+          </span>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          {googleConnected ? t("syncNoteConnected") : t("syncNote")}
+        </p>
+        {sp.synced === "1" && <p className="chip done">{t("justSynced")}</p>}
+        {syncMeta && (
+          <p className="muted" style={{ marginTop: "0.5rem", fontSize: "0.85rem" }}>
+            {t("syncStats", {
+              scanned: syncMeta.scanned,
+              imported: syncMeta.imported,
+              updated: syncMeta.updated,
+              purged: syncMeta.purged,
+            })}
+          </p>
+        )}
       </div>
 
       {pending.length > 0 && (
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>{t("pending")}</h2>
+          <div className="panel-header">
+            <h2>{t("pending")}</h2>
+            <span className="chip soon">{pending.length}</span>
+          </div>
           {pending.map((b) => (
             <div className="list-row" key={b.id}>
-              <div>
-                <div style={{ fontWeight: 800 }}>
+              <div className="list-row-main">
+                <div className="list-row-title">
                   {b.student.name} · {b.type}
                 </div>
-                <div className="muted">
-                  {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)} ({timeZone})
+                <div className="list-row-meta">
+                  {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "0.4rem" }}>
+              <div className="list-row-actions">
                 <form action={decideBooking}>
                   <input type="hidden" name="id" value={b.id} />
                   <input type="hidden" name="decision" value="approve" />
-                  <button className="btn" type="submit">
+                  <button className="btn sm" type="submit">
                     {common("approve")}
                   </button>
                 </form>
                 <form action={decideBooking}>
                   <input type="hidden" name="id" value={b.id} />
                   <input type="hidden" name="decision" value="decline" />
-                  <button className="btn danger" type="submit">
+                  <button className="btn danger sm" type="submit">
                     {common("decline")}
                   </button>
                 </form>
@@ -217,16 +223,20 @@ export default async function CalendarPage({
       )}
 
       <div className="panel">
-        <div className="cal-view-tabs">
+        <div className="cal-view-tabs" role="tablist" aria-label="Calendar view">
           <Link
             className={`btn ${view === "days" ? "" : "secondary"}`}
             href={`/calendar?view=days&start=${todayYmd}`}
+            role="tab"
+            aria-selected={view === "days"}
           >
             {t("viewDays")}
           </Link>
           <Link
             className={`btn ${view === "month" ? "" : "secondary"}`}
             href={`/calendar?view=month&month=${todayYmd.slice(0, 7)}`}
+            role="tab"
+            aria-selected={view === "month"}
           >
             {t("viewMonth")}
           </Link>

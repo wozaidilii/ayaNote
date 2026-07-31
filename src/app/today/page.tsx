@@ -7,9 +7,10 @@ import { formatInTz, normalizeTimezone, rollingDayWindowInTz } from "@/lib/timez
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function TodayPage() {
-  const [t, common, teacher] = await Promise.all([
+  const [t, common, nav, teacher] = await Promise.all([
     getTranslations("today"),
     getTranslations("common"),
+    getTranslations("nav"),
     prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
 
@@ -41,45 +42,74 @@ export default async function TodayPage() {
 
   return (
     <AppShell active="today">
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {t("subtitle")} · {timeZone}
-      </p>
-      <div className="panel" style={{ marginTop: "1.2rem" }}>
-        {lessons.length === 0 && <p className="muted">{common("noItems")}</p>}
-        {lessons.map((lesson) => {
-          const last = lesson.student.lessons[0]?.summary;
-          const focus =
-            last?.nextFocus || parseJsonArray(lesson.student.progress?.topicsCoveredJson)[0] || "—";
-          return (
-            <div className="list-row" key={lesson.id}>
-              <div>
-                <div style={{ fontWeight: 700 }}>{lesson.student.name}</div>
-                <div className="muted" style={{ fontSize: "0.9rem" }}>
-                  {formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone)} · {lesson.student.level}
+      <header className="page-header">
+        <div className="page-header-text">
+          <h1 className="h1">{t("title")}</h1>
+          <p className="muted">
+            {t("subtitle")} · {timeZone}
+          </p>
+        </div>
+        <div className="page-header-actions">
+          <Link className="btn secondary" href="/calendar">
+            {nav("calendar")}
+          </Link>
+          <Link className="btn secondary" href="/students">
+            {nav("students")}
+          </Link>
+        </div>
+      </header>
+
+      <div className="panel">
+        <div className="panel-header">
+          <h2>{t("title")}</h2>
+          <span className="chip">{lessons.length}</span>
+        </div>
+
+        {lessons.length === 0 ? (
+          <div className="empty-state">
+            <p>{common("noItems")}</p>
+            <Link className="btn secondary" href="/calendar?view=days">
+              {nav("calendar")}
+            </Link>
+          </div>
+        ) : (
+          lessons.map((lesson) => {
+            const last = lesson.student.lessons[0]?.summary;
+            const focus =
+              last?.nextFocus ||
+              parseJsonArray(lesson.student.progress?.topicsCoveredJson)[0] ||
+              "—";
+            return (
+              <div className="list-row" key={lesson.id}>
+                <div className="list-row-main">
+                  <div className="list-row-title">{lesson.student.name}</div>
+                  <div className="list-row-meta">
+                    {formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone)} ·{" "}
+                    {lesson.student.level}
+                  </div>
+                  <div className="list-row-tags">
+                    <span className="chip">
+                      {t("context")}: {focus}
+                    </span>
+                    <span className={`chip ${lesson.prepStatus === "ready" ? "done" : "soon"}`}>
+                      {t("prepStatus")}: {lesson.prepStatus}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ marginTop: "0.35rem" }}>
-                  <span className="chip">
-                    {t("context")}: {focus}
-                  </span>{" "}
-                  <span className="chip">
-                    {t("prepStatus")}: {lesson.prepStatus}
-                  </span>
+                <div className="list-row-actions">
+                  {lesson.meetLink && (
+                    <a className="btn sm" href={lesson.meetLink} target="_blank" rel="noreferrer">
+                      {t("joinMeet")}
+                    </a>
+                  )}
+                  <Link className="btn secondary sm" href={`/lessons/${lesson.id}`}>
+                    {common("openLesson")}
+                  </Link>
                 </div>
               </div>
-              <div style={{ display: "grid", gap: "0.4rem" }}>
-                {lesson.meetLink && (
-                  <a className="btn" href={lesson.meetLink} target="_blank" rel="noreferrer">
-                    {t("joinMeet")}
-                  </a>
-                )}
-                <Link className="btn secondary" href={`/lessons/${lesson.id}`}>
-                  {common("openLesson")}
-                </Link>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </AppShell>
   );
