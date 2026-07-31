@@ -164,7 +164,7 @@ export function MonthCalendar({
                   </a>
                 )}
                 {!past && (
-                  <Link className="btn secondary" href={`/prep#lesson-${lesson.id}`}>
+                  <Link className="btn secondary" href={`/prep?lesson=${lesson.id}#lesson-${lesson.id}`}>
                     {labels.openPrep}
                   </Link>
                 )}

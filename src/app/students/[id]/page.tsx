@@ -70,7 +70,7 @@ export default async function StudentDetailPage({
               {t("nextLesson")}: {formatInTz(nextLesson.startsAt, "MMM d HH:mm", timeZone)}
             </Link>
             {nextLesson.prepDraft && (
-              <Link className="btn secondary" href={`/prep#lesson-${nextLesson.id}`}>
+              <Link className="btn secondary" href={`/prep?lesson=${nextLesson.id}#lesson-${nextLesson.id}`}>
                 {t("openPrep")}
               </Link>
             )}

@@ -161,9 +161,19 @@
   },
   "prep": {
     "title": "Prep Queue",
-    "subtitle": "Review AI drafts before class",
+    "subtitle": "Prepare each student’s next lesson — switch students, then edit one section at a time",
     "markReady": "Mark ready",
-    "regenerate": "Regenerate draft"
+    "regenerate": "Regenerate draft",
+    "queue": "Next lessons",
+    "empty": "No upcoming lessons to prep. Sync Calendar or wait for bookings.",
+    "sectionWarmup": "Warmup",
+    "sectionReview": "Review",
+    "sectionNewFocus": "New focus",
+    "sectionPractice": "Practice",
+    "sectionHomework": "Homework seed",
+    "lastFocus": "Last focus",
+    "noDraft": "Generate a draft or write notes for this section…",
+    "sections": "Prep sections"
   },
   "availability": {
     "title": "Availability",

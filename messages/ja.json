@@ -161,9 +161,19 @@
   },
   "prep": {
     "title": "教案キュー",
-    "subtitle": "授業前にAI下書きを確認",
+    "subtitle": "生徒ごとの次回レッスンを準備 — 左で切り替え、右でセクション編集",
     "markReady": "準備完了にする",
-    "regenerate": "下書きを再生成"
+    "regenerate": "下書きを再生成",
+    "queue": "次回レッスン",
+    "empty": "準備するレッスンがありません。カレンダーを同期するか予約を待ってください。",
+    "sectionWarmup": "ウォームアップ",
+    "sectionReview": "復習",
+    "sectionNewFocus": "新フォーカス",
+    "sectionPractice": "練習",
+    "sectionHomework": "宿題ネタ",
+    "lastFocus": "前回フォーカス",
+    "noDraft": "下書きを生成するか、このセクションにメモを書いてください…",
+    "sections": "教案セクション"
   },
   "availability": {
     "title": "空き時間",
