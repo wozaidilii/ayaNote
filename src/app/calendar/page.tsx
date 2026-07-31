@@ -1,17 +1,21 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { decideBooking, syncGoogleCalendar } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { FiveDayCalendar } from "@/components/five-day-calendar";
 import { MonthCalendar, type CalendarLessonItem } from "@/components/month-calendar";
 import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 import {
+  consecutiveYmds,
   dayBoundsInTz,
   formatInTz,
   monthGridYm,
   normalizeTimezone,
   parseMonthParam,
   shiftMonth,
+  shiftYmd,
   wallTimeToUtc,
   ymdInTz,
 } from "@/lib/timezone";
@@ -19,10 +23,18 @@ import {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ synced?: string; sync?: string; month?: string; day?: string }>;
+  searchParams: Promise<{
+    synced?: string;
+    sync?: string;
+    month?: string;
+    day?: string;
+    view?: string;
+    start?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const now = new Date();
+  const view = sp.view === "month" ? "month" : "days";
 
   const [t, common, teacher] = await Promise.all([
     getTranslations("calendar"),
@@ -36,11 +48,17 @@ export default async function CalendarPage({
   const timeZone = normalizeTimezone(
     teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
   );
-  const month = parseMonthParam(sp.month, timeZone, now, teacher.locale || "ja");
   const todayYmd = ymdInTz(now, timeZone);
+  const month = parseMonthParam(sp.month, timeZone, now, teacher.locale || "ja");
   const weeks = monthGridYm(month.year, month.monthIndex0, timeZone);
   const prevMonth = shiftMonth(month.year, month.monthIndex0, -1);
   const nextMonth = shiftMonth(month.year, month.monthIndex0, 1);
+
+  const daysStart =
+    sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : todayYmd;
+  const fiveDays = consecutiveYmds(daysStart, 5, timeZone);
+  const prevStart = shiftYmd(daysStart, -5, timeZone);
+  const nextStart = shiftYmd(daysStart, 5, timeZone);
 
   const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
 
@@ -64,26 +82,32 @@ export default async function CalendarPage({
     }
   }
 
-  // Load a wide window around the visible month (±8 days padding for week spill)
   const monthStartYmd = `${month.year}-${String(month.monthIndex0 + 1).padStart(2, "0")}-01`;
   const nextMonthKey = shiftMonth(month.year, month.monthIndex0, 1);
   const monthStartNoon = wallTimeToUtc(monthStartYmd, "12:00", timeZone);
   const monthEndNoon = wallTimeToUtc(`${nextMonthKey}-01`, "12:00", timeZone);
-  const paddedStart = dayBoundsInTz(
+  const monthPaddedStart = dayBoundsInTz(
     ymdInTz(new Date(monthStartNoon.getTime() - 8 * 86400000), timeZone),
     timeZone,
   ).start;
-  const paddedEnd = dayBoundsInTz(
+  const monthPaddedEnd = dayBoundsInTz(
     ymdInTz(new Date(monthEndNoon.getTime() + 8 * 86400000), timeZone),
     timeZone,
   ).end;
+
+  const daysRangeStart = dayBoundsInTz(fiveDays[0], timeZone).start;
+  const daysRangeEnd = dayBoundsInTz(shiftYmd(fiveDays[fiveDays.length - 1], 1, timeZone), timeZone)
+    .start;
+
+  const rangeStart = view === "month" ? monthPaddedStart : daysRangeStart;
+  const rangeEnd = view === "month" ? monthPaddedEnd : daysRangeEnd;
 
   const [lessons, pending] = await Promise.all([
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
         status: { not: "cancelled" },
-        startsAt: { gte: paddedStart, lt: paddedEnd },
+        startsAt: { gte: rangeStart, lt: rangeEnd },
       },
       include: {
         student: true,
@@ -193,28 +217,61 @@ export default async function CalendarPage({
       )}
 
       <div className="panel">
-        <MonthCalendar
-          weeks={weeks}
-          lessons={calendarLessons}
-          timeZone={timeZone}
-          monthLabel={month.label}
-          prevMonth={prevMonth}
-          nextMonth={nextMonth}
-          todayYmd={todayYmd}
-          selectedYmd={sp.day}
-          locale={locale}
-          labels={{
-            timezone: t("timezone"),
-            today: t("todayBtn"),
-            openRecord: t("openRecord"),
-            openLesson: common("openLesson"),
-            joinMeet: t("joinMeet"),
-            openPrep: t("openPrep"),
-            finished: t("finished"),
-            upcoming: t("upcoming"),
-            noLessonsDay: t("noLessonsDay"),
-          }}
-        />
+        <div className="cal-view-tabs">
+          <Link
+            className={`btn ${view === "days" ? "" : "secondary"}`}
+            href={`/calendar?view=days&start=${todayYmd}`}
+          >
+            {t("viewDays")}
+          </Link>
+          <Link
+            className={`btn ${view === "month" ? "" : "secondary"}`}
+            href={`/calendar?view=month&month=${todayYmd.slice(0, 7)}`}
+          >
+            {t("viewMonth")}
+          </Link>
+        </div>
+
+        {view === "days" ? (
+          <FiveDayCalendar
+            days={fiveDays}
+            lessons={calendarLessons}
+            timeZone={timeZone}
+            todayYmd={todayYmd}
+            prevStart={prevStart}
+            nextStart={nextStart}
+            labels={{
+              timezone: t("timezone"),
+              today: t("todayBtn"),
+              openRecord: t("openRecord"),
+              openLesson: common("openLesson"),
+              joinMeet: t("joinMeet"),
+            }}
+          />
+        ) : (
+          <MonthCalendar
+            weeks={weeks}
+            lessons={calendarLessons}
+            timeZone={timeZone}
+            monthLabel={month.label}
+            prevMonth={prevMonth}
+            nextMonth={nextMonth}
+            todayYmd={todayYmd}
+            selectedYmd={sp.day}
+            locale={locale}
+            labels={{
+              timezone: t("timezone"),
+              today: t("todayBtn"),
+              openRecord: t("openRecord"),
+              openLesson: common("openLesson"),
+              joinMeet: t("joinMeet"),
+              openPrep: t("openPrep"),
+              finished: t("finished"),
+              upcoming: t("upcoming"),
+              noLessonsDay: t("noLessonsDay"),
+            }}
+          />
+        )}
       </div>
     </AppShell>
   );

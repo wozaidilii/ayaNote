@@ -532,6 +532,177 @@ a {
   margin-top: 0 !important;
 }
 
+.cal-view-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* —— 5-day schedule (Google-like) —— */
+
+.day5-cal {
+  margin-top: 4px;
+}
+
+.day5-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--page);
+}
+
+.day5-grid {
+  display: grid;
+  grid-template-columns: 52px repeat(5, minmax(110px, 1fr));
+  min-width: 720px;
+}
+
+.day5-gutter {
+  border-right: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.day5-corner {
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+}
+
+.day5-hours {
+  position: relative;
+}
+
+.day5-hour-label {
+  font-size: 10px;
+  color: var(--ink-subtle);
+  text-align: right;
+  padding-right: 6px;
+  transform: translateY(-6px);
+  box-sizing: border-box;
+}
+
+.day5-col {
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+
+.day5-col:last-child {
+  border-right: 0;
+}
+
+.day5-col.is-today {
+  background: #f8fbff;
+}
+
+.day5-col-head {
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: var(--canvas);
+}
+
+.day5-weekday {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+
+.day5-daynum {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.day5-daynum.is-today {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.day5-col-body {
+  position: relative;
+}
+
+.day5-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--line);
+  pointer-events: none;
+}
+
+.day5-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  transform: translateY(-1px);
+}
+
+.day5-now-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d93025;
+  margin-left: -5px;
+  flex-shrink: 0;
+}
+
+.day5-now-line {
+  flex: 1;
+  height: 2px;
+  background: #d93025;
+}
+
+.day5-event {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 2;
+  border-radius: 3px;
+  padding: 3px 5px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.25;
+  border: 1px solid transparent;
+}
+
+.day5-event.is-upcoming {
+  background: var(--blue-soft);
+  border-color: #b3d4ff;
+  color: var(--blue);
+}
+
+.day5-event.is-past {
+  background: var(--green-soft);
+  border-color: #b3e6d1;
+  color: var(--green-text);
+}
+
+.day5-event-time {
+  font-weight: 700;
+}
+
+.day5-event-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .month-cal-cell {
     min-height: 72px;

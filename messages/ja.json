@@ -59,7 +59,7 @@
   },
   "calendar": {
     "title": "Googleカレンダー",
-    "subtitle": "タイムゾーン基準の月カレンダー — 過去・これから両方",
+    "subtitle": "タイムゾーン基準のスケジュール — 5日間 / 月表示",
     "connected": "GOOGLE連携済み",
     "notConnected": "GOOGLE未連携",
     "syncNote": "Googleを接続すると、カレンダー上の予約済み授業がAyaNoteに入ります。",
@@ -83,7 +83,9 @@
     "joinMeet": "Meetに入る",
     "timezone": "タイムゾーン",
     "todayBtn": "今日",
-    "noLessonsDay": "この日のレッスンはありません。"
+    "noLessonsDay": "この日のレッスンはありません。",
+    "viewDays": "5日間",
+    "viewMonth": "月"
   },
   "students": {
     "title": "生徒",
@@ -111,7 +113,13 @@
     "openPrep": "教案を開く",
     "openRoom": "レッスンルーム",
     "noUpcoming": "予定なし",
-    "course": "コース"
+    "course": "コース",
+    "seedDriveTitle": "Driveから過去ノートを取り込む",
+    "seedDriveHint": "各生徒名に合うDriveの書き起こし／ノートを検索し、要約・語彙・文法メモリを生成します。すでに履歴がある生徒はスキップします。",
+    "seedDrive": "Driveをスキャンしてメモリ生成",
+    "seedDriveForce": "履歴がある生徒も再スキャン",
+    "seedDone": "Drive取り込み完了：{students}人に{created}件のレッスン（スキャン{scanned}件、スキップ{skipped}）。",
+    "seedError": "取り込み警告"
   },
   "lessonRoom": {
     "title": "レッスンルーム",

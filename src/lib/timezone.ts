@@ -153,6 +153,27 @@ export function shiftMonth(year: number, monthIndex0: number, delta: number): st
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+/** N consecutive calendar days starting at ymd (inclusive), in the given timezone. */
+export function consecutiveYmds(
+  startYmd: string,
+  count: number,
+  timeZone: string = DEFAULT_TIMEZONE,
+): string[] {
+  const tz = normalizeTimezone(timeZone);
+  const out: string[] = [];
+  let noon = wallTimeToUtc(startYmd, "12:00", tz);
+  for (let i = 0; i < count; i++) {
+    out.push(ymdInTz(noon, tz));
+    noon = addDays(noon, 1);
+  }
+  return out;
+}
+
+export function shiftYmd(ymd: string, deltaDays: number, timeZone: string = DEFAULT_TIMEZONE): string {
+  const noon = wallTimeToUtc(ymd, "12:00", timeZone);
+  return ymdInTz(addDays(noon, deltaDays), timeZone);
+}
+
 /** Zoned Date for reading .getHours() etc. after toZonedTime (internal). */
 export function asZoned(date: Date, timeZone: string) {
   return toZonedTime(date, normalizeTimezone(timeZone));

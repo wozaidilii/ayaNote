@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { createStudent } from "@/app/actions";
+import { createStudent, seedMemoryFromDrive } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
@@ -10,7 +10,17 @@ import { parseJsonArray } from "@/lib/utils";
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; level?: string; archived?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    level?: string;
+    archived?: string;
+    seeded?: string;
+    created?: string;
+    students?: string;
+    skipped?: string;
+    scanned?: string;
+    seedErr?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -22,6 +32,8 @@ export default async function StudentsPage({
     getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
+
+  const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
 
   const [students, levels] = await Promise.all([
     prisma.student.findMany({
@@ -57,7 +69,50 @@ export default async function StudentsPage({
         </div>
       </div>
 
-      <form className="panel" style={{ marginTop: "1.2rem" }} method="get">
+      {sp.seeded === "1" && (
+        <p className="chip done" style={{ marginTop: "1rem" }}>
+          {t("seedDone", {
+            created: sp.created ?? "0",
+            students: sp.students ?? "0",
+            scanned: sp.scanned ?? "0",
+            skipped: sp.skipped ?? "0",
+          })}
+        </p>
+      )}
+      {sp.seedErr && (
+        <p className="chip" style={{ marginTop: "0.5rem" }}>
+          {t("seedError")}: {decodeURIComponent(sp.seedErr)}
+        </p>
+      )}
+
+      <div className="panel" style={{ marginTop: "1.2rem" }}>
+        <h2 style={{ marginTop: 0 }}>{t("seedDriveTitle")}</h2>
+        <p className="muted">{t("seedDriveHint")}</p>
+        {googleConnected ? (
+          <form action={seedMemoryFromDrive}>
+            <label
+              style={{
+                display: "flex",
+                gap: "0.5rem",
+                alignItems: "center",
+                marginBottom: "0.8rem",
+              }}
+            >
+              <input type="checkbox" name="force" value="1" />
+              {t("seedDriveForce")}
+            </label>
+            <button className="btn" type="submit">
+              {t("seedDrive")}
+            </button>
+          </form>
+        ) : (
+          <a className="btn secondary" href="/settings">
+            Connect Google in Settings
+          </a>
+        )}
+      </div>
+
+      <form className="panel" method="get">
         <div className="grid-2">
           <div className="field">
             <label htmlFor="q">{t("search")}</label>

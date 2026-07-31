@@ -59,7 +59,7 @@
   },
   "calendar": {
     "title": "Google Calendar",
-    "subtitle": "Month view in your timezone — past and upcoming lessons",
+    "subtitle": "Schedule in your timezone — 5-day view or month grid",
     "connected": "GOOGLE CONNECTED",
     "notConnected": "GOOGLE NOT CONNECTED",
     "syncNote": "Connect Google to pull booked classes from your calendar into AyaNote.",
@@ -83,7 +83,9 @@
     "joinMeet": "Join Meet",
     "timezone": "Timezone",
     "todayBtn": "Today",
-    "noLessonsDay": "No lessons on this day."
+    "noLessonsDay": "No lessons on this day.",
+    "viewDays": "5 days",
+    "viewMonth": "Month"
   },
   "students": {
     "title": "Students",
@@ -111,7 +113,13 @@
     "openPrep": "Open prep",
     "openRoom": "Lesson room",
     "noUpcoming": "No upcoming lesson",
-    "course": "Course"
+    "course": "Course",
+    "seedDriveTitle": "Import past notes from Drive",
+    "seedDriveHint": "Scan Google Drive for transcripts/notes matching each student name, then generate lesson summaries and vocab/grammar memory. Skips students who already have history.",
+    "seedDrive": "Scan Drive & seed memory",
+    "seedDriveForce": "Also re-scan students who already have memory",
+    "seedDone": "Drive seed finished: {created} lessons for {students} students (scanned {scanned} docs, skipped {skipped}).",
+    "seedError": "Seed warning"
   },
   "lessonRoom": {
     "title": "Lesson Room",

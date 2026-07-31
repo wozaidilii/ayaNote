@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
 import { generatePrepDraft, getAiProvider } from "@/lib/ai";
-import { applyTranscriptToLesson, fetchAndImportDriveTranscript } from "@/lib/drive-transcript";
+import { applyTranscriptToLesson, fetchAndImportDriveTranscript, seedMemoryFromDriveForTeacher } from "@/lib/drive-transcript";
 import { prisma } from "@/lib/db";
 import {
   createCalendarMeetEvent,
@@ -680,4 +680,27 @@ export async function syncGoogleCalendar() {
   revalidatePath("/prep");
   revalidatePath("/student");
   redirect("/calendar?synced=1");
+}
+
+export async function seedMemoryFromDrive(formData: FormData) {
+  const teacher = await getTeacher();
+  const force = String(formData.get("force") ?? "") === "1";
+  const result = await seedMemoryFromDriveForTeacher(teacher.id, { force, maxDocsPerStudent: 4 });
+
+  revalidatePath("/students");
+  revalidatePath("/calendar");
+  revalidatePath("/today");
+  revalidatePath("/student");
+  revalidatePath("/student/history");
+  revalidatePath("/prep");
+
+  const q = new URLSearchParams({
+    seeded: "1",
+    created: String(result.lessonsCreated),
+    students: String(result.studentsProcessed),
+    skipped: String(result.skippedStudents),
+    scanned: String(result.docsScanned),
+  });
+  if (result.errors.length) q.set("seedErr", result.errors[0].slice(0, 120));
+  redirect(`/students?${q.toString()}`);
 }

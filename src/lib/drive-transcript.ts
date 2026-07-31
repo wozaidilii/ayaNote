@@ -329,3 +329,282 @@ export async function fetchAndImportDriveTranscript(lessonId: string): Promise<D
     };
   }
 }
+
+function scoreArchiveDoc(file: DriveFile, hints: string[]): number {
+  const name = file.name.toLowerCase();
+  let score = 0;
+  for (const hint of hints) {
+    const h = hint.toLowerCase();
+    if (h.length >= 2 && name.includes(h)) score += 50;
+  }
+  if (/transcript|文字起こし|文字记录|gemini|meet|議事録|lesson|notes|ノート|授業|レッスン/.test(name)) {
+    score += 25;
+  }
+  if (/doc|記録|memo|まとめ/.test(name)) score += 8;
+  return score;
+}
+
+/** Push summary vocab/grammar/topics into the student memory bank. */
+export async function persistSummaryToStudentMemory(lessonId: string) {
+  const lesson = await prisma.lesson.findUniqueOrThrow({
+    where: { id: lessonId },
+    include: { summary: true },
+  });
+  if (!lesson.summary) return;
+
+  const vocab = (() => {
+    try {
+      return JSON.parse(lesson.summary.vocabJson) as Array<{
+        term: string;
+        reading?: string;
+        meaning?: string;
+      }>;
+    } catch {
+      return [];
+    }
+  })();
+  const grammar = (() => {
+    try {
+      return JSON.parse(lesson.summary.grammarJson) as Array<{
+        pattern: string;
+        notes?: string;
+      }>;
+    } catch {
+      return [];
+    }
+  })();
+
+  const existingVocab = await prisma.vocabItem.findMany({
+    where: { studentId: lesson.studentId },
+    select: { term: true },
+  });
+  const vocabSet = new Set(existingVocab.map((v) => v.term.toLowerCase()));
+  for (const v of vocab.slice(0, 20)) {
+    if (!v.term || vocabSet.has(v.term.toLowerCase())) continue;
+    await prisma.vocabItem.create({
+      data: {
+        studentId: lesson.studentId,
+        term: v.term,
+        reading: v.reading ?? "",
+        meaning: v.meaning ?? "",
+      },
+    });
+    vocabSet.add(v.term.toLowerCase());
+  }
+
+  const existingGrammar = await prisma.grammarItem.findMany({
+    where: { studentId: lesson.studentId },
+    select: { pattern: true },
+  });
+  const grammarSet = new Set(existingGrammar.map((g) => g.pattern.toLowerCase()));
+  for (const g of grammar.slice(0, 20)) {
+    if (!g.pattern || grammarSet.has(g.pattern.toLowerCase())) continue;
+    await prisma.grammarItem.create({
+      data: {
+        studentId: lesson.studentId,
+        pattern: g.pattern,
+        notes: g.notes ?? "",
+      },
+    });
+    grammarSet.add(g.pattern.toLowerCase());
+  }
+
+  const topics = (() => {
+    try {
+      return JSON.parse(lesson.summary.topicsJson) as string[];
+    } catch {
+      return [];
+    }
+  })();
+  const mistakes = (() => {
+    try {
+      return JSON.parse(lesson.summary.mistakesJson) as string[];
+    } catch {
+      return [];
+    }
+  })();
+
+  const existing = await prisma.progressSnapshot.findUnique({
+    where: { studentId: lesson.studentId },
+  });
+  const covered = Array.from(
+    new Set([...(existing ? JSON.parse(existing.topicsCoveredJson || "[]") as string[] : []), ...topics]),
+  );
+
+  await prisma.progressSnapshot.upsert({
+    where: { studentId: lesson.studentId },
+    create: {
+      studentId: lesson.studentId,
+      topicsCoveredJson: toJson(covered),
+      strengthsJson: toJson([]),
+      weaknessesJson: toJson(mistakes.slice(0, 12)),
+      attendanceCount: 1,
+      note: lesson.summary.nextFocus,
+    },
+    update: {
+      topicsCoveredJson: toJson(covered),
+      weaknessesJson: toJson(
+        Array.from(
+          new Set([
+            ...(existing ? (JSON.parse(existing.weaknessesJson || "[]") as string[]) : []),
+            ...mistakes,
+          ]),
+        ).slice(0, 12),
+      ),
+      attendanceCount: (existing?.attendanceCount ?? 0) + 1,
+      note: lesson.summary.nextFocus,
+    },
+  });
+
+  await prisma.summary.update({
+    where: { lessonId },
+    data: { approved: true },
+  });
+}
+
+export type DriveSeedResult = {
+  studentsProcessed: number;
+  lessonsCreated: number;
+  docsScanned: number;
+  skippedStudents: number;
+  errors: string[];
+};
+
+/**
+ * Scan Drive for notes/transcripts matching each student and create past completed lessons
+ * with AI summaries + memory bank entries. Skips students who already have approved history
+ * unless force=true.
+ */
+export async function seedMemoryFromDriveForTeacher(
+  teacherId: string,
+  opts: { force?: boolean; maxDocsPerStudent?: number } = {},
+): Promise<DriveSeedResult> {
+  const maxDocs = opts.maxDocsPerStudent ?? 4;
+  const result: DriveSeedResult = {
+    studentsProcessed: 0,
+    lessonsCreated: 0,
+    docsScanned: 0,
+    skippedStudents: 0,
+    errors: [],
+  };
+
+  const teacher = await prisma.teacher.findUnique({ where: { id: teacherId } });
+  if (!teacher) {
+    result.errors.push("Teacher not found");
+    return result;
+  }
+
+  const accessToken = await getValidAccessToken(teacher);
+  if (!accessToken) {
+    result.errors.push("Connect Google in Settings first (Drive readonly).");
+    return result;
+  }
+  await persistRefreshedToken(teacherId, teacher, accessToken);
+
+  const students = await prisma.student.findMany({
+    where: { teacherId, archivedAt: null },
+    include: {
+      lessons: {
+        where: { status: "completed", summary: { is: { approved: true } } },
+        take: 1,
+      },
+      vocabItems: { take: 1 },
+      grammarItems: { take: 1 },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  const usedDriveIds = new Set(
+    (
+      await prisma.lesson.findMany({
+        where: { teacherId, driveFileId: { not: null } },
+        select: { driveFileId: true },
+      })
+    )
+      .map((l) => l.driveFileId)
+      .filter(Boolean) as string[],
+  );
+
+  for (const student of students) {
+    const hasMemory =
+      student.lessons.length > 0 || student.vocabItems.length > 0 || student.grammarItems.length > 0;
+    if (hasMemory && !opts.force) {
+      result.skippedStudents += 1;
+      continue;
+    }
+
+    result.studentsProcessed += 1;
+    const hints = nameHintsForStudent(student.name);
+    const primary = hints[0] ?? student.name;
+
+    const seen = new Map<string, DriveFile>();
+    for (const q of [primary, ...hints.slice(1, 3), "文字起こし", "transcript"]) {
+      const batch = await listRecentDriveDocs({
+        accessToken,
+        folderId: teacher.googleTranscriptFolderId,
+        query: q,
+        nameContains: q && !["文字起こし", "transcript"].includes(q) ? q : undefined,
+        pageSize: 25,
+      });
+      for (const f of batch) seen.set(f.id, f);
+    }
+
+    const ranked = Array.from(seen.values())
+      .map((f) => ({ f, score: scoreArchiveDoc(f, hints) }))
+      .filter((x) => x.score >= 40 && !usedDriveIds.has(x.f.id))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const am = a.f.modifiedTime ? +new Date(a.f.modifiedTime) : 0;
+        const bm = b.f.modifiedTime ? +new Date(b.f.modifiedTime) : 0;
+        return bm - am;
+      })
+      .slice(0, maxDocs);
+
+    result.docsScanned += seen.size;
+
+    for (const { f } of ranked) {
+      try {
+        const rawText = await exportDriveDocText(accessToken, f.id);
+        if (!rawText.trim() || rawText.trim().length < 80) continue;
+
+        const end = f.modifiedTime
+          ? new Date(f.modifiedTime)
+          : f.createdTime
+            ? new Date(f.createdTime)
+            : new Date();
+        const start = new Date(end.getTime() - 60 * 60 * 1000);
+
+        const lesson = await prisma.lesson.create({
+          data: {
+            teacherId,
+            studentId: student.id,
+            startsAt: start,
+            endsAt: end,
+            status: "completed",
+            prepStatus: "none",
+            transcriptStatus: "imported",
+            driveFileId: f.id,
+            tagsJson: toJson(["drive_archive"]),
+          },
+        });
+        usedDriveIds.add(f.id);
+
+        await applyTranscriptToLesson({
+          lessonId: lesson.id,
+          rawText,
+          source: "drive_import",
+          driveFileId: f.id,
+          tags: ["drive_archive"],
+        });
+        await persistSummaryToStudentMemory(lesson.id);
+        result.lessonsCreated += 1;
+      } catch (e) {
+        result.errors.push(
+          `${student.name} / ${f.name}: ${e instanceof Error ? e.message : "failed"}`,
+        );
+      }
+    }
+  }
+
+  return result;
+}
