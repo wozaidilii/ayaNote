@@ -121,16 +121,17 @@ model Summary {
 }
 
 model PrepDraft {
-  id          String   @id @default(cuid())
-  lessonId    String   @unique
-  warmup      String   @default("")
-  review      String   @default("")
-  newFocus    String   @default("")
-  practice    String   @default("")
-  homeworkSeed String  @default("")
-  status      String   @default("draft") // draft | ready
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  lessonId     String   @unique
+  warmup       String   @default("")
+  review       String   @default("")
+  newFocus     String   @default("")
+  practice     String   @default("")
+  homeworkSeed String   @default("")
+  refsJson     String   @default("{}") // sources used when drafting
+  status       String   @default("draft") // draft | ready
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 }

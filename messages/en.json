@@ -175,8 +175,21 @@
     "noDraft": "Generate a draft or write notes for this section…",
     "sections": "Prep sections",
     "generating": "Generating drafts… {done}/{total}",
+    "generatingStudent": "Writing prep for {name}…",
+    "waiting": "queued",
     "generateMissing": "Generate {count} missing",
-    "generateDone": "Drafts ready — review and mark ready before class."
+    "generateDone": "Drafts ready — review references below, then mark ready before class.",
+    "refsTitle": "Referenced for this draft",
+    "refsCourse": "Course",
+    "refsGoals": "Goals",
+    "refsPast": "Recent lessons",
+    "refsTopics": "Topics",
+    "refsWeak": "Weak points",
+    "refsVocab": "Vocab bank",
+    "refsNone": "None yet",
+    "placeholderLine1": "Pulling course track, goals, and level…",
+    "placeholderLine2": "Reading recent lesson summaries & next focus…",
+    "placeholderLine3": "Mixing vocab bank and weak points into sections…"
   },
   "availability": {
     "title": "Availability",

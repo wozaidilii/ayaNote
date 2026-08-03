@@ -827,6 +827,120 @@ a {
   font-size: 13px;
 }
 
+.prep-batch-current {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--blue);
+}
+
+.prep-queue-item[data-generating="true"] {
+  background: var(--blue-soft);
+  border-color: #b3d4ff;
+}
+
+.prep-generating {
+  padding: 8px 0 4px;
+}
+
+.prep-generating-title {
+  margin-bottom: var(--space-3);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--blue);
+}
+
+.prep-skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: var(--space-4);
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+
+.prep-skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(9, 30, 66, 0.06) 0%,
+    rgba(9, 30, 66, 0.12) 45%,
+    rgba(9, 30, 66, 0.06) 90%
+  );
+  background-size: 200% 100%;
+  animation: prep-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes prep-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prep-skeleton-line {
+    animation: none;
+  }
+}
+
+.prep-placeholder-hints {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.prep-refs {
+  margin-bottom: var(--space-4);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+
+.prep-refs-title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.prep-refs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+@media (max-width: 700px) {
+  .prep-refs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.prep-ref-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.prep-ref-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.prep-ref-empty {
+  font-size: 12px;
+}
+
 .prep-editor-top {
   display: flex;
   justify-content: space-between;

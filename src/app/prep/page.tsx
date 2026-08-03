@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { PrepWorkspace, type PrepLessonItem } from "@/components/prep-workspace";
 import { courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { parsePrepRefs } from "@/lib/prep-refs";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 
@@ -74,6 +75,7 @@ export default async function PrepPage({
       practice: lesson.prepDraft?.practice ?? "",
       homeworkSeed: lesson.prepDraft?.homeworkSeed ?? "",
     },
+    refs: parsePrepRefs(lesson.prepDraft?.refsJson),
   }));
 
   // Put requested lesson first in client selection via URL; component reads ?lesson=
@@ -107,8 +109,21 @@ export default async function PrepPage({
           noDraft: t("noDraft"),
           sections: t("sections"),
           generating: t("generating"),
+          generatingStudent: t("generatingStudent"),
+          waiting: t("waiting"),
           generateMissing: t("generateMissing"),
           generateDone: t("generateDone"),
+          refsTitle: t("refsTitle"),
+          refsCourse: t("refsCourse"),
+          refsGoals: t("refsGoals"),
+          refsPast: t("refsPast"),
+          refsTopics: t("refsTopics"),
+          refsWeak: t("refsWeak"),
+          refsVocab: t("refsVocab"),
+          refsNone: t("refsNone"),
+          placeholderLine1: t("placeholderLine1"),
+          placeholderLine2: t("placeholderLine2"),
+          placeholderLine3: t("placeholderLine3"),
         }}
       />
     </AppShell>

@@ -175,8 +175,21 @@
     "noDraft": "下書きを生成するか、このセクションにメモを書いてください…",
     "sections": "教案セクション",
     "generating": "下書き生成中… {done}/{total}",
+    "generatingStudent": "{name} の教案を作成中…",
+    "waiting": "待機",
     "generateMissing": "未生成 {count} 件を生成",
-    "generateDone": "下書きの準備ができました。授業前に確認して完了にしてください。"
+    "generateDone": "下書きの準備ができました。参照元を確認してから完了にしてください。",
+    "refsTitle": "この下書きが参照したもの",
+    "refsCourse": "コース",
+    "refsGoals": "目標",
+    "refsPast": "最近のレッスン",
+    "refsTopics": "トピック",
+    "refsWeak": "弱点",
+    "refsVocab": "語彙バンク",
+    "refsNone": "まだなし",
+    "placeholderLine1": "コース・目標・レベルを読み込み中…",
+    "placeholderLine2": "直近のレッスン要約と次回フォーカスを参照中…",
+    "placeholderLine3": "語彙バンクと弱点を各セクションに反映中…"
   },
   "availability": {
     "title": "空き時間",

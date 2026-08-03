@@ -7,6 +7,11 @@ import {
   generateMissingPrepBatch,
   savePrepDraft,
 } from "@/app/actions";
+import {
+  emptyPrepRefs,
+  hasPrepRefs,
+  type PrepRefs,
+} from "@/lib/prep-refs";
 
 export type PrepLessonItem = {
   id: string;
@@ -24,6 +29,7 @@ export type PrepLessonItem = {
     practice: string;
     homeworkSeed: string;
   };
+  refs: PrepRefs;
 };
 
 const SECTIONS = [
@@ -56,6 +62,33 @@ function missingDraftIds(
     .map((l) => l.id);
 }
 
+function RefGroup({
+  label,
+  items,
+  empty,
+}: {
+  label: string;
+  items: string[];
+  empty: string;
+}) {
+  return (
+    <div className="prep-ref-group">
+      <div className="prep-ref-label">{label}</div>
+      {items.length === 0 ? (
+        <span className="muted prep-ref-empty">{empty}</span>
+      ) : (
+        <div className="prep-ref-chips">
+          {items.map((item) => (
+            <span className="chip" key={`${label}-${item}`}>
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PrepWorkspace({
   lessons,
   labels,
@@ -76,8 +109,21 @@ export function PrepWorkspace({
     noDraft: string;
     sections: string;
     generating: string;
+    generatingStudent: string;
+    waiting: string;
     generateMissing: string;
     generateDone: string;
+    refsTitle: string;
+    refsCourse: string;
+    refsGoals: string;
+    refsPast: string;
+    refsTopics: string;
+    refsWeak: string;
+    refsVocab: string;
+    refsNone: string;
+    placeholderLine1: string;
+    placeholderLine2: string;
+    placeholderLine3: string;
   };
 }) {
   const router = useRouter();
@@ -86,19 +132,26 @@ export function PrepWorkspace({
   const [drafts, setDrafts] = useState(() =>
     Object.fromEntries(lessons.map((l) => [l.id, { ...l.draft }])),
   );
+  const [refsMap, setRefsMap] = useState(() =>
+    Object.fromEntries(lessons.map((l) => [l.id, { ...l.refs }])),
+  );
   const [statuses, setStatuses] = useState(() =>
     Object.fromEntries(lessons.map((l) => [l.id, l.prepStatus])),
   );
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [batchTotal, setBatchTotal] = useState(0);
   const [batchDone, setBatchDone] = useState(0);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchMessage, setBatchMessage] = useState("");
+  const [regenBusy, setRegenBusy] = useState(false);
   const autoStarted = useRef(false);
   const batchInFlight = useRef(false);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     setDrafts(Object.fromEntries(lessons.map((l) => [l.id, { ...l.draft }])));
+    setRefsMap(Object.fromEntries(lessons.map((l) => [l.id, { ...l.refs }])));
     setStatuses(Object.fromEntries(lessons.map((l) => [l.id, l.prepStatus])));
   }, [lessons]);
 
@@ -124,6 +177,20 @@ export function PrepWorkspace({
     return () => window.removeEventListener("hashchange", fromHash);
   }, [lessons]);
 
+  function applyGenerated(
+    item: Awaited<ReturnType<typeof generateMissingPrepBatch>>["generated"][number],
+  ) {
+    setDrafts((prev) => ({
+      ...prev,
+      [item.lessonId]: { ...item.draft },
+    }));
+    setRefsMap((prev) => ({
+      ...prev,
+      [item.lessonId]: { ...item.refs },
+    }));
+    setStatuses((prev) => ({ ...prev, [item.lessonId]: "draft" }));
+  }
+
   async function runBatch(ids: string[]) {
     if (ids.length === 0 || batchInFlight.current) return;
     batchInFlight.current = true;
@@ -131,24 +198,22 @@ export function PrepWorkspace({
     setBatchTotal(ids.length);
     setBatchDone(0);
     setBatchMessage("");
+    setPendingIds(ids);
 
     let queue = [...ids];
     let completed = 0;
 
     try {
       while (queue.length > 0) {
-        const chunk = queue.slice(0, 4);
-        queue = queue.slice(4);
-        const result = await generateMissingPrepBatch(chunk);
-        for (const item of result.generated) {
-          setDrafts((prev) => ({
-            ...prev,
-            [item.lessonId]: { ...item.draft },
-          }));
-          setStatuses((prev) => ({ ...prev, [item.lessonId]: "draft" }));
-        }
-        completed += chunk.length;
-        setBatchDone(Math.min(completed, ids.length));
+        const lessonId = queue[0]!;
+        setActiveId(lessonId);
+        setPendingIds(queue);
+        const result = await generateMissingPrepBatch([lessonId]);
+        for (const item of result.generated) applyGenerated(item);
+        queue = queue.slice(1);
+        completed += 1;
+        setBatchDone(completed);
+        setPendingIds(queue);
       }
       setBatchMessage(labels.generateDone);
       startTransition(() => router.refresh());
@@ -157,6 +222,8 @@ export function PrepWorkspace({
     } finally {
       batchInFlight.current = false;
       setBatchRunning(false);
+      setActiveId(null);
+      setPendingIds([]);
     }
   }
 
@@ -168,13 +235,32 @@ export function PrepWorkspace({
     void runBatch(missing);
   }, [lessons]);
 
+  async function onRegenerate() {
+    if (!selected || regenBusy || batchRunning) return;
+    setRegenBusy(true);
+    setActiveId(selected.id);
+    try {
+      const result = await generateLessonPrep(selected.id);
+      applyGenerated(result);
+      startTransition(() => router.refresh());
+    } finally {
+      setRegenBusy(false);
+      setActiveId(null);
+    }
+  }
+
   const selected = useMemo(
     () => lessons.find((l) => l.id === selectedId) ?? lessons[0],
     [lessons, selectedId],
   );
 
   const currentDraft = selected ? drafts[selected.id] : null;
+  const currentRefs = selected ? (refsMap[selected.id] ?? emptyPrepRefs()) : emptyPrepRefs();
   const missingCount = missingDraftIds(lessons, drafts).length;
+  const selectedGenerating =
+    Boolean(selected) &&
+    (activeId === selected?.id ||
+      (batchRunning && pendingIds.includes(selected?.id ?? "") && !hasDraftContent(currentDraft!)));
 
   function selectLesson(id: string) {
     setSelectedId(id);
@@ -213,6 +299,9 @@ export function PrepWorkspace({
     return map[key];
   };
 
+  const activeStudentName =
+    lessons.find((l) => l.id === activeId)?.studentName ?? "";
+
   return (
     <div className="prep-layout">
       <aside className="prep-queue panel" aria-label={labels.queue}>
@@ -224,11 +313,18 @@ export function PrepWorkspace({
         {(batchRunning || batchMessage || missingCount > 0) && (
           <div className="prep-batch-status">
             {batchRunning ? (
-              <p className="muted">
-                {labels.generating
-                  .replace("{done}", String(batchDone))
-                  .replace("{total}", String(batchTotal))}
-              </p>
+              <>
+                <p className="muted">
+                  {labels.generating
+                    .replace("{done}", String(batchDone))
+                    .replace("{total}", String(batchTotal))}
+                </p>
+                {activeStudentName && (
+                  <p className="prep-batch-current">
+                    {labels.generatingStudent.replace("{name}", activeStudentName)}
+                  </p>
+                )}
+              </>
             ) : batchMessage ? (
               <p className="muted">{batchMessage}</p>
             ) : null}
@@ -248,8 +344,11 @@ export function PrepWorkspace({
           {lessons.map((lesson) => {
             const active = lesson.id === selected.id;
             const status = statuses[lesson.id] ?? lesson.prepStatus;
-            const filling =
+            const isActiveGen = activeId === lesson.id;
+            const isWaiting =
               batchRunning &&
+              pendingIds.includes(lesson.id) &&
+              !isActiveGen &&
               !hasDraftContent(drafts[lesson.id] ?? lesson.draft);
             return (
               <button
@@ -257,6 +356,7 @@ export function PrepWorkspace({
                 type="button"
                 className="prep-queue-item"
                 data-active={active}
+                data-generating={isActiveGen || undefined}
                 onClick={() => selectLesson(lesson.id)}
               >
                 <div className="prep-queue-name">{lesson.studentName}</div>
@@ -264,10 +364,14 @@ export function PrepWorkspace({
                 <div className="prep-queue-tags">
                   <span
                     className={`chip ${
-                      status === "ready" ? "done" : filling ? "soon" : status === "draft" ? "done" : "soon"
+                      isActiveGen
+                        ? "soon"
+                        : status === "ready" || status === "draft"
+                          ? "done"
+                          : "soon"
                     }`}
                   >
-                    {filling ? "…" : status}
+                    {isActiveGen ? "…" : isWaiting ? labels.waiting : status}
                   </span>
                   <span className="chip">{lesson.courseLabel}</span>
                 </div>
@@ -293,67 +397,128 @@ export function PrepWorkspace({
             )}
           </div>
           <div className="list-row-actions">
-            <form action={generateLessonPrep.bind(null, selected.id)}>
-              <button className="btn secondary sm" type="submit" disabled={batchRunning}>
-                {labels.regenerate}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <div className="prep-section-tabs" role="tablist" aria-label={labels.sections}>
-          {SECTIONS.map((s) => (
             <button
-              key={s.key}
+              className="btn secondary sm"
               type="button"
-              role="tab"
-              className="prep-section-tab"
-              data-active={section === s.key}
-              aria-selected={section === s.key}
-              onClick={() => setSection(s.key)}
+              disabled={batchRunning || regenBusy}
+              onClick={() => void onRegenerate()}
             >
-              {sectionLabel(s.key)}
+              {regenBusy ? "…" : labels.regenerate}
             </button>
-          ))}
+          </div>
         </div>
 
-        <form action={savePrepDraft} className="prep-section-body">
-          <input type="hidden" name="lessonId" value={selected.id} />
-          {SECTIONS.map((s) => (
-            <input
-              key={`hidden-${s.key}`}
-              type="hidden"
-              name={s.key}
-              value={currentDraft[s.key]}
-            />
-          ))}
-
-          <div className="field">
-            <label htmlFor={`prep-${selected.id}-${section}`}>{sectionLabel(section)}</label>
-            <textarea
-              id={`prep-${selected.id}-${section}`}
-              value={currentDraft[section]}
-              onChange={(e) => updateField(section, e.target.value)}
-              placeholder={
-                batchRunning && !hasDraftContent(currentDraft)
-                  ? labels.generating
-                      .replace("{done}", String(batchDone))
-                      .replace("{total}", String(batchTotal))
-                  : labels.noDraft
-              }
-              rows={14}
-            />
+        {selectedGenerating ? (
+          <div className="prep-generating" aria-live="polite">
+            <div className="prep-generating-title">
+              {labels.generatingStudent.replace("{name}", selected.studentName)}
+            </div>
+            <div className="prep-skeleton-lines">
+              <div className="prep-skeleton-line" style={{ width: "92%" }} />
+              <div className="prep-skeleton-line" style={{ width: "78%" }} />
+              <div className="prep-skeleton-line" style={{ width: "86%" }} />
+              <div className="prep-skeleton-line" style={{ width: "64%" }} />
+              <div className="prep-skeleton-line" style={{ width: "88%" }} />
+              <div className="prep-skeleton-line" style={{ width: "72%" }} />
+            </div>
+            <ul className="prep-placeholder-hints muted">
+              <li>{labels.placeholderLine1}</li>
+              <li>{labels.placeholderLine2}</li>
+              <li>{labels.placeholderLine3}</li>
+            </ul>
           </div>
+        ) : (
+          <>
+            {hasPrepRefs(currentRefs) && (
+              <div className="prep-refs">
+                <div className="prep-refs-title">{labels.refsTitle}</div>
+                <div className="prep-refs-grid">
+                  <RefGroup
+                    label={labels.refsCourse}
+                    items={[
+                      currentRefs.course,
+                      currentRefs.level,
+                    ].filter(Boolean)}
+                    empty={labels.refsNone}
+                  />
+                  <RefGroup
+                    label={labels.refsGoals}
+                    items={currentRefs.goals ? [currentRefs.goals] : []}
+                    empty={labels.refsNone}
+                  />
+                  <RefGroup
+                    label={labels.refsPast}
+                    items={currentRefs.pastLessons}
+                    empty={labels.refsNone}
+                  />
+                  <RefGroup
+                    label={labels.refsTopics}
+                    items={currentRefs.topics}
+                    empty={labels.refsNone}
+                  />
+                  <RefGroup
+                    label={labels.refsWeak}
+                    items={currentRefs.weaknesses}
+                    empty={labels.refsNone}
+                  />
+                  <RefGroup
+                    label={labels.refsVocab}
+                    items={currentRefs.vocab}
+                    empty={labels.refsNone}
+                  />
+                </div>
+              </div>
+            )}
 
-          <div className="prep-editor-actions">
-            <button className="btn secondary" name="status" value="draft" type="submit">
-              {labels.saveDraft}
-            </button>
-            <button className="btn" name="status" value="ready" type="submit">
-              {labels.markReady}
-            </button>
-          </div>
-        </form>
+            <div className="prep-section-tabs" role="tablist" aria-label={labels.sections}>
+              {SECTIONS.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  role="tab"
+                  className="prep-section-tab"
+                  data-active={section === s.key}
+                  aria-selected={section === s.key}
+                  onClick={() => setSection(s.key)}
+                >
+                  {sectionLabel(s.key)}
+                </button>
+              ))}
+            </div>
+
+            <form action={savePrepDraft} className="prep-section-body">
+              <input type="hidden" name="lessonId" value={selected.id} />
+              {SECTIONS.map((s) => (
+                <input
+                  key={`hidden-${s.key}`}
+                  type="hidden"
+                  name={s.key}
+                  value={currentDraft[s.key]}
+                />
+              ))}
+
+              <div className="field">
+                <label htmlFor={`prep-${selected.id}-${section}`}>{sectionLabel(section)}</label>
+                <textarea
+                  id={`prep-${selected.id}-${section}`}
+                  value={currentDraft[section]}
+                  onChange={(e) => updateField(section, e.target.value)}
+                  placeholder={labels.noDraft}
+                  rows={14}
+                />
+              </div>
+
+              <div className="prep-editor-actions">
+                <button className="btn secondary" name="status" value="draft" type="submit">
+                  {labels.saveDraft}
+                </button>
+                <button className="btn" name="status" value="ready" type="submit">
+                  {labels.markReady}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </section>
     </div>
   );

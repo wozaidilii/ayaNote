@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
-import { generatePrepDraft, getAiProvider } from "@/lib/ai";
+import { courseTypeLabel, generatePrepDraft, getAiProvider } from "@/lib/ai";
 import { applyTranscriptToLesson, fetchAndImportDriveTranscript, seedMemoryFromDriveForTeacher } from "@/lib/drive-transcript";
 import { prisma } from "@/lib/db";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/lib/google";
 import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
+import type { PrepRefs } from "@/lib/prep-refs";
 import { LESSON_MINUTES, blackoutDateFromYmd } from "@/lib/scheduling";
 import { DEMO_TEACHER_EMAIL, type AppRole } from "@/lib/session";
 import { getActiveStudent } from "@/lib/active-student";
@@ -301,6 +302,13 @@ async function writePrepDraftForLesson(lessonId: string) {
   const weaknesses = lesson.student.progress
     ? parseJsonArray(lesson.student.progress.weaknessesJson)
     : [];
+  const vocab = lesson.student.vocabItems.map((v) => v.term);
+  const pastLessons = lesson.student.lessons.map((l) => {
+    const focus = l.summary?.nextFocus?.trim();
+    const topics = l.summary ? parseJsonArray(l.summary.topicsJson).slice(0, 2) : [];
+    const label = focus || topics.join(" / ") || "past lesson";
+    return label;
+  });
 
   const draft = await generatePrepDraft({
     studentName: lesson.student.name,
@@ -309,13 +317,23 @@ async function writePrepDraftForLesson(lessonId: string) {
     goals: lesson.student.goals,
     lastTopics,
     weaknesses,
-    vocab: lesson.student.vocabItems.map((v) => v.term),
+    vocab,
   });
+
+  const refs: PrepRefs = {
+    course: courseTypeLabel(lesson.student.courseType),
+    level: lesson.student.level,
+    goals: lesson.student.goals?.trim() || "",
+    pastLessons,
+    topics: [...new Set(lastTopics)].slice(0, 8),
+    weaknesses: weaknesses.slice(0, 6),
+    vocab: vocab.slice(0, 10),
+  };
 
   await prisma.prepDraft.upsert({
     where: { lessonId },
-    create: { lessonId, ...draft, status: "draft" },
-    update: { ...draft, status: "draft" },
+    create: { lessonId, ...draft, refsJson: toJson(refs), status: "draft" },
+    update: { ...draft, refsJson: toJson(refs), status: "draft" },
   });
 
   await prisma.lesson.update({
@@ -323,7 +341,7 @@ async function writePrepDraftForLesson(lessonId: string) {
     data: { prepStatus: "draft" },
   });
 
-  return { lessonId, draft };
+  return { lessonId, draft, refs };
 }
 
 function revalidatePrepSurfaces(lessonIds: string[] = []) {
@@ -336,8 +354,9 @@ function revalidatePrepSurfaces(lessonIds: string[] = []) {
 }
 
 export async function generateLessonPrep(lessonId: string) {
-  await writePrepDraftForLesson(lessonId);
+  const result = await writePrepDraftForLesson(lessonId);
   revalidatePrepSurfaces([lessonId]);
+  return result;
 }
 
 /** Fill missing prep drafts for upcoming lessons. Processes a small batch to stay within serverless time limits. */
