@@ -7,25 +7,27 @@ import {
 } from "../src/lib/session";
 import { toJson } from "../src/lib/utils";
 
+/** Previous trial login id — migrate to DEMO_TEACHER_EMAIL when present. */
 const LEGACY_TEACHER_EMAIL = "ayano@ayanote.app";
 
 /** Minimal bootstrap — classes come from in-app booking + Classroom. */
 async function main() {
   const passwordHash = await hashPassword(DEMO_TEACHER_PASSWORD);
+  const loginId = DEMO_TEACHER_EMAIL as string;
 
   // Migrate previous trial account if still present under the old email.
   const legacy = await prisma.teacher.findUnique({
     where: { email: LEGACY_TEACHER_EMAIL },
   });
-  if (legacy && DEMO_TEACHER_EMAIL !== LEGACY_TEACHER_EMAIL) {
+  if (legacy && loginId !== LEGACY_TEACHER_EMAIL) {
     const taken = await prisma.teacher.findUnique({
-      where: { email: DEMO_TEACHER_EMAIL },
+      where: { email: loginId },
     });
     if (!taken) {
       await prisma.teacher.update({
         where: { id: legacy.id },
         data: {
-          email: DEMO_TEACHER_EMAIL,
+          email: loginId,
           name: "Admin",
           passwordHash,
           locale: "ja",
@@ -35,10 +37,10 @@ async function main() {
   }
 
   const teacher = await prisma.teacher.upsert({
-    where: { email: DEMO_TEACHER_EMAIL },
+    where: { email: loginId },
     create: {
       name: "Admin",
-      email: DEMO_TEACHER_EMAIL,
+      email: loginId,
       passwordHash,
       locale: "ja",
     },
