@@ -1,17 +1,17 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
-import { StudentSwitcher } from "@/components/student-switcher";
-import { getActiveStudent, listActiveStudentsForTeacher } from "@/lib/active-student";
+import { selectBookingNotices } from "@/lib/booking";
+import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentHomePage() {
-  const [t, common, active, roster] = await Promise.all([
+  const [t, common, active] = await Promise.all([
     getTranslations("studentHome"),
     getTranslations("common"),
     getActiveStudent(),
-    listActiveStudentsForTeacher(),
   ]);
 
   const student = await prisma.student.findFirstOrThrow({
@@ -20,20 +20,44 @@ export default async function StudentHomePage() {
       teacher: { select: { timezone: true } },
       progress: true,
       bookingRequests: {
-        where: { status: "pending" },
-        orderBy: { requestedStart: "asc" },
-        take: 3,
+        orderBy: { updatedAt: "desc" },
+        take: 12,
       },
       lessons: {
-        where: { status: "scheduled", startsAt: { gte: new Date() } },
-        include: { prepDraft: true, summary: true },
+        where: { status: { in: ["scheduled", "in_progress"] }, startsAt: { gte: new Date() } },
+        include: { summary: true },
         orderBy: { startsAt: "asc" },
         take: 1,
       },
     },
   });
+
+  const lastCompleted = await prisma.lesson.findFirst({
+    where: {
+      studentId: student.id,
+      status: "completed",
+      summary: { is: { approved: true } },
+    },
+    include: { summary: true },
+    orderBy: { startsAt: "desc" },
+  });
+
   const next = student.lessons[0];
   const timeZone = normalizeTimezone(student.teacher.timezone);
+  const pending = student.bookingRequests.filter((b) => b.status === "pending");
+  const notices = selectBookingNotices(
+    student.bookingRequests.map((b) => ({
+      id: b.id,
+      type: b.type,
+      status: b.status as "approved" | "declined" | "cancelled" | "pending",
+      requestedStart: b.requestedStart,
+      updatedAt: b.updatedAt,
+      note: b.note,
+    })),
+  );
+
+  const homework = lastCompleted?.summary?.homework || "—";
+  const whatNext = lastCompleted?.summary?.nextFocus || "—";
 
   return (
     <AppShell active="home" personName={student.name}>
@@ -42,18 +66,18 @@ export default async function StudentHomePage() {
         {student.name} · {student.email} · {timeZone}
       </p>
 
-      <StudentSwitcher
-        activeId={student.id}
-        label={t("switchStudent")}
-        students={roster.map((s) => ({
-          id: s.id,
-          name: s.name,
-          email: s.email,
-          nextLabel: s.lessons[0]
-            ? formatInTz(s.lessons[0].startsAt, "MMM d HH:mm", timeZone)
-            : undefined,
-        }))}
-      />
+      {notices.length > 0 && (
+        <div className="panel" style={{ marginTop: "1rem" }}>
+          <h2 style={{ marginTop: 0 }}>{t("notices")}</h2>
+          {notices.map((n) => (
+            <p key={n.id} className="muted" style={{ margin: "0.35rem 0" }}>
+              <span className={`chip ${n.status === "approved" ? "done" : ""}`}>{n.status}</span>{" "}
+              {n.type} · {formatInTz(n.requestedStart, "MMM d HH:mm", timeZone)}
+              {n.note ? ` — ${n.note}` : ""}
+            </p>
+          ))}
+        </div>
+      )}
 
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div className="panel">
@@ -71,8 +95,7 @@ export default async function StudentHomePage() {
                 <strong>{t("status")}:</strong> {next.status}
               </p>
               <p>
-                <strong>{t("whatNext")}:</strong>{" "}
-                {next.prepDraft?.newFocus || next.summary?.nextFocus || "—"}
+                <strong>{t("whatNext")}:</strong> {whatNext}
               </p>
               {next.meetLink ? (
                 <p>
@@ -87,10 +110,18 @@ export default async function StudentHomePage() {
           ) : (
             <p className="muted">{t("noUpcoming")}</p>
           )}
-          {student.bookingRequests.length > 0 && (
+          <p style={{ marginTop: "1rem" }}>
+            <strong>{common("homework")}:</strong> {homework}
+          </p>
+          <p style={{ marginTop: "0.8rem" }}>
+            <Link className="btn secondary sm" href="/student/book">
+              {t("bookCta")}
+            </Link>
+          </p>
+          {pending.length > 0 && (
             <div style={{ marginTop: "1rem" }}>
               <h3>{t("pending")}</h3>
-              {student.bookingRequests.map((b) => (
+              {pending.map((b) => (
                 <p key={b.id} className="muted" style={{ margin: "0.3rem 0" }}>
                   {formatInTz(b.requestedStart, "MMM d HH:mm", timeZone)} · {b.status}
                 </p>
@@ -106,6 +137,10 @@ export default async function StudentHomePage() {
           <p>
             <strong>{common("topics")}:</strong>{" "}
             {parseJsonArray(student.progress?.topicsCoveredJson).join(" · ") || "—"}
+          </p>
+          <p>
+            <strong>{common("strengths")}:</strong>{" "}
+            {parseJsonArray(student.progress?.strengthsJson).join(" · ") || "—"}
           </p>
           <p>
             <strong>{common("weaknesses")}:</strong>{" "}

@@ -89,6 +89,33 @@ function RefGroup({
   );
 }
 
+function PastLessonLinks({
+  label,
+  links,
+  empty,
+}: {
+  label: string;
+  links: Array<{ id: string; label: string }>;
+  empty: string;
+}) {
+  return (
+    <div className="prep-ref-group">
+      <div className="prep-ref-label">{label}</div>
+      {links.length === 0 ? (
+        <span className="muted prep-ref-empty">{empty}</span>
+      ) : (
+        <div className="prep-ref-chips">
+          {links.map((item) => (
+            <a className="chip" key={item.id} href={`/lessons/${item.id}`}>
+              {item.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PrepWorkspace({
   lessons,
   labels,
@@ -124,6 +151,9 @@ export function PrepWorkspace({
     placeholderLine1: string;
     placeholderLine2: string;
     placeholderLine3: string;
+    sourceAi: string;
+    sourceHeuristic: string;
+    sourceEdited: string;
   };
 }) {
   const router = useRouter();
@@ -395,6 +425,17 @@ export function PrepWorkspace({
                 </span>
               </p>
             )}
+            {currentRefs.generationSource && currentRefs.generationSource !== "unknown" && (
+              <p style={{ marginTop: 8 }}>
+                <span className={`chip ${currentRefs.generationSource === "heuristic" ? "" : "done"}`}>
+                  {currentRefs.generationSource === "ai"
+                    ? labels.sourceAi
+                    : currentRefs.generationSource === "edited"
+                      ? labels.sourceEdited
+                      : labels.sourceHeuristic}
+                </span>
+              </p>
+            )}
           </div>
           <div className="list-row-actions">
             <button
@@ -446,11 +487,19 @@ export function PrepWorkspace({
                     items={currentRefs.goals ? [currentRefs.goals] : []}
                     empty={labels.refsNone}
                   />
-                  <RefGroup
-                    label={labels.refsPast}
-                    items={currentRefs.pastLessons}
-                    empty={labels.refsNone}
-                  />
+                  {currentRefs.pastLessonLinks.length > 0 ? (
+                    <PastLessonLinks
+                      label={labels.refsPast}
+                      links={currentRefs.pastLessonLinks}
+                      empty={labels.refsNone}
+                    />
+                  ) : (
+                    <RefGroup
+                      label={labels.refsPast}
+                      items={currentRefs.pastLessons}
+                      empty={labels.refsNone}
+                    />
+                  )}
                   <RefGroup
                     label={labels.refsTopics}
                     items={currentRefs.topics}

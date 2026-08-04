@@ -55,7 +55,11 @@
     "subtitle": "Upcoming lessons with one-line context",
     "prepStatus": "Prep",
     "context": "Last focus",
-    "joinMeet": "Join Meet"
+    "joinMeet": "Join Meet",
+    "openPrep": "Open prep",
+    "pendingBookings": "Pending booking requests",
+    "bookingConflict": "That time conflicts with an existing lesson. Decline or pick another slot.",
+    "bookingUpdated": "Booking decision saved."
   },
   "calendar": {
     "title": "Google Calendar",
@@ -157,7 +161,22 @@
     "errDriveNotFound": "No matching Drive Doc found. Wait for Meet transcript, set folder ID in Settings, or paste manually.",
     "errDriveEmpty": "Matched a Drive Doc but it was empty.",
     "errDriveNoGoogle": "Google is not connected. Connect in Settings.",
-    "errDriveGeneric": "Drive fetch failed"
+    "errDriveConsent": "Student has not consented to recording — enable consent on the student profile, or paste manually.",
+    "errDriveGeneric": "Drive fetch failed",
+    "lessonStatus": "Lesson",
+    "pipelineTitle": "Lesson pipeline",
+    "pipelineHint": "Mark progress, import transcript, approve memory, then open prep for the next class.",
+    "markInProgress": "Mark in progress",
+    "markComplete": "Mark complete",
+    "openPrep": "Open prep",
+    "okApproved": "Summary approved and merged into student memory (deduped).",
+    "okStatus": "Lesson status updated.",
+    "heuristicBadge": "Heuristic summary",
+    "heuristicWarn": "This summary was generated without a live AI model — edit carefully before approving.",
+    "noConsent": "No recording consent",
+    "consentRequired": "Recording consent is off — Drive auto-import is blocked.",
+    "approvedNote": "Approved — vocab/grammar merged into memory.",
+    "prepSidebar": "Prep draft"
   },
   "prep": {
     "title": "Prep Queue",
@@ -189,7 +208,10 @@
     "refsNone": "None yet",
     "placeholderLine1": "Pulling course track, goals, and level…",
     "placeholderLine2": "Reading recent lesson summaries & next focus…",
-    "placeholderLine3": "Mixing vocab bank and weak points into sections…"
+    "placeholderLine3": "Mixing vocab bank and weak points into sections…",
+    "sourceAi": "Generated with AI",
+    "sourceHeuristic": "Local heuristic (no AI key / AI failed) — edit before class",
+    "sourceEdited": "Teacher-edited draft"
   },
   "availability": {
     "title": "Availability",
@@ -203,7 +225,9 @@
     "blackouts": "Blackout dates",
     "blackoutReason": "Reason (optional)",
     "addBlackout": "Add blackout",
-    "remove": "Remove"
+    "remove": "Remove",
+    "bookingConflict": "That time conflicts with an existing lesson.",
+    "bookingUpdated": "Booking decision saved."
   },
   "settings": {
     "title": "Settings",
@@ -239,7 +263,8 @@
     "joinMeet": "Join Meet",
     "status": "Status",
     "pending": "Pending requests",
-    "switchStudent": "Viewing as student",
+    "notices": "Booking updates",
+    "bookCta": "Book / reschedule",
     "noUpcoming": "No upcoming lesson synced yet. Ask your teacher to connect Google Calendar, or book a slot.",
     "noMeetYet": "Meet link not on this calendar event yet."
   },
@@ -258,10 +283,14 @@
     "confirm": "Confirm this slot",
     "duration": "Duration",
     "cancel": "Cancel",
-    "myBookings": "My bookings"
+    "myBookings": "My bookings",
+    "okRequested": "Request sent — wait for teacher confirmation.",
+    "errConflict": "That slot conflicts with an existing lesson.",
+    "errHalfHour": "Lessons must start on the hour or half-hour.",
+    "errInvalidTime": "Invalid start time."
   },
   "studentHistory": {
     "title": "Lesson history",
-    "subtitle": "Summaries only (no full transcripts)"
+    "subtitle": "Approved summaries only (no full transcripts, no teacher prep drafts)"
   }
 }

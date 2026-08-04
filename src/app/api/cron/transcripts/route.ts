@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       transcriptStatus: "waiting_drive",
       status: { not: "cancelled" },
       endsAt: { gte: windowStart, lte: windowEnd },
+      student: { recordingConsent: true },
     },
     select: { id: true },
     take: 20,

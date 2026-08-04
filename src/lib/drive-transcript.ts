@@ -1,17 +1,29 @@
 import { summarizeTranscript, type LessonSummaryPayload } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import {
+  nameHintsForStudent,
+  pickBestDriveTranscript,
+  type DriveFileLike,
+} from "@/lib/drive-match";
+import {
   exportDriveDocText,
   getValidAccessToken,
   listRecentDriveDocs,
 } from "@/lib/google";
-import { toJson } from "@/lib/utils";
+import {
+  deriveStrengths,
+  mergeStringLists,
+  planGrammarMerge,
+  planVocabMerge,
+} from "@/lib/student-memory";
+import { parseJsonArray, toJson } from "@/lib/utils";
 
 export type DriveFetchStatus =
   | "imported"
   | "not_found"
   | "empty_doc"
   | "no_google_token"
+  | "consent_denied"
   | "error";
 
 export type DriveFetchResult = {
@@ -21,47 +33,7 @@ export type DriveFetchResult = {
   message?: string;
 };
 
-type DriveFile = {
-  id: string;
-  name: string;
-  createdTime?: string;
-  modifiedTime?: string;
-};
-
-function nameHintsForStudent(studentName: string) {
-  const raw = studentName.trim();
-  const parts = raw
-    .replace(/[\[\]]/g, " ")
-    .split(/[\s_・]+/)
-    .map((p) => p.trim())
-    .filter((p) => p.length >= 2 && !/^(さん|様|lesson|japanese|日本語)$/i.test(p));
-  return Array.from(new Set([raw, ...parts])).filter(Boolean);
-}
-
-function scoreDriveFile(
-  file: DriveFile,
-  opts: { endMs: number; hints: string[]; windowMs: number },
-): number {
-  const name = file.name.toLowerCase();
-  let score = 0;
-  const mod = file.modifiedTime
-    ? new Date(file.modifiedTime).getTime()
-    : file.createdTime
-      ? new Date(file.createdTime).getTime()
-      : 0;
-  if (mod) {
-    const delta = Math.abs(mod - opts.endMs);
-    if (delta <= opts.windowMs) score += 100 - Math.min(90, delta / (60_000 * 2));
-    else if (delta <= opts.windowMs * 2) score += 20;
-  }
-  for (const hint of opts.hints) {
-    const h = hint.toLowerCase();
-    if (h.length >= 2 && name.includes(h)) score += 40;
-  }
-  if (/transcript|文字起こし|文字记录|gemini|meet recording|議事録/.test(name)) score += 35;
-  if (/doc|notes/.test(name)) score += 5;
-  return score;
-}
+type DriveFile = DriveFileLike;
 
 /** List + rank Drive Docs that look like a Meet transcript for this lesson. */
 export async function findTranscriptDriveDoc(opts: {
@@ -73,7 +45,6 @@ export async function findTranscriptDriveDoc(opts: {
 }): Promise<DriveFile | null> {
   const hints = nameHintsForStudent(opts.studentName);
   const primaryHint = hints[0] ?? opts.studentName;
-  const windowMs = 4 * 60 * 60 * 1000;
 
   const searches: Array<string | undefined> = [
     primaryHint,
@@ -96,17 +67,11 @@ export async function findTranscriptDriveDoc(opts: {
     if (seen.size >= 40) break;
   }
 
-  const files = Array.from(seen.values());
-  if (files.length === 0) return null;
-
-  const endMs = opts.endsAt.getTime();
-  const ranked = files
-    .map((f) => ({ f, score: scoreDriveFile(f, { endMs, hints, windowMs }) }))
-    .sort((a, b) => b.score - a.score);
-
-  const best = ranked[0];
-  if (!best || best.score < 25) return null;
-  return best.f;
+  const picked = pickBestDriveTranscript(Array.from(seen.values()), {
+    endsAt: opts.endsAt,
+    studentName: opts.studentName,
+  });
+  return picked?.file ?? null;
 }
 
 async function persistRefreshedToken(
@@ -282,6 +247,13 @@ export async function fetchAndImportDriveTranscript(lessonId: string): Promise<D
   });
   if (!lesson) return { status: "error", message: "Lesson not found" };
 
+  if (!lesson.student.recordingConsent) {
+    return {
+      status: "consent_denied",
+      message: "Student has not consented to recording/transcript import. Paste manually or update consent.",
+    };
+  }
+
   try {
     const accessToken = await getValidAccessToken(lesson.teacher);
     if (!accessToken) {
@@ -376,59 +348,66 @@ export async function persistSummaryToStudentMemory(lessonId: string) {
 
   const existingVocab = await prisma.vocabItem.findMany({
     where: { studentId: lesson.studentId },
-    select: { term: true },
   });
-  const vocabSet = new Set(existingVocab.map((v) => v.term.toLowerCase()));
-  for (const v of vocab.slice(0, 20)) {
-    if (!v.term || vocabSet.has(v.term.toLowerCase())) continue;
-    await prisma.vocabItem.create({
-      data: {
-        studentId: lesson.studentId,
-        term: v.term,
-        reading: v.reading ?? "",
-        meaning: v.meaning ?? "",
-      },
-    });
-    vocabSet.add(v.term.toLowerCase());
+  for (const op of planVocabMerge(vocab, existingVocab)) {
+    if (op.action === "create") {
+      await prisma.vocabItem.create({
+        data: {
+          studentId: lesson.studentId,
+          term: op.term,
+          reading: op.reading,
+          meaning: op.meaning,
+        },
+      });
+    } else {
+      await prisma.vocabItem.update({
+        where: { id: op.id },
+        data: { reading: op.reading, meaning: op.meaning },
+      });
+    }
   }
 
   const existingGrammar = await prisma.grammarItem.findMany({
     where: { studentId: lesson.studentId },
-    select: { pattern: true },
   });
-  const grammarSet = new Set(existingGrammar.map((g) => g.pattern.toLowerCase()));
-  for (const g of grammar.slice(0, 20)) {
-    if (!g.pattern || grammarSet.has(g.pattern.toLowerCase())) continue;
-    await prisma.grammarItem.create({
-      data: {
-        studentId: lesson.studentId,
-        pattern: g.pattern,
-        notes: g.notes ?? "",
-      },
-    });
-    grammarSet.add(g.pattern.toLowerCase());
+  for (const op of planGrammarMerge(grammar, existingGrammar)) {
+    if (op.action === "create") {
+      await prisma.grammarItem.create({
+        data: {
+          studentId: lesson.studentId,
+          pattern: op.pattern,
+          notes: op.notes,
+        },
+      });
+    } else {
+      await prisma.grammarItem.update({
+        where: { id: op.id },
+        data: { notes: op.notes },
+      });
+    }
   }
 
-  const topics = (() => {
-    try {
-      return JSON.parse(lesson.summary.topicsJson) as string[];
-    } catch {
-      return [];
-    }
-  })();
-  const mistakes = (() => {
-    try {
-      return JSON.parse(lesson.summary.mistakesJson) as string[];
-    } catch {
-      return [];
-    }
-  })();
+  const topics = parseJsonArray(lesson.summary.topicsJson);
+  const mistakes = parseJsonArray(lesson.summary.mistakesJson);
+  const newStrengths = deriveStrengths(topics, mistakes);
 
   const existing = await prisma.progressSnapshot.findUnique({
     where: { studentId: lesson.studentId },
   });
-  const covered = Array.from(
-    new Set([...(existing ? JSON.parse(existing.topicsCoveredJson || "[]") as string[] : []), ...topics]),
+  const covered = mergeStringLists(
+    existing ? parseJsonArray(existing.topicsCoveredJson) : [],
+    topics,
+    40,
+  );
+  const strengths = mergeStringLists(
+    existing ? parseJsonArray(existing.strengthsJson) : [],
+    newStrengths,
+    12,
+  );
+  const weaknesses = mergeStringLists(
+    existing ? parseJsonArray(existing.weaknessesJson) : [],
+    mistakes,
+    12,
   );
 
   await prisma.progressSnapshot.upsert({
@@ -436,21 +415,15 @@ export async function persistSummaryToStudentMemory(lessonId: string) {
     create: {
       studentId: lesson.studentId,
       topicsCoveredJson: toJson(covered),
-      strengthsJson: toJson([]),
-      weaknessesJson: toJson(mistakes.slice(0, 12)),
+      strengthsJson: toJson(strengths),
+      weaknessesJson: toJson(weaknesses),
       attendanceCount: 1,
       note: lesson.summary.nextFocus,
     },
     update: {
       topicsCoveredJson: toJson(covered),
-      weaknessesJson: toJson(
-        Array.from(
-          new Set([
-            ...(existing ? (JSON.parse(existing.weaknessesJson || "[]") as string[]) : []),
-            ...mistakes,
-          ]),
-        ).slice(0, 12),
-      ),
+      strengthsJson: toJson(strengths),
+      weaknessesJson: toJson(weaknesses),
       attendanceCount: (existing?.attendanceCount ?? 0) + 1,
       note: lesson.summary.nextFocus,
     },

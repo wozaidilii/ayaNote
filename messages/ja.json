@@ -55,7 +55,11 @@
     "subtitle": "これから始まるレッスンと一行コンテキスト",
     "prepStatus": "教案",
     "context": "前回フォーカス",
-    "joinMeet": "Meetに入る"
+    "joinMeet": "Meetに入る",
+    "openPrep": "教案を開く",
+    "pendingBookings": "保留中の予約リクエスト",
+    "bookingConflict": "既存レッスンと時間が重なっています。却下するか別枠を選んでください。",
+    "bookingUpdated": "予約の承認／却下を保存しました。"
   },
   "calendar": {
     "title": "Googleカレンダー",
@@ -157,7 +161,22 @@
     "errDriveNotFound": "一致するDriveドキュメントが見つかりません。Meet転写の保存を待つか、設定でフォルダIDを指定、または手動貼り付け。",
     "errDriveEmpty": "ドキュメントは見つかりましたが中身が空です。",
     "errDriveNoGoogle": "Google未連携です。設定から接続してください。",
-    "errDriveGeneric": "Drive取得に失敗"
+    "errDriveConsent": "生徒が録音に同意していません。プロフィールで同意をオンにするか、手動貼り付けしてください。",
+    "errDriveGeneric": "Drive取得に失敗",
+    "lessonStatus": "レッスン",
+    "pipelineTitle": "レッスン導線",
+    "pipelineHint": "進行状況を更新 → 転写取り込み → メモリ承認 → 次回教案へ。",
+    "markInProgress": "進行中にする",
+    "markComplete": "完了にする",
+    "openPrep": "教案を開く",
+    "okApproved": "要約を承認し、生徒メモリに反映しました（重複は統合）。",
+    "okStatus": "レッスン状態を更新しました。",
+    "heuristicBadge": "簡易要約",
+    "heuristicWarn": "AIモデルなしの簡易要約です。承認前に内容を確認してください。",
+    "noConsent": "録音同意なし",
+    "consentRequired": "録音同意がオフのため、Drive自動取り込みはできません。",
+    "approvedNote": "承認済み — 語彙／文法はメモリに統合済み。",
+    "prepSidebar": "教案下書き"
   },
   "prep": {
     "title": "教案キュー",
@@ -189,7 +208,10 @@
     "refsNone": "まだなし",
     "placeholderLine1": "コース・目標・レベルを読み込み中…",
     "placeholderLine2": "直近のレッスン要約と次回フォーカスを参照中…",
-    "placeholderLine3": "語彙バンクと弱点を各セクションに反映中…"
+    "placeholderLine3": "語彙バンクと弱点を各セクションに反映中…",
+    "sourceAi": "AI生成",
+    "sourceHeuristic": "ローカル簡易生成（AIキーなし／失敗）— 授業前に編集してください",
+    "sourceEdited": "先生が編集した下書き"
   },
   "availability": {
     "title": "空き時間",
@@ -203,7 +225,9 @@
     "blackouts": "休講日",
     "blackoutReason": "理由（任意）",
     "addBlackout": "休講日を追加",
-    "remove": "削除"
+    "remove": "削除",
+    "bookingConflict": "既存レッスンと時間が重なっています。",
+    "bookingUpdated": "予約の承認／却下を保存しました。"
   },
   "settings": {
     "title": "設定",
@@ -239,7 +263,8 @@
     "joinMeet": "Meetに入る",
     "status": "ステータス",
     "pending": "保留中のリクエスト",
-    "switchStudent": "表示する生徒",
+    "notices": "予約の更新",
+    "bookCta": "予約・振替",
     "noUpcoming": "次回レッスンがまだありません。先生がGoogleカレンダーを同期するか、予約してください。",
     "noMeetYet": "この予定にMeetリンクがまだありません。"
   },
@@ -258,10 +283,14 @@
     "confirm": "この枠で確定",
     "duration": "時間",
     "cancel": "キャンセル",
-    "myBookings": "自分の予約"
+    "myBookings": "自分の予約",
+    "okRequested": "リクエストを送信しました。先生の確認をお待ちください。",
+    "errConflict": "既存レッスンと時間が重なっています。",
+    "errHalfHour": "開始時刻は :00 または :30 にしてください。",
+    "errInvalidTime": "開始時刻が無効です。"
   },
   "studentHistory": {
     "title": "レッスン履歴",
-    "subtitle": "要約のみ（全文書き起こしは非表示）"
+    "subtitle": "承認済み要約のみ（全文・教案下書きは非表示）"
   }
 }

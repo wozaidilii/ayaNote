@@ -124,6 +124,9 @@ export default async function PrepPage({
           placeholderLine1: t("placeholderLine1"),
           placeholderLine2: t("placeholderLine2"),
           placeholderLine3: t("placeholderLine3"),
+          sourceAi: t("sourceAi"),
+          sourceHeuristic: t("sourceHeuristic"),
+          sourceEdited: t("sourceEdited"),
         }}
       />
     </AppShell>

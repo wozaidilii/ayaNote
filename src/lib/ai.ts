@@ -225,9 +225,9 @@ export async function generatePrepDraft(input: {
   lastTopics: string[];
   weaknesses: string[];
   vocab: string[];
-}): Promise<PrepDraftPayload> {
+}): Promise<PrepDraftPayload & { generationSource: "ai" | "heuristic" }> {
   const model = getModel();
-  if (!model) return heuristicPrep(input);
+  if (!model) return { ...heuristicPrep(input), generationSource: "heuristic" };
 
   const course = courseTypeLabel(input.courseType || input.level);
 
@@ -248,8 +248,8 @@ Return warmup, review (include example sentences using last grammar), newFocus, 
 Match register to course (business keigo / casual / JLPT patterns / travel).
 Keep each section actionable; Japanese phrases welcome.`,
     });
-    return object;
+    return { ...object, generationSource: "ai" };
   } catch {
-    return heuristicPrep(input);
+    return { ...heuristicPrep(input), generationSource: "heuristic" };
   }
 }

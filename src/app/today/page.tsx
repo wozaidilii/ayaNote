@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
+import { BookingInbox } from "@/components/booking-inbox";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 import { formatInTz, normalizeTimezone, rollingDayWindowInTz } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
-export default async function TodayPage() {
+export default async function TodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; err?: string }>;
+}) {
+  const sp = await searchParams;
   const [t, common, nav, teacher] = await Promise.all([
     getTranslations("today"),
     getTranslations("common"),
@@ -17,28 +23,36 @@ export default async function TodayPage() {
   const timeZone = normalizeTimezone(teacher.timezone);
   const { start, end } = rollingDayWindowInTz(timeZone, 2);
 
-  const lessons = await prisma.lesson.findMany({
-    where: {
-      teacherId: teacher.id,
-      startsAt: { gte: start, lt: end },
-      status: { not: "cancelled" },
-    },
-    include: {
-      student: {
-        include: {
-          progress: true,
-          lessons: {
-            where: { status: "completed" },
-            include: { summary: true },
-            orderBy: { startsAt: "desc" },
-            take: 1,
+  const [lessons, pendingBookings] = await Promise.all([
+    prisma.lesson.findMany({
+      where: {
+        teacherId: teacher.id,
+        startsAt: { gte: start, lt: end },
+        status: { not: "cancelled" },
+      },
+      include: {
+        student: {
+          include: {
+            progress: true,
+            lessons: {
+              where: { status: "completed" },
+              include: { summary: true },
+              orderBy: { startsAt: "desc" },
+              take: 1,
+            },
           },
         },
+        prepDraft: true,
       },
-      prepDraft: true,
-    },
-    orderBy: { startsAt: "asc" },
-  });
+      orderBy: { startsAt: "asc" },
+    }),
+    prisma.bookingRequest.findMany({
+      where: { teacherId: teacher.id, status: "pending" },
+      include: { student: true },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+  ]);
 
   return (
     <AppShell active="today">
@@ -58,6 +72,31 @@ export default async function TodayPage() {
           </Link>
         </div>
       </header>
+
+      {sp.err === "booking_conflict" && <p className="chip">{t("bookingConflict")}</p>}
+      {sp.ok?.startsWith("booking_") && <p className="chip done">{t("bookingUpdated")}</p>}
+
+      {pendingBookings.length > 0 && (
+        <div style={{ marginBottom: "1rem" }}>
+          <BookingInbox
+            returnTo="/today"
+            timeZone={timeZone}
+            bookings={pendingBookings.map((b) => ({
+              id: b.id,
+              type: b.type,
+              note: b.note,
+              studentName: b.student.name,
+              requestedStart: b.requestedStart,
+            }))}
+            labels={{
+              title: t("pendingBookings"),
+              empty: common("noItems"),
+              approve: common("approve"),
+              decline: common("decline"),
+            }}
+          />
+        </div>
+      )}
 
       <div className="panel">
         <div className="panel-header">
@@ -85,7 +124,7 @@ export default async function TodayPage() {
                   <div className="list-row-title">{lesson.student.name}</div>
                   <div className="list-row-meta">
                     {formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone)} ·{" "}
-                    {lesson.student.level}
+                    {lesson.student.level} · {lesson.status}
                   </div>
                   <div className="list-row-tags">
                     <span className="chip">
@@ -102,6 +141,9 @@ export default async function TodayPage() {
                       {t("joinMeet")}
                     </a>
                   )}
+                  <Link className="btn secondary sm" href={`/prep?lesson=${lesson.id}`}>
+                    {t("openPrep")}
+                  </Link>
                   <Link className="btn secondary sm" href={`/lessons/${lesson.id}`}>
                     {common("openLesson")}
                   </Link>

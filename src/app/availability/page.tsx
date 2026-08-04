@@ -1,18 +1,23 @@
 import { getTranslations } from "next-intl/server";
 import {
   addBlackoutDate,
-  decideBooking,
   removeBlackoutDate,
   updateAvailability,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { AvailabilityForm } from "@/components/availability-form";
+import { BookingInbox } from "@/components/booking-inbox";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
-import { formatInTz, normalizeTimezone, ymdInTz } from "@/lib/timezone";
+import { normalizeTimezone, ymdInTz } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
-export default async function AvailabilityPage() {
+export default async function AvailabilityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; err?: string }>;
+}) {
+  const sp = await searchParams;
   const [t, common, teacher] = await Promise.all([
     getTranslations("availability"),
     getTranslations("common"),
@@ -38,6 +43,9 @@ export default async function AvailabilityPage() {
       <p className="muted">
         {t("subtitle")} · {timeZone}
       </p>
+
+      {sp.err === "booking_conflict" && <p className="chip">{t("bookingConflict")}</p>}
+      {sp.ok?.startsWith("booking_") && <p className="chip done">{t("bookingUpdated")}</p>}
 
       <AvailabilityForm
         action={updateAvailability}
@@ -89,38 +97,23 @@ export default async function AvailabilityPage() {
         ))}
       </div>
 
-      <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("bookings")}</h2>
-        {bookings.length === 0 && <p className="muted">{common("noItems")}</p>}
-        {bookings.map((b) => (
-          <div className="list-row" key={b.id}>
-            <div>
-              <div style={{ fontWeight: 700 }}>
-                {b.student.name} · {b.type}
-              </div>
-              <div className="muted">
-                {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)} — {b.note || "—"}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "0.4rem" }}>
-              <form action={decideBooking}>
-                <input type="hidden" name="id" value={b.id} />
-                <input type="hidden" name="decision" value="approve" />
-                <button className="btn" type="submit">
-                  {common("approve")}
-                </button>
-              </form>
-              <form action={decideBooking}>
-                <input type="hidden" name="id" value={b.id} />
-                <input type="hidden" name="decision" value="decline" />
-                <button className="btn danger" type="submit">
-                  {common("decline")}
-                </button>
-              </form>
-            </div>
-          </div>
-        ))}
-      </div>
+      <BookingInbox
+        returnTo="/availability"
+        timeZone={timeZone}
+        bookings={bookings.map((b) => ({
+          id: b.id,
+          type: b.type,
+          note: b.note,
+          studentName: b.student.name,
+          requestedStart: b.requestedStart,
+        }))}
+        labels={{
+          title: t("bookings"),
+          empty: common("noItems"),
+          approve: common("approve"),
+          decline: common("decline"),
+        }}
+      />
     </AppShell>
   );
 }

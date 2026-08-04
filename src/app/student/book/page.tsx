@@ -6,7 +6,12 @@ import { prisma } from "@/lib/db";
 import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
-export default async function StudentBookPage() {
+export default async function StudentBookPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; err?: string }>;
+}) {
+  const sp = await searchParams;
   const active = await getActiveStudent();
   const [t, common, teacher, student] = await Promise.all([
     getTranslations("studentBook"),
@@ -83,6 +88,11 @@ export default async function StudentBookPage() {
       <p className="muted">
         {t("subtitle")} · {student.name}
       </p>
+
+      {sp.ok === "requested" && <p className="chip done">{t("okRequested")}</p>}
+      {sp.err === "booking_conflict" && <p className="chip">{t("errConflict")}</p>}
+      {sp.err === "half_hour" && <p className="chip">{t("errHalfHour")}</p>}
+      {sp.err === "invalid_time" && <p className="chip">{t("errInvalidTime")}</p>}
 
       <div className="panel" style={{ marginTop: "1.1rem" }}>
         <span className="pixel-banner">{t("slotRule")}</span>
