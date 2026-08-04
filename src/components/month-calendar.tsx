@@ -61,7 +61,8 @@ export function MonthCalendar({
   }
 
   const heads = locale.startsWith("ja") ? WEEKDAYS_JA : WEEKDAYS;
-  const focusYmd = selectedYmd && byDay.has(selectedYmd) ? selectedYmd : todayYmd;
+  const focusYmd =
+    selectedYmd && byDay.has(selectedYmd) ? selectedYmd : todayYmd;
   const dayLessons = byDay.get(focusYmd) ?? [];
   const now = Date.now();
 
@@ -69,18 +70,31 @@ export function MonthCalendar({
     <div className="month-cal">
       <div className="month-cal-toolbar">
         <div className="month-cal-nav">
-          <Link className="btn ghost" href={`/calendar?month=${prevMonth}`} aria-label="Previous month">
+          <Link
+            className="btn ghost"
+            href={`/calendar?month=${prevMonth}`}
+            aria-label="Previous month"
+          >
             ‹
           </Link>
           <h2 className="month-cal-title">{monthLabel}</h2>
-          <Link className="btn ghost" href={`/calendar?month=${nextMonth}`} aria-label="Next month">
+          <Link
+            className="btn ghost"
+            href={`/calendar?month=${nextMonth}`}
+            aria-label="Next month"
+          >
             ›
           </Link>
-          <Link className="btn secondary" href={`/calendar?month=${todayYmd.slice(0, 7)}&day=${todayYmd}`}>
+          <Link
+            className="btn secondary"
+            href={`/calendar?month=${todayYmd.slice(0, 7)}&day=${todayYmd}`}
+          >
             {labels.today}
           </Link>
         </div>
-        <span className="chip sky">{labels.timezone}: {timeZone}</span>
+        <span className="chip sky">
+          {labels.timezone}: {timeZone}
+        </span>
       </div>
 
       <div className="month-cal-grid">
@@ -111,7 +125,9 @@ export function MonthCalendar({
                 <div className="month-cal-daynum">{dayNum}</div>
                 <div className="month-cal-events">
                   {items.slice(0, 3).map((ev) => {
-                    const past = new Date(ev.endsAt).getTime() < now || ev.status === "completed";
+                    const past =
+                      new Date(ev.endsAt).getTime() < now ||
+                      ev.status === "completed";
                     return (
                       <div
                         key={ev.id}
@@ -137,40 +153,75 @@ export function MonthCalendar({
 
       <div className="month-cal-detail panel" style={{ marginTop: "1rem" }}>
         <h3 style={{ marginTop: 0 }}>
-          {formatInTz(wallTimeToUtc(focusYmd, "12:00", timeZone), "EEE · yyyy-MM-dd", timeZone)}
+          {formatInTz(
+            wallTimeToUtc(focusYmd, "12:00", timeZone),
+            "EEE · yyyy-MM-dd",
+            timeZone,
+          )}
         </h3>
-        {dayLessons.length === 0 && <p className="muted">{labels.noLessonsDay}</p>}
+        {dayLessons.length === 0 && (
+          <p className="muted">{labels.noLessonsDay}</p>
+        )}
         {dayLessons.map((lesson) => {
-          const past = new Date(lesson.endsAt).getTime() < now || lesson.status === "completed";
+          const past =
+            new Date(lesson.endsAt).getTime() < now ||
+            lesson.status === "completed";
           return (
             <div className="list-row" key={lesson.id}>
               <div>
                 <div style={{ fontWeight: 700 }}>
                   {formatInTz(lesson.startsAt, "HH:mm", timeZone)}–
-                  {formatInTz(lesson.endsAt, "HH:mm", timeZone)} · {lesson.studentName}
+                  {formatInTz(lesson.endsAt, "HH:mm", timeZone)} ·{" "}
+                  {lesson.studentName}
                 </div>
-                <div style={{ marginTop: "0.35rem", display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    marginTop: "0.35rem",
+                    display: "flex",
+                    gap: "0.35rem",
+                    flexWrap: "wrap",
+                  }}
+                >
                   <span className={`chip ${past ? "done" : "soon"}`}>
                     {past ? labels.finished : labels.upcoming}
                   </span>
-                  {lesson.fromGoogle && <span className="chip sky">Google</span>}
-                  {lesson.prepStatus && <span className="chip">Prep: {lesson.prepStatus}</span>}
+                  {lesson.fromGoogle && (
+                    <span className="chip sky">Google</span>
+                  )}
+                  {lesson.prepStatus && (
+                    <span className="chip">Prep: {lesson.prepStatus}</span>
+                  )}
                 </div>
               </div>
               <div style={{ display: "grid", gap: "0.35rem" }}>
                 {lesson.meetLink && !past && (
-                  <a className="btn" href={lesson.meetLink} target="_blank" rel="noreferrer">
+                  <a
+                    className="btn"
+                    href={lesson.meetLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     {labels.joinMeet}
                   </a>
                 )}
                 {!past && (
-                  <Link className="btn secondary" href={`/prep?lesson=${lesson.id}#lesson-${lesson.id}`}>
+                  <Link
+                    className="btn secondary"
+                    href={`/prep?lesson=${lesson.id}#lesson-${lesson.id}`}
+                  >
                     {labels.openPrep}
                   </Link>
                 )}
-                <Link className="btn ghost" href={`/lessons/${lesson.id}`}>
-                  {past || lesson.hasSummary ? labels.openRecord : labels.openLesson}
-                </Link>
+                <a
+                  className="btn ghost"
+                  href={`/classroom/${lesson.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {past || lesson.hasSummary
+                    ? labels.openRecord
+                    : labels.openLesson}
+                </a>
               </div>
             </div>
           );

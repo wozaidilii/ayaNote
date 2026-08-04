@@ -8,11 +8,8 @@ import {
   updateLessonStatus,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
-import { ClassroomVideo } from "@/components/classroom-video";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
-import { livekitConfigured } from "@/lib/livekit";
-import { sttConfigured } from "@/lib/stt";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -106,8 +103,6 @@ export default async function LessonRoomPage({
   const googleConnected = Boolean(
     lesson.teacher.googleConnectedEmail || lesson.teacher.googleRefreshToken,
   );
-  const livekitReady = livekitConfigured();
-  const sttReady = sttConfigured();
 
   return (
     <AppShell active="today">
@@ -128,6 +123,7 @@ export default async function LessonRoomPage({
           display: "flex",
           flexWrap: "wrap",
           gap: "0.35rem",
+          alignItems: "center",
         }}
       >
         <span className="chip">{t(statusKey)}</span>
@@ -140,6 +136,14 @@ export default async function LessonRoomPage({
         <span className="chip">
           {hasAiKey ? t("aiReady", { provider }) : t("aiMissing", { provider })}
         </span>
+        <a
+          className="btn"
+          href={`/classroom/${lesson.id}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t("openClassroomTab")}
+        </a>
       </div>
 
       {sp.ok === "summary" && <p className="chip done">{t("okSummary")}</p>}
@@ -173,30 +177,6 @@ export default async function LessonRoomPage({
             {t("errDriveGeneric")}: {sp.err}
           </p>
         )}
-
-      <div style={{ marginTop: "1.2rem" }}>
-        <ClassroomVideo
-          lessonId={lesson.id}
-          livekitReady={livekitReady}
-          sttReady={sttReady}
-          labels={{
-            title: t("classroomTitle"),
-            join: t("classroomJoin"),
-            leave: t("classroomLeave"),
-            connecting: t("classroomConnecting"),
-            notConfigured: t("classroomNotConfigured"),
-            recording: t("classroomRecording"),
-            ending: t("classroomEnding"),
-            endAndTranscribe: t("classroomEndTranscribe"),
-            leaveOnly: t("classroomLeaveOnly"),
-            errorToken: t("classroomErrToken"),
-            errorTranscribe: t("classroomErrTranscribe"),
-            okTranscribed: t("okLivekit"),
-            sttMissing: t("classroomSttMissing"),
-            hint: t("classroomHint"),
-          }}
-        />
-      </div>
 
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div>

@@ -51,8 +51,8 @@ export default async function StudentDetailPage({
     <AppShell active="students">
       <h1 className="h1">{student.name}</h1>
       <p className="muted">
-        {common("course")}: {courseTypeLabel(student.courseType)} · {common("level")}:{" "}
-        {student.level} · {student.email}
+        {common("course")}: {courseTypeLabel(student.courseType)} ·{" "}
+        {common("level")}: {student.level} · {student.email}
         {student.archivedAt && ` · ${t("archived")}`}
       </p>
 
@@ -66,11 +66,20 @@ export default async function StudentDetailPage({
       >
         {nextLesson && (
           <>
-            <Link className="btn" href={`/lessons/${nextLesson.id}`}>
-              {t("nextLesson")}: {formatInTz(nextLesson.startsAt, "MMM d HH:mm", timeZone)}
-            </Link>
+            <a
+              className="btn"
+              href={`/classroom/${nextLesson.id}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("nextLesson")}:{" "}
+              {formatInTz(nextLesson.startsAt, "MMM d HH:mm", timeZone)}
+            </a>
             {nextLesson.prepDraft && (
-              <Link className="btn secondary" href={`/prep?lesson=${nextLesson.id}#lesson-${nextLesson.id}`}>
+              <Link
+                className="btn secondary"
+                href={`/prep?lesson=${nextLesson.id}#lesson-${nextLesson.id}`}
+              >
                 {t("openPrep")}
               </Link>
             )}
@@ -79,9 +88,7 @@ export default async function StudentDetailPage({
             </Link>
           </>
         )}
-        {!nextLesson && (
-          <span className="chip">{t("noUpcoming")}</span>
-        )}
+        {!nextLesson && <span className="chip">{t("noUpcoming")}</span>}
       </div>
 
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
@@ -93,11 +100,21 @@ export default async function StudentDetailPage({
           </div>
           <div className="field">
             <label htmlFor="email">{t("email")}</label>
-            <input id="email" name="email" type="email" defaultValue={student.email} required />
+            <input
+              id="email"
+              name="email"
+              type="email"
+              defaultValue={student.email}
+              required
+            />
           </div>
           <div className="field">
             <label htmlFor="courseType">{common("course")}</label>
-            <select id="courseType" name="courseType" defaultValue={student.courseType}>
+            <select
+              id="courseType"
+              name="courseType"
+              defaultValue={student.courseType}
+            >
               {COURSE_TYPES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -115,10 +132,25 @@ export default async function StudentDetailPage({
           </div>
           <div className="field">
             <label htmlFor="privateNotes">Private notes</label>
-            <textarea id="privateNotes" name="privateNotes" defaultValue={student.privateNotes} />
+            <textarea
+              id="privateNotes"
+              name="privateNotes"
+              defaultValue={student.privateNotes}
+            />
           </div>
-          <label style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.8rem" }}>
-            <input type="checkbox" name="recordingConsent" defaultChecked={student.recordingConsent} />
+          <label
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              alignItems: "center",
+              marginBottom: "0.8rem",
+            }}
+          >
+            <input
+              type="checkbox"
+              name="recordingConsent"
+              defaultChecked={student.recordingConsent}
+            />
             {t("consent")}
           </label>
           <button className="btn" type="submit">
@@ -129,11 +161,13 @@ export default async function StudentDetailPage({
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>{t("progress")}</h2>
           <p>
-            <strong>{common("attendance")}:</strong> {student.progress?.attendanceCount ?? 0}
+            <strong>{common("attendance")}:</strong>{" "}
+            {student.progress?.attendanceCount ?? 0}
           </p>
           <p>
             <strong>{common("topics")}:</strong>{" "}
-            {parseJsonArray(student.progress?.topicsCoveredJson).join(" · ") || "—"}
+            {parseJsonArray(student.progress?.topicsCoveredJson).join(" · ") ||
+              "—"}
           </p>
           <p>
             <strong>{common("strengths")}:</strong>{" "}
@@ -141,7 +175,8 @@ export default async function StudentDetailPage({
           </p>
           <p>
             <strong>{common("weaknesses")}:</strong>{" "}
-            {parseJsonArray(student.progress?.weaknessesJson).join(" · ") || "—"}
+            {parseJsonArray(student.progress?.weaknessesJson).join(" · ") ||
+              "—"}
           </p>
           <p className="muted">{student.progress?.note}</p>
 
@@ -150,7 +185,13 @@ export default async function StudentDetailPage({
             {t("inviteHint")}
           </p>
           {inviteUrl ? (
-            <code style={{ display: "block", wordBreak: "break-all", fontSize: "0.8rem" }}>
+            <code
+              style={{
+                display: "block",
+                wordBreak: "break-all",
+                fontSize: "0.8rem",
+              }}
+            >
               {inviteUrl || `/invite/${student.inviteToken}`}
             </code>
           ) : (
@@ -158,7 +199,8 @@ export default async function StudentDetailPage({
           )}
           {student.inviteTokenExpiresAt && (
             <p className="muted" style={{ fontSize: "0.85rem" }}>
-              {t("inviteExpires")}: {ymdInTz(student.inviteTokenExpiresAt, timeZone)}
+              {t("inviteExpires")}:{" "}
+              {ymdInTz(student.inviteTokenExpiresAt, timeZone)}
             </p>
           )}
           <form action={regenerateInviteToken} style={{ marginTop: "0.6rem" }}>
@@ -196,11 +238,18 @@ export default async function StudentDetailPage({
               <div style={{ fontWeight: 650 }}>
                 {formatInTz(lesson.startsAt, "yyyy-MM-dd HH:mm", timeZone)}
               </div>
-              <div className="muted">{lesson.summary?.nextFocus || lesson.status}</div>
+              <div className="muted">
+                {lesson.summary?.nextFocus || lesson.status}
+              </div>
             </div>
-            <Link className="btn ghost" href={`/lessons/${lesson.id}`}>
-              Open
-            </Link>
+            <a
+              className="btn ghost"
+              href={`/classroom/${lesson.id}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Classroom
+            </a>
           </div>
         ))}
       </div>
@@ -211,7 +260,8 @@ export default async function StudentDetailPage({
           <ul>
             {student.vocabItems.map((v) => (
               <li key={v.id}>
-                <strong>{v.term}</strong> {v.reading && `(${v.reading})`} — {v.meaning}
+                <strong>{v.term}</strong> {v.reading && `(${v.reading})`} —{" "}
+                {v.meaning}
               </li>
             ))}
           </ul>

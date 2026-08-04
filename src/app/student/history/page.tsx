@@ -35,7 +35,9 @@ export default async function StudentHistoryPage() {
         {t("subtitle")} · {student.name} · {timeZone}
       </p>
       <div className="panel" style={{ marginTop: "1.2rem" }}>
-        {student.lessons.length === 0 && <p className="muted">{common("noItems")}</p>}
+        {student.lessons.length === 0 && (
+          <p className="muted">{common("noItems")}</p>
+        )}
         {student.lessons.map((lesson) => (
           <div className="list-row" key={lesson.id}>
             <div>
@@ -44,7 +46,9 @@ export default async function StudentHistoryPage() {
               </div>
               <div className="muted">
                 {common("topics")}:{" "}
-                {lesson.summary ? parseJsonArray(lesson.summary.topicsJson).join(" · ") : "—"}
+                {lesson.summary
+                  ? parseJsonArray(lesson.summary.topicsJson).join(" · ")
+                  : "—"}
               </div>
               <div>
                 {common("homework")}: {lesson.summary?.homework || "—"}
@@ -52,6 +56,16 @@ export default async function StudentHistoryPage() {
               <div>
                 {common("nextFocus")}: {lesson.summary?.nextFocus || "—"}
               </div>
+            </div>
+            <div className="list-row-actions">
+              <a
+                className="btn secondary sm"
+                href={`/classroom/${lesson.id}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t("viewClassroom")}
+              </a>
             </div>
           </div>
         ))}

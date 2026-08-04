@@ -209,7 +209,9 @@ export function FiveDayCalendar({
                     return (
                       <Link
                         key={ev.id}
-                        href={`/lessons/${ev.id}`}
+                        href={`/classroom/${ev.id}`}
+                        target="_blank"
+                        rel="noreferrer"
                         className={`day5-event ${past ? "is-past" : "is-upcoming"}`}
                         style={{ top, height }}
                         title={`${formatInTz(ev.startsAt, "HH:mm", timeZone)} ${ev.studentName}`}

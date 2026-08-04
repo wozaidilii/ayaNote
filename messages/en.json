@@ -56,10 +56,7 @@
     "prepStatus": "Prep",
     "context": "Last focus",
     "joinMeet": "Join Meet",
-    "openPrep": "Open prep",
-    "pendingBookings": "Pending booking requests",
-    "bookingConflict": "That time conflicts with an existing lesson. Decline or pick another slot.",
-    "bookingUpdated": "Booking decision saved."
+    "openClassroom": "Open Classroom"
   },
   "calendar": {
     "title": "Google Calendar",
@@ -149,6 +146,7 @@
     "classroomErrTranscribe": "Transcription failed",
     "classroomSttMissing": "STT not configured — set OPENAI_API_KEY (Whisper) or DEEPGRAM_API_KEY. You can still call, then paste a transcript below.",
     "okLivekit": "Classroom audio transcribed and summarized. Review below.",
+    "openClassroomTab": "Open Classroom (new tab)",
     "statusNone": "No transcript yet",
     "statusWaiting": "Waiting for Drive transcript",
     "statusImported": "Imported from Drive",
@@ -306,6 +304,20 @@
   },
   "studentHistory": {
     "title": "Lesson history",
-    "subtitle": "Approved summaries only (no full transcripts, no teacher prep drafts)"
+    "subtitle": "Summaries only (no full transcripts)",
+    "viewClassroom": "View classroom & plan"
+  },
+  "classroom": {
+    "planTitle": "Lesson plan",
+    "notesTitle": "Shared notes",
+    "notesHint": "Teacher and student can both edit. Changes autosave and sync every few seconds.",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "peerUpdated": "Updated from the other side",
+    "saveError": "Save failed — retry by editing again",
+    "pastBanner": "Past classroom — video ended. Lesson plan and notes from this session stay below.",
+    "pastChip": "Past session",
+    "openLessonRoom": "Lesson room (transcript)",
+    "back": "Back"
   }
 }
