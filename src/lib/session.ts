@@ -49,12 +49,12 @@ export async function requireTeacher() {
     session.role !== "teacher" ||
     !session.teacherId
   ) {
-    redirect("/login");
+    redirect("/");
   }
   const teacher = await prisma.teacher.findUnique({
     where: { id: session.teacherId },
   });
-  if (!teacher) redirect("/login");
+  if (!teacher) redirect("/");
   return teacher;
 }
 

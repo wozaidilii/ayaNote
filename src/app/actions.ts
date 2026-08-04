@@ -21,15 +21,15 @@ export async function loginTeacher(formData: FormData) {
     .toLowerCase();
   const password = String(formData.get("password") ?? "");
   if (!email || !password) {
-    redirect("/login?err=missing");
+    redirect("/?err=missing");
   }
 
   const teacher = await prisma.teacher.findUnique({ where: { email } });
   if (!teacher?.passwordHash) {
-    redirect("/login?err=invalid");
+    redirect("/?err=invalid");
   }
   const ok = await verifyPassword(password, teacher.passwordHash);
-  if (!ok) redirect("/login?err=invalid");
+  if (!ok) redirect("/?err=invalid");
 
   await setAuthSession({ role: "teacher", teacherId: teacher.id });
   redirect("/today");
