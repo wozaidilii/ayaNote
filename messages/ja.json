@@ -138,6 +138,10 @@
     "aiReady": "AI: {provider}",
     "aiMissing": "AIキー未設定（{provider}）— ローカルヒューリスティックのみ",
     "okSummary": "まとめを生成しました。下で確認して承認してください。",
+    "summarizingChip": "まとめ生成中…",
+    "generatingTitle": "今日のまとめを生成中",
+    "generatingBody": "Classroom音声を文字起こしし、レッスンまとめを作成しています。完了するとこのページが更新されます。",
+    "generatingFailed": "まとめの生成に時間がかかっています。下に書き起こしを貼り付けるか、Classroomでもう一度「終了して文字起こし」を試してください。",
     "warnNoAiKey": "サーバーにAI APIキーがありません — ローカルヒューリスティックを使用。DEEPSEEK_API_KEYを設定してください。",
     "errEmpty": "生成前に書き起こしを貼り付けてください。"
   },

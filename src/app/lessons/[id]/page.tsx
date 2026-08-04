@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { approveSummary, importTranscriptAndSummarize } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { BookOpen, Video, UiIcon } from "@/components/icons";
+import { SummaryGeneratingPanel } from "@/components/summary-generating-panel";
 import { PageHeading } from "@/components/ui-heading";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
@@ -99,6 +100,7 @@ export default async function LessonRoomPage({
     provider === "deepseek"
       ? Boolean(process.env.DEEPSEEK_API_KEY)
       : Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
+  const summarizing = sp.ok === "summarizing" && !lesson.summary;
 
   return (
     <AppShell active="today" personName={teacher.name}>
@@ -146,48 +148,62 @@ export default async function LessonRoomPage({
       </div>
 
       {sp.ok === "summary" && <p className="chip done">{t("okSummary")}</p>}
+      {summarizing && <p className="chip soon">{t("summarizingChip")}</p>}
       {sp.ok === "livekit" && <p className="chip done">{t("okLivekit")}</p>}
       {sp.warn === "no_ai_key" && <p className="chip">{t("warnNoAiKey")}</p>}
       {sp.err === "empty_transcript" && <p className="chip">{t("errEmpty")}</p>}
 
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div>
-          <form className="panel" action={importTranscriptAndSummarize}>
-            <input type="hidden" name="lessonId" value={lesson.id} />
-            <h2 style={{ marginTop: 0 }}>{t("pasteTitle")}</h2>
-            <p className="muted">{t("manualFallback")}</p>
-            {lesson.summary && <p className="chip">{t("regenNote")}</p>}
-            <div className="field">
-              <label htmlFor="transcript">{t("paste")}</label>
-              <textarea
-                id="transcript"
-                name="transcript"
-                placeholder={t("placeholder")}
-                defaultValue={
-                  lesson.transcript?.editedText ||
-                  lesson.transcript?.rawText ||
-                  ""
-                }
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="tags">{t("tags")}</label>
-              <input
-                id="tags"
-                name="tags"
-                placeholder="て形, keigo, travel"
-                defaultValue={parseJsonArray(lesson.tagsJson).join(", ")}
-              />
-            </div>
-            <button className="btn" type="submit">
-              {lesson.summary
-                ? t("regenerateSummary")
-                : `${common("import")} / ${common("generate")}`}
-            </button>
-          </form>
+          {summarizing ? (
+            <SummaryGeneratingPanel
+              lessonId={lesson.id}
+              labels={{
+                generatingTitle: t("generatingTitle"),
+                generatingBody: t("generatingBody"),
+                generatingFailed: t("generatingFailed"),
+              }}
+            />
+          ) : null}
 
-          {lesson.summary && (
+          {!summarizing && (
+            <form className="panel" action={importTranscriptAndSummarize}>
+              <input type="hidden" name="lessonId" value={lesson.id} />
+              <h2 style={{ marginTop: 0 }}>{t("pasteTitle")}</h2>
+              <p className="muted">{t("manualFallback")}</p>
+              {lesson.summary && <p className="chip">{t("regenNote")}</p>}
+              <div className="field">
+                <label htmlFor="transcript">{t("paste")}</label>
+                <textarea
+                  id="transcript"
+                  name="transcript"
+                  placeholder={t("placeholder")}
+                  defaultValue={
+                    lesson.transcript?.editedText ||
+                    lesson.transcript?.rawText ||
+                    ""
+                  }
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="tags">{t("tags")}</label>
+                <input
+                  id="tags"
+                  name="tags"
+                  placeholder="て形, keigo, travel"
+                  defaultValue={parseJsonArray(lesson.tagsJson).join(", ")}
+                />
+              </div>
+              <button className="btn" type="submit">
+                {lesson.summary
+                  ? t("regenerateSummary")
+                  : `${common("import")} / ${common("generate")}`}
+              </button>
+            </form>
+          )}
+
+          {!summarizing && lesson.summary && (
             <form className="panel" action={approveSummary}>
               <input type="hidden" name="lessonId" value={lesson.id} />
 

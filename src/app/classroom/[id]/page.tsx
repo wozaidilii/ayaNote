@@ -93,9 +93,6 @@ export default async function ClassroomPage({
           statusLive: t("statusLive"),
           statusError: t("statusError"),
           screenShare: t("screenShare"),
-          enlargeVideo: t("enlargeVideo"),
-          restoreBoard: t("restoreBoard"),
-          clickBoardReturn: t("clickBoardReturn"),
         }}
       />
     </div>

@@ -157,6 +157,10 @@
     "aiReady": "AI: {provider}",
     "aiMissing": "AI key missing ({provider}) — local heuristic only",
     "okSummary": "Summary generated. Review and approve below.",
+    "summarizingChip": "Generating summary…",
+    "generatingTitle": "Generating today’s summary",
+    "generatingBody": "Transcribing classroom audio and drafting the lesson summary. This page will update when ready.",
+    "generatingFailed": "Summary is taking too long. Paste a transcript below as a fallback, or reopen Classroom and try End & transcribe again.",
     "warnNoAiKey": "No AI API key on server — summary used a local heuristic. Set DEEPSEEK_API_KEY for better results.",
     "errEmpty": "Paste a transcript before generating."
   },

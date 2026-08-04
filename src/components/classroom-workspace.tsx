@@ -44,9 +44,6 @@ type Labels = {
   statusLive: string;
   statusError: string;
   screenShare: string;
-  enlargeVideo: string;
-  restoreBoard: string;
-  clickBoardReturn: string;
 };
 
 function MixedAudioRecorder({
@@ -237,28 +234,16 @@ function statusLabel(status: ClassroomSaveStatus, labels: Labels) {
 }
 
 function CallLayout({
-  videoExpanded,
-  setVideoExpanded,
   board,
-  labels,
   error,
   recording,
 }: {
-  videoExpanded: boolean;
-  setVideoExpanded: (v: boolean) => void;
   board: ReactNode;
-  labels: Labels;
   error: string | null;
   recording: boolean;
 }) {
   return (
-    <div
-      className={
-        videoExpanded
-          ? "classroom-meet-body is-call is-video-expanded"
-          : "classroom-meet-body is-call"
-      }
-    >
+    <div className="classroom-meet-body is-call">
       <aside
         className="classroom-float-dock"
         role="complementary"
@@ -269,41 +254,8 @@ function CallLayout({
         {error && <p className="chip">{error}</p>}
       </aside>
 
-      <section
-        className="classroom-stage panel"
-        onClick={
-          videoExpanded
-            ? () => {
-                setVideoExpanded(false);
-              }
-            : undefined
-        }
-        role={videoExpanded ? "button" : undefined}
-        tabIndex={videoExpanded ? 0 : undefined}
-        onKeyDown={
-          videoExpanded
-            ? (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setVideoExpanded(false);
-                }
-              }
-            : undefined
-        }
-        aria-label={videoExpanded ? labels.clickBoardReturn : undefined}
-      >
-        {videoExpanded && (
-          <p className="classroom-dock-hint muted">{labels.clickBoardReturn}</p>
-        )}
-        <div
-          className={
-            videoExpanded
-              ? "classroom-board-wrap is-compact-preview"
-              : "classroom-board-wrap"
-          }
-        >
-          {board}
-        </div>
+      <section className="classroom-stage panel">
+        <div className="classroom-board-wrap">{board}</div>
       </section>
     </div>
   );
@@ -348,13 +300,12 @@ export function ClassroomWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [recordActive, setRecordActive] = useState(false);
   const [userLeftCall, setUserLeftCall] = useState(false);
-  const [videoExpanded, setVideoExpanded] = useState(false);
   const pendingUploadRef = useRef(false);
 
   const docKey = useMemo(() => JSON.stringify(initialDoc), [initialDoc]);
 
   const join = useCallback(async () => {
-    if (!livekitReady || isPast) return;
+    if (!livekitReady || isPast || ending) return;
     setLoading(true);
     setError(null);
     setUserLeftCall(false);
@@ -375,62 +326,44 @@ export function ClassroomWorkspace({
       }
       setTokenInfo({ token: data.token, url: data.url });
       setRecordActive(true);
-      setVideoExpanded(false);
     } catch {
       setError(labels.errorToken);
     } finally {
       setLoading(false);
     }
-  }, [isPast, labels.errorToken, lessonId, livekitReady]);
+  }, [ending, isPast, labels.errorToken, lessonId, livekitReady]);
 
   useEffect(() => {
-    if (!isPast && livekitReady && !tokenInfo && !userLeftCall) {
+    if (!isPast && livekitReady && !tokenInfo && !userLeftCall && !ending) {
       void join();
     }
-  }, [isPast, join, livekitReady, tokenInfo, userLeftCall]);
+  }, [ending, isPast, join, livekitReady, tokenInfo, userLeftCall]);
 
-  const uploadAndSummarize = async (blob: Blob) => {
-    setEnding(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append("audio", blob, "classroom.webm");
-      const res = await fetch(`/api/lessons/${lessonId}/transcribe`, {
-        method: "POST",
-        body: form,
-      });
-      const data = (await res.json()) as { error?: string; detail?: string };
-      if (!res.ok) {
-        setError(
-          labels.errorTranscribe +
-            (data.detail || data.error ? `: ${data.detail || data.error}` : ""),
-        );
-        return;
-      }
-      setTokenInfo(null);
-      setRecordActive(false);
-      setVideoExpanded(false);
-      if (role === "teacher") {
-        router.push(`/lessons/${lessonId}?ok=summary`);
-      } else {
-        router.push(`/student/history`);
-      }
-      router.refresh();
-    } catch {
-      setError(labels.errorTranscribe);
-    } finally {
-      setEnding(false);
-      pendingUploadRef.current = false;
+  const uploadAndSummarize = (blob: Blob) => {
+    const form = new FormData();
+    form.append("audio", blob, "classroom.webm");
+    // Kick off STT + summary in the background; leave Classroom immediately.
+    void fetch(`/api/lessons/${lessonId}/transcribe`, {
+      method: "POST",
+      body: form,
+    });
+    pendingUploadRef.current = false;
+    setTokenInfo(null);
+    setRecordActive(false);
+    if (role === "teacher") {
+      router.replace(`/lessons/${lessonId}?ok=summarizing`);
+    } else {
+      router.replace(`/student/history`);
     }
   };
 
   const onChunk = useCallback(
     (blob: Blob) => {
       if (!pendingUploadRef.current) return;
-      void uploadAndSummarize(blob);
+      uploadAndSummarize(blob);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lessonId],
+    [lessonId, role],
   );
 
   const endAndTranscribe = () => {
@@ -439,24 +372,30 @@ export function ClassroomWorkspace({
       return;
     }
     pendingUploadRef.current = true;
+    setUserLeftCall(true);
     setEnding(true);
     setRecordActive(false);
   };
+
+  useEffect(() => {
+    if (!ending) return;
+    const timer = window.setTimeout(() => {
+      if (!pendingUploadRef.current) return;
+      pendingUploadRef.current = false;
+      setEnding(false);
+      setTokenInfo(null);
+      setRecordActive(false);
+      setError(labels.errorTranscribe);
+    }, 10000);
+    return () => window.clearTimeout(timer);
+  }, [ending, labels.errorTranscribe]);
 
   const leaveCall = () => {
     pendingUploadRef.current = false;
     setUserLeftCall(true);
     setRecordActive(false);
-    setVideoExpanded(false);
     setTokenInfo(null);
   };
-
-  useEffect(() => {
-    if (tokenInfo && !recordActive && pendingUploadRef.current && ending) {
-      const t = window.setTimeout(() => setTokenInfo(null), 400);
-      return () => window.clearTimeout(t);
-    }
-  }, [ending, recordActive, tokenInfo]);
 
   const board = (
     <>
@@ -493,14 +432,6 @@ export function ClassroomWorkspace({
         {inCall && (
           <>
             <ScreenShareButton label={labels.screenShare} />
-            <button
-              className="btn secondary sm"
-              type="button"
-              disabled={ending}
-              onClick={() => setVideoExpanded(!videoExpanded)}
-            >
-              {videoExpanded ? labels.restoreBoard : labels.enlargeVideo}
-            </button>
             <button
               className="btn sm"
               type="button"
@@ -585,32 +516,36 @@ export function ClassroomWorkspace({
         data-lk-theme="default"
         className="classroom-livekit-root"
         onDisconnected={() => {
-          if (!pendingUploadRef.current) {
+          if (!pendingUploadRef.current && !ending) {
             setTokenInfo(null);
             setRecordActive(false);
-            setVideoExpanded(false);
           }
         }}
       >
         <MixedAudioRecorder active={recordActive} onChunk={onChunk} />
         <RoomAudioRenderer />
         {topBar(true)}
-        <CallLayout
-          videoExpanded={videoExpanded}
-          setVideoExpanded={setVideoExpanded}
-          board={board}
-          labels={labels}
-          error={error}
-          recording={recordActive}
-        />
+        <CallLayout board={board} error={error} recording={recordActive} />
       </LiveKitRoom>
     );
   }
 
   return (
     <div className="classroom-meet">
-      {error && !tokenInfo && <p className="chip">{error}</p>}
+      {error && !tokenInfo && !ending && <p className="chip">{error}</p>}
       {body}
+      {ending && (
+        <div
+          className="classroom-ending-overlay"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="classroom-ending-card panel">
+            <p className="classroom-ending-title">{labels.ending}</p>
+            {error && <p className="chip">{error}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
