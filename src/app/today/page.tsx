@@ -3,7 +3,11 @@ import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { DEMO_TEACHER_EMAIL } from "@/lib/session";
-import { formatInTz, normalizeTimezone, rollingDayWindowInTz } from "@/lib/timezone";
+import {
+  formatInTz,
+  normalizeTimezone,
+  rollingDayWindowInTz,
+} from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function TodayPage() {
@@ -91,18 +95,36 @@ export default async function TodayPage() {
                     <span className="chip">
                       {t("context")}: {focus}
                     </span>
-                    <span className={`chip ${lesson.prepStatus === "ready" ? "done" : "soon"}`}>
+                    <span
+                      className={`chip ${lesson.prepStatus === "ready" ? "done" : "soon"}`}
+                    >
                       {t("prepStatus")}: {lesson.prepStatus}
                     </span>
                   </div>
                 </div>
                 <div className="list-row-actions">
+                  <a
+                    className="btn sm"
+                    href={`/classroom/${lesson.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("openClassroom")}
+                  </a>
                   {lesson.meetLink && (
-                    <a className="btn sm" href={lesson.meetLink} target="_blank" rel="noreferrer">
+                    <a
+                      className="btn secondary sm"
+                      href={lesson.meetLink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       {t("joinMeet")}
                     </a>
                   )}
-                  <Link className="btn secondary sm" href={`/lessons/${lesson.id}`}>
+                  <Link
+                    className="btn secondary sm"
+                    href={`/lessons/${lesson.id}`}
+                  >
                     {common("openLesson")}
                   </Link>
                 </div>

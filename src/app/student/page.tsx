@@ -92,7 +92,12 @@ export default async function StudentHomePage() {
                 <p className="muted">{t("noMeetYet")}</p>
               )}
               <p>
-                <a className="btn secondary" href={`/lessons/${next.id}`}>
+                <a
+                  className="btn secondary"
+                  href={`/classroom/${next.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   {t("enterClassroom")}
                 </a>
               </p>

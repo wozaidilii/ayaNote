@@ -55,7 +55,8 @@
     "subtitle": "これから始まるレッスンと一行コンテキスト",
     "prepStatus": "教案",
     "context": "前回フォーカス",
-    "joinMeet": "Meetに入る"
+    "joinMeet": "Meetに入る",
+    "openClassroom": "Classroomを開く"
   },
   "calendar": {
     "title": "Googleカレンダー",
@@ -145,6 +146,7 @@
     "classroomErrTranscribe": "文字起こしに失敗しました",
     "classroomSttMissing": "STT未設定 — OPENAI_API_KEY（Whisper）または DEEPGRAM_API_KEY を設定。通話は可能で、書き起こしは下に貼れます。",
     "okLivekit": "Classroomの音声を文字起こし・要約しました。下で確認してください。",
+    "openClassroomTab": "Classroomを開く（新しいタブ）",
     "statusNone": "書き起こしなし",
     "statusWaiting": "Drive転写を待機中",
     "statusImported": "Driveから取り込み済み",
@@ -277,6 +279,20 @@
   },
   "studentHistory": {
     "title": "レッスン履歴",
-    "subtitle": "要約のみ（全文書き起こしは非表示）"
+    "subtitle": "要約のみ（全文書き起こしは非表示）",
+    "viewClassroom": "Classroomと教案を見る"
+  },
+  "classroom": {
+    "planTitle": "教案",
+    "notesTitle": "共有ノート",
+    "notesHint": "先生と生徒の両方が編集できます。自動保存し、数秒ごとに同期します。",
+    "saving": "保存中…",
+    "saved": "保存済み",
+    "peerUpdated": "相手側の更新を反映",
+    "saveError": "保存に失敗 — もう一度編集してください",
+    "pastBanner": "過去のClassroom — ビデオは終了。この回の教案とノートは下に残っています。",
+    "pastChip": "過去の授業",
+    "openLessonRoom": "レッスンルーム（書き起こし）",
+    "back": "戻る"
   }
 }

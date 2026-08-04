@@ -201,11 +201,14 @@ export function ClassroomVideo({
   livekitReady,
   sttReady,
   labels,
+  redirectBase,
 }: {
   lessonId: string;
   livekitReady: boolean;
   sttReady: boolean;
   labels: Labels;
+  /** Where to land after successful transcribe (default lesson room) */
+  redirectBase?: string;
 }) {
   const router = useRouter();
   const [joined, setJoined] = useState(false);
@@ -263,7 +266,7 @@ export function ClassroomVideo({
         );
         return;
       }
-      router.push(`/lessons/${lessonId}?ok=livekit`);
+      router.push(`${redirectBase ?? `/lessons/${lessonId}`}?ok=livekit`);
       router.refresh();
     } catch {
       setError(labels.errorTranscribe);
@@ -278,8 +281,8 @@ export function ClassroomVideo({
       if (!pendingUploadRef.current) return;
       void uploadAndSummarize(blob);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- upload closes over lessonId/labels via state
-    [lessonId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- upload closes over lessonId via state
+    [lessonId, redirectBase],
   );
 
   const endAndTranscribe = () => {

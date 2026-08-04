@@ -73,6 +73,8 @@ model Lesson {
   meetLink         String?
   transcriptStatus String   @default("none") // none | waiting_drive | imported | manual
   driveFileId      String?
+  /** Shared live notes during / after classroom (teacher + student) */
+  classroomNotes   String   @default("")
   tagsJson         String   @default("[]")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
