@@ -291,6 +291,8 @@
     "ending": "文字起こし中…",
     "endAndTranscribe": "終了して文字起こし",
     "leaveOnly": "通話のみ退出",
+    "rejoin": "通話に再参加",
+    "leftCall": "通話から退出済み — ボードはそのまま",
     "errorToken": "ビデオに入れませんでした",
     "errorTranscribe": "文字起こしに失敗",
     "sttMissing": "STTキー未設定 — 通話は可能。文字起こしには OPENAI_API_KEY が必要",

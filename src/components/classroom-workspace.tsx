@@ -32,6 +32,8 @@ type Labels = {
   ending: string;
   endAndTranscribe: string;
   leaveOnly: string;
+  rejoin: string;
+  leftCall: string;
   errorToken: string;
   errorTranscribe: string;
   sttMissing: string;
@@ -183,20 +185,22 @@ function Filmstrip() {
   );
 
   return (
-    <div className="classroom-filmstrip-tiles">
-      {tracks.map((trackRef) => (
-        <ParticipantTile
-          key={`${trackRef.participant.identity}-${trackRef.source}`}
-          trackRef={trackRef}
-          className="classroom-filmstrip-tile"
-        />
-      ))}
+    <>
+      <div className="classroom-filmstrip-tiles">
+        {tracks.map((trackRef) => (
+          <ParticipantTile
+            key={`${trackRef.participant.identity}-${trackRef.source}`}
+            trackRef={trackRef}
+            className="classroom-filmstrip-tile"
+          />
+        ))}
+      </div>
       <ControlBar
         variation="minimal"
         controls={{ chat: false, screenShare: true }}
         className="classroom-filmstrip-controls"
       />
-    </div>
+    </>
   );
 }
 
@@ -246,6 +250,7 @@ export function ClassroomWorkspace({
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recordActive, setRecordActive] = useState(false);
+  const [userLeftCall, setUserLeftCall] = useState(false);
   const pendingUploadRef = useRef(false);
 
   const docKey = useMemo(() => JSON.stringify(initialDoc), [initialDoc]);
@@ -254,6 +259,7 @@ export function ClassroomWorkspace({
     if (!livekitReady || isPast) return;
     setLoading(true);
     setError(null);
+    setUserLeftCall(false);
     try {
       const res = await fetch("/api/livekit/token", {
         method: "POST",
@@ -279,10 +285,10 @@ export function ClassroomWorkspace({
   }, [isPast, labels.errorToken, lessonId, livekitReady]);
 
   useEffect(() => {
-    if (!isPast && livekitReady && !tokenInfo) {
+    if (!isPast && livekitReady && !tokenInfo && !userLeftCall) {
       void join();
     }
-  }, [isPast, join, livekitReady, tokenInfo]);
+  }, [isPast, join, livekitReady, tokenInfo, userLeftCall]);
 
   const uploadAndSummarize = async (blob: Blob) => {
     setEnding(true);
@@ -335,6 +341,7 @@ export function ClassroomWorkspace({
 
   const leaveCall = () => {
     pendingUploadRef.current = false;
+    setUserLeftCall(true);
     setRecordActive(false);
     setTokenInfo(null);
   };
@@ -379,6 +386,16 @@ export function ClassroomWorkspace({
             </button>
           </>
         )}
+        {!isPast && livekitReady && userLeftCall && !tokenInfo && (
+          <button
+            className="btn sm"
+            type="button"
+            disabled={loading}
+            onClick={() => void join()}
+          >
+            {loading ? labels.connecting : labels.rejoin}
+          </button>
+        )}
         {lessonRoomHref && (
           <a className="btn ghost sm" href={lessonRoomHref}>
             Room
@@ -410,27 +427,35 @@ export function ClassroomWorkspace({
     </section>
   );
 
+  const floatingDock = (content: ReactNode) => (
+    <div className="classroom-float-dock" role="complementary">
+      {content}
+    </div>
+  );
+
   let body: ReactNode;
 
   if (isPast || !livekitReady) {
     body = (
       <div className="classroom-meet-body is-solo">
         {docPane(false)}
-        {!isPast && !livekitReady && (
-          <aside className="classroom-filmstrip panel">
-            <p className="muted">{labels.notConfigured}</p>
-          </aside>
-        )}
+        {!isPast &&
+          !livekitReady &&
+          floatingDock(<p className="muted">{labels.notConfigured}</p>)}
       </div>
     );
   } else if (!tokenInfo) {
     body = (
-      <div className="classroom-meet-body">
+      <div className="classroom-meet-body is-solo">
         {docPane(false)}
-        <aside className="classroom-filmstrip panel">
-          <p className="muted">{labels.connecting}</p>
-          {error && <p className="chip">{error}</p>}
-        </aside>
+        {floatingDock(
+          <>
+            <p className="muted" style={{ margin: 0 }}>
+              {userLeftCall ? labels.leftCall : labels.connecting}
+            </p>
+            {error && <p className="chip">{error}</p>}
+          </>,
+        )}
       </div>
     );
   } else {
@@ -452,12 +477,14 @@ export function ClassroomWorkspace({
       >
         <MixedAudioRecorder active={recordActive} onChunk={onChunk} />
         <RoomAudioRenderer />
-        <div className="classroom-meet-body">
+        <div className="classroom-meet-body is-solo">
           {docPane(true)}
-          <aside className="classroom-filmstrip">
-            <Filmstrip />
-            {error && <p className="chip">{error}</p>}
-          </aside>
+          {floatingDock(
+            <>
+              <Filmstrip />
+              {error && <p className="chip">{error}</p>}
+            </>,
+          )}
         </div>
       </LiveKitRoom>
     );

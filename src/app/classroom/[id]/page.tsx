@@ -81,6 +81,8 @@ export default async function ClassroomPage({
           ending: t("ending"),
           endAndTranscribe: t("endAndTranscribe"),
           leaveOnly: t("leaveOnly"),
+          rejoin: t("rejoin"),
+          leftCall: t("leftCall"),
           errorToken: t("errorToken"),
           errorTranscribe: t("errorTranscribe"),
           sttMissing: t("sttMissing"),

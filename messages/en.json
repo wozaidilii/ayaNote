@@ -291,6 +291,8 @@
     "ending": "Transcribing…",
     "endAndTranscribe": "End & transcribe",
     "leaveOnly": "Leave call",
+    "rejoin": "Rejoin call",
+    "leftCall": "Call left — board stays open",
     "errorToken": "Could not join video",
     "errorTranscribe": "Transcription failed",
     "sttMissing": "STT key missing — call works; set OPENAI_API_KEY to transcribe",
