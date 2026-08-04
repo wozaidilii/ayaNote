@@ -1,7 +1,10 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { StudentSwitcher } from "@/components/student-switcher";
-import { getActiveStudent, listActiveStudentsForTeacher } from "@/lib/active-student";
+import {
+  getActiveStudent,
+  listActiveStudentsForTeacher,
+} from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
@@ -76,13 +79,23 @@ export default async function StudentHomePage() {
               </p>
               {next.meetLink ? (
                 <p>
-                  <a className="btn" href={next.meetLink} target="_blank" rel="noreferrer">
+                  <a
+                    className="btn"
+                    href={next.meetLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     {t("joinMeet")}
                   </a>
                 </p>
               ) : (
                 <p className="muted">{t("noMeetYet")}</p>
               )}
+              <p>
+                <a className="btn secondary" href={`/lessons/${next.id}`}>
+                  {t("enterClassroom")}
+                </a>
+              </p>
             </>
           ) : (
             <p className="muted">{t("noUpcoming")}</p>
@@ -92,7 +105,8 @@ export default async function StudentHomePage() {
               <h3>{t("pending")}</h3>
               {student.bookingRequests.map((b) => (
                 <p key={b.id} className="muted" style={{ margin: "0.3rem 0" }}>
-                  {formatInTz(b.requestedStart, "MMM d HH:mm", timeZone)} · {b.status}
+                  {formatInTz(b.requestedStart, "MMM d HH:mm", timeZone)} ·{" "}
+                  {b.status}
                 </p>
               ))}
             </div>
@@ -101,15 +115,18 @@ export default async function StudentHomePage() {
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>{t("progress")}</h2>
           <p>
-            <strong>{common("attendance")}:</strong> {student.progress?.attendanceCount ?? 0}
+            <strong>{common("attendance")}:</strong>{" "}
+            {student.progress?.attendanceCount ?? 0}
           </p>
           <p>
             <strong>{common("topics")}:</strong>{" "}
-            {parseJsonArray(student.progress?.topicsCoveredJson).join(" · ") || "—"}
+            {parseJsonArray(student.progress?.topicsCoveredJson).join(" · ") ||
+              "—"}
           </p>
           <p>
             <strong>{common("weaknesses")}:</strong>{" "}
-            {parseJsonArray(student.progress?.weaknessesJson).join(" · ") || "—"}
+            {parseJsonArray(student.progress?.weaknessesJson).join(" · ") ||
+              "—"}
           </p>
         </div>
       </div>

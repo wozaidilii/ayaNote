@@ -8,11 +8,7 @@ import {
 import { toJson } from "@/lib/utils";
 
 export type DriveFetchStatus =
-  | "imported"
-  | "not_found"
-  | "empty_doc"
-  | "no_google_token"
-  | "error";
+  "imported" | "not_found" | "empty_doc" | "no_google_token" | "error";
 
 export type DriveFetchResult = {
   status: DriveFetchStatus;
@@ -34,7 +30,9 @@ function nameHintsForStudent(studentName: string) {
     .replace(/[\[\]]/g, " ")
     .split(/[\s_・]+/)
     .map((p) => p.trim())
-    .filter((p) => p.length >= 2 && !/^(さん|様|lesson|japanese|日本語)$/i.test(p));
+    .filter(
+      (p) => p.length >= 2 && !/^(さん|様|lesson|japanese|日本語)$/i.test(p),
+    );
   return Array.from(new Set([raw, ...parts])).filter(Boolean);
 }
 
@@ -51,14 +49,16 @@ function scoreDriveFile(
       : 0;
   if (mod) {
     const delta = Math.abs(mod - opts.endMs);
-    if (delta <= opts.windowMs) score += 100 - Math.min(90, delta / (60_000 * 2));
+    if (delta <= opts.windowMs)
+      score += 100 - Math.min(90, delta / (60_000 * 2));
     else if (delta <= opts.windowMs * 2) score += 20;
   }
   for (const hint of opts.hints) {
     const h = hint.toLowerCase();
     if (h.length >= 2 && name.includes(h)) score += 40;
   }
-  if (/transcript|文字起こし|文字记录|gemini|meet recording|議事録/.test(name)) score += 35;
+  if (/transcript|文字起こし|文字记录|gemini|meet recording|議事録/.test(name))
+    score += 35;
   if (/doc|notes/.test(name)) score += 5;
   return score;
 }
@@ -89,7 +89,8 @@ export async function findTranscriptDriveDoc(opts: {
       accessToken: opts.accessToken,
       folderId: opts.folderId,
       query: q,
-      nameContains: q && !["transcript", "文字起こし"].includes(q) ? q : undefined,
+      nameContains:
+        q && !["transcript", "文字起こし"].includes(q) ? q : undefined,
       pageSize: 30,
     });
     for (const f of batch) seen.set(f.id, f);
@@ -234,7 +235,7 @@ async function buildSummarizeContext(lessonId: string) {
 export async function applyTranscriptToLesson(opts: {
   lessonId: string;
   rawText: string;
-  source: "drive_import" | "meet_import";
+  source: "drive_import" | "meet_import" | "livekit" | "upload" | "manual";
   driveFileId?: string | null;
   tags?: string[];
 }) {
@@ -242,11 +243,18 @@ export async function applyTranscriptToLesson(opts: {
   const summary = await summarizeTranscript(opts.rawText, context);
   const data = summaryPersistData(summary);
 
+  const transcriptStatus =
+    opts.source === "drive_import"
+      ? "imported"
+      : opts.source === "livekit" || opts.source === "upload"
+        ? "imported"
+        : "manual";
+
   await prisma.lesson.update({
     where: { id: opts.lessonId },
     data: {
       status: "completed",
-      transcriptStatus: opts.source === "drive_import" ? "imported" : "manual",
+      transcriptStatus,
       ...(opts.driveFileId ? { driveFileId: opts.driveFileId } : {}),
       ...(opts.tags ? { tagsJson: toJson(opts.tags) } : {}),
       transcript: {
@@ -275,7 +283,9 @@ export async function applyTranscriptToLesson(opts: {
 }
 
 /** Find Drive transcript for one lesson, import, summarize. */
-export async function fetchAndImportDriveTranscript(lessonId: string): Promise<DriveFetchResult> {
+export async function fetchAndImportDriveTranscript(
+  lessonId: string,
+): Promise<DriveFetchResult> {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: { student: true, teacher: true },
@@ -337,7 +347,11 @@ function scoreArchiveDoc(file: DriveFile, hints: string[]): number {
     const h = hint.toLowerCase();
     if (h.length >= 2 && name.includes(h)) score += 50;
   }
-  if (/transcript|文字起こし|文字记录|gemini|meet|議事録|lesson|notes|ノート|授業|レッスン/.test(name)) {
+  if (
+    /transcript|文字起こし|文字记录|gemini|meet|議事録|lesson|notes|ノート|授業|レッスン/.test(
+      name,
+    )
+  ) {
     score += 25;
   }
   if (/doc|記録|memo|まとめ/.test(name)) score += 8;
@@ -396,7 +410,9 @@ export async function persistSummaryToStudentMemory(lessonId: string) {
     where: { studentId: lesson.studentId },
     select: { pattern: true },
   });
-  const grammarSet = new Set(existingGrammar.map((g) => g.pattern.toLowerCase()));
+  const grammarSet = new Set(
+    existingGrammar.map((g) => g.pattern.toLowerCase()),
+  );
   for (const g of grammar.slice(0, 20)) {
     if (!g.pattern || grammarSet.has(g.pattern.toLowerCase())) continue;
     await prisma.grammarItem.create({
@@ -428,7 +444,12 @@ export async function persistSummaryToStudentMemory(lessonId: string) {
     where: { studentId: lesson.studentId },
   });
   const covered = Array.from(
-    new Set([...(existing ? JSON.parse(existing.topicsCoveredJson || "[]") as string[] : []), ...topics]),
+    new Set([
+      ...(existing
+        ? (JSON.parse(existing.topicsCoveredJson || "[]") as string[])
+        : []),
+      ...topics,
+    ]),
   );
 
   await prisma.progressSnapshot.upsert({
@@ -446,7 +467,9 @@ export async function persistSummaryToStudentMemory(lessonId: string) {
       weaknessesJson: toJson(
         Array.from(
           new Set([
-            ...(existing ? (JSON.parse(existing.weaknessesJson || "[]") as string[]) : []),
+            ...(existing
+              ? (JSON.parse(existing.weaknessesJson || "[]") as string[])
+              : []),
             ...mistakes,
           ]),
         ).slice(0, 12),
@@ -527,7 +550,9 @@ export async function seedMemoryFromDriveForTeacher(
 
   for (const student of students) {
     const hasMemory =
-      student.lessons.length > 0 || student.vocabItems.length > 0 || student.grammarItems.length > 0;
+      student.lessons.length > 0 ||
+      student.vocabItems.length > 0 ||
+      student.grammarItems.length > 0;
     if (hasMemory && !opts.force) {
       result.skippedStudents += 1;
       continue;
@@ -538,12 +563,18 @@ export async function seedMemoryFromDriveForTeacher(
     const primary = hints[0] ?? student.name;
 
     const seen = new Map<string, DriveFile>();
-    for (const q of [primary, ...hints.slice(1, 3), "文字起こし", "transcript"]) {
+    for (const q of [
+      primary,
+      ...hints.slice(1, 3),
+      "文字起こし",
+      "transcript",
+    ]) {
       const batch = await listRecentDriveDocs({
         accessToken,
         folderId: teacher.googleTranscriptFolderId,
         query: q,
-        nameContains: q && !["文字起こし", "transcript"].includes(q) ? q : undefined,
+        nameContains:
+          q && !["文字起こし", "transcript"].includes(q) ? q : undefined,
         pageSize: 25,
       });
       for (const f of batch) seen.set(f.id, f);

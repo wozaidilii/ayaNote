@@ -5,12 +5,19 @@ import { useEffect, useMemo, useState } from "react";
 import type { CalendarLessonItem } from "@/components/month-calendar";
 import { formatInTz, wallTimeToUtc, ymdInTz } from "@/lib/timezone";
 
-const HOUR_START = 7;
-const HOUR_END = 22;
-const PX_PER_HOUR = 52;
-const HOURS = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
+const HOUR_START = 0;
+const HOUR_END = 24;
+const PX_PER_HOUR = 40;
+const HOURS = Array.from(
+  { length: HOUR_END - HOUR_START },
+  (_, i) => HOUR_START + i,
+);
 
-function minutesFromDayStart(iso: string, ymd: string, timeZone: string): number {
+function minutesFromDayStart(
+  iso: string,
+  ymd: string,
+  timeZone: string,
+): number {
   const start = wallTimeToUtc(ymd, "00:00", timeZone).getTime();
   return (new Date(iso).getTime() - start) / 60_000;
 }
@@ -60,10 +67,16 @@ export function FiveDayCalendar({
   }, [days, lessons, timeZone]);
 
   const nowYmd = ymdInTz(new Date(nowMs), timeZone);
-  const nowMinutes = minutesFromDayStart(new Date(nowMs).toISOString(), nowYmd, timeZone);
-  const nowTop =
-    ((nowMinutes - HOUR_START * 60) / 60) * PX_PER_HOUR;
-  const showNowLine = days.includes(nowYmd) && nowMinutes >= HOUR_START * 60 && nowMinutes <= HOUR_END * 60;
+  const nowMinutes = minutesFromDayStart(
+    new Date(nowMs).toISOString(),
+    nowYmd,
+    timeZone,
+  );
+  const nowTop = ((nowMinutes - HOUR_START * 60) / 60) * PX_PER_HOUR;
+  const showNowLine =
+    days.includes(nowYmd) &&
+    nowMinutes >= HOUR_START * 60 &&
+    nowMinutes <= HOUR_END * 60;
 
   const gridHeight = (HOUR_END - HOUR_START) * PX_PER_HOUR;
 
@@ -79,9 +92,17 @@ export function FiveDayCalendar({
             ‹
           </Link>
           <h2 className="month-cal-title">
-            {formatInTz(wallTimeToUtc(days[0], "12:00", timeZone), "M/d", timeZone)}
+            {formatInTz(
+              wallTimeToUtc(days[0], "12:00", timeZone),
+              "M/d",
+              timeZone,
+            )}
             {" – "}
-            {formatInTz(wallTimeToUtc(days[days.length - 1], "12:00", timeZone), "M/d", timeZone)}
+            {formatInTz(
+              wallTimeToUtc(days[days.length - 1], "12:00", timeZone),
+              "M/d",
+              timeZone,
+            )}
           </h2>
           <Link
             className="btn ghost"
@@ -90,7 +111,10 @@ export function FiveDayCalendar({
           >
             ›
           </Link>
-          <Link className="btn secondary" href={`/calendar?view=days&start=${todayYmd}`}>
+          <Link
+            className="btn secondary"
+            href={`/calendar?view=days&start=${todayYmd}`}
+          >
             {labels.today}
           </Link>
         </div>
@@ -100,7 +124,10 @@ export function FiveDayCalendar({
       </div>
 
       <div className="day5-scroll">
-        <div className="day5-grid" style={{ ["--day5-h" as string]: `${gridHeight}px` }}>
+        <div
+          className="day5-grid"
+          style={{ ["--day5-h" as string]: `${gridHeight}px` }}
+        >
           <div className="day5-gutter">
             <div className="day5-corner" />
             <div className="day5-hours" style={{ height: gridHeight }}>
@@ -120,13 +147,22 @@ export function FiveDayCalendar({
             const items = byDay.get(ymd) ?? [];
             const isToday = ymd === todayYmd || ymd === nowYmd;
             const dayNum = Number(ymd.slice(-2));
-            const weekday = formatInTz(wallTimeToUtc(ymd, "12:00", timeZone), "EEE", timeZone);
+            const weekday = formatInTz(
+              wallTimeToUtc(ymd, "12:00", timeZone),
+              "EEE",
+              timeZone,
+            );
 
             return (
-              <div key={ymd} className={`day5-col ${isToday ? "is-today" : ""}`}>
+              <div
+                key={ymd}
+                className={`day5-col ${isToday ? "is-today" : ""}`}
+              >
                 <div className="day5-col-head">
                   <div className="day5-weekday">{weekday}</div>
-                  <div className={`day5-daynum ${isToday ? "is-today" : ""}`}>{dayNum}</div>
+                  <div className={`day5-daynum ${isToday ? "is-today" : ""}`}>
+                    {dayNum}
+                  </div>
                 </div>
                 <div className="day5-col-body" style={{ height: gridHeight }}>
                   {HOURS.map((h) => (
@@ -138,25 +174,38 @@ export function FiveDayCalendar({
                   ))}
 
                   {showNowLine && ymd === nowYmd && (
-                    <div className="day5-now" style={{ top: Math.max(0, nowTop) }}>
+                    <div
+                      className="day5-now"
+                      style={{ top: Math.max(0, nowTop) }}
+                    >
                       <span className="day5-now-dot" />
                       <span className="day5-now-line" />
                     </div>
                   )}
 
                   {items.map((ev) => {
-                    const startMin = minutesFromDayStart(ev.startsAt, ymd, timeZone);
-                    const endMin = minutesFromDayStart(ev.endsAt, ymd, timeZone);
+                    const startMin = minutesFromDayStart(
+                      ev.startsAt,
+                      ymd,
+                      timeZone,
+                    );
+                    const endMin = minutesFromDayStart(
+                      ev.endsAt,
+                      ymd,
+                      timeZone,
+                    );
                     const clampedStart = Math.max(startMin, HOUR_START * 60);
                     const clampedEnd = Math.min(endMin, HOUR_END * 60);
                     if (clampedEnd <= clampedStart) return null;
-                    const top = ((clampedStart - HOUR_START * 60) / 60) * PX_PER_HOUR;
+                    const top =
+                      ((clampedStart - HOUR_START * 60) / 60) * PX_PER_HOUR;
                     const height = Math.max(
                       22,
                       ((clampedEnd - clampedStart) / 60) * PX_PER_HOUR - 2,
                     );
                     const past =
-                      new Date(ev.endsAt).getTime() < nowMs || ev.status === "completed";
+                      new Date(ev.endsAt).getTime() < nowMs ||
+                      ev.status === "completed";
                     return (
                       <Link
                         key={ev.id}
