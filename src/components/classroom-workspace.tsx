@@ -242,12 +242,14 @@ function CallLayout({
   board,
   labels,
   error,
+  recording,
 }: {
   videoExpanded: boolean;
   setVideoExpanded: (v: boolean) => void;
   board: ReactNode;
   labels: Labels;
   error: string | null;
+  recording: boolean;
 }) {
   return (
     <div
@@ -257,7 +259,11 @@ function CallLayout({
           : "classroom-meet-body is-call"
       }
     >
-      <aside className="classroom-float-dock" role="complementary">
+      <aside
+        className="classroom-float-dock"
+        role="complementary"
+        data-recording={recording ? "true" : undefined}
+      >
         <VideoTiles />
         <HoverAvControls />
         {error && <p className="chip">{error}</p>}
@@ -595,6 +601,7 @@ export function ClassroomWorkspace({
           board={board}
           labels={labels}
           error={error}
+          recording={recordActive}
         />
       </LiveKitRoom>
     );

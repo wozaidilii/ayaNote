@@ -54,14 +54,14 @@
   },
   "login": {
     "title": "Teacher login",
-    "subtitle": "Sign in with your AyaNote email and password.",
-    "email": "Email",
+    "subtitle": "Sign in with your AyaNote account and password.",
+    "email": "Account",
     "password": "Password",
     "submit": "Sign in",
     "studentHint": "Students use their invite link.",
     "backHome": "Back home",
-    "errMissing": "Email and password are required.",
-    "errInvalid": "Invalid email or password."
+    "errMissing": "Account and password are required.",
+    "errInvalid": "Invalid account or password."
   },
   "invite": {
     "welcome": "Welcome, {name}",

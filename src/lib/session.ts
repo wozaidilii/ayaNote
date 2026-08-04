@@ -5,11 +5,11 @@ import { prisma } from "@/lib/db";
 
 export type AppRole = "teacher" | "student";
 
-/** Seed / known trial teacher email */
-export const DEMO_TEACHER_EMAIL = "ayano@ayanote.app";
+/** Seed / known trial teacher login id (stored in Teacher.email). */
+export const DEMO_TEACHER_EMAIL = "admin";
 export const DEMO_STUDENT_EMAIL = "alex@example.com";
 /** Default password for seeded trial teacher (change in production). */
-export const DEMO_TEACHER_PASSWORD = "ayanote-trial";
+export const DEMO_TEACHER_PASSWORD = "123456";
 
 export type SessionInfo = {
   role: AppRole | null;

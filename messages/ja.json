@@ -260,14 +260,14 @@
   },
   "login": {
     "title": "先生ログイン",
-    "subtitle": "AyaNoteのメールとパスワードでサインインします。",
-    "email": "メール",
+    "subtitle": "AyaNoteのアカウントとパスワードでサインインします。",
+    "email": "アカウント",
     "password": "パスワード",
     "submit": "サインイン",
     "studentHint": "生徒は招待リンクを使います。",
     "backHome": "ホームへ",
-    "errMissing": "メールとパスワードを入力してください。",
-    "errInvalid": "メールまたはパスワードが正しくありません。"
+    "errMissing": "アカウントとパスワードを入力してください。",
+    "errInvalid": "アカウントまたはパスワードが正しくありません。"
   },
   "invite": {
     "welcome": "ようこそ、{name}さん",
