@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { createStudent } from "@/app/actions";
+import { Plus, Search, Users, X, UiIcon } from "@/components/icons";
+import { EmptyState, PageHeading, PanelTitle } from "@/components/ui-heading";
 import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
-import { parseJsonArray } from "@/lib/utils";
 
 export type StudentListItem = {
   id: string;
@@ -68,25 +69,28 @@ export function StudentsWorkspace({
 
   return (
     <>
-      <header className="page-header">
-        <div className="page-header-text">
-          <h1 className="h1">{labels.title}</h1>
-          <p className="muted">{labels.subtitle}</p>
-        </div>
-        <div className="page-header-actions">
-          <span className="chip">{filtered.length}</span>
-          <button
-            className="btn sm"
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-          >
-            {labels.addStudent}
-          </button>
-        </div>
-      </header>
+      <PageHeading
+        icon={Users}
+        title={labels.title}
+        subtitle={labels.subtitle}
+        actions={
+          <>
+            <span className="chip">{filtered.length}</span>
+            <button
+              className="btn sm"
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+            >
+              <UiIcon icon={Plus} size={15} />
+              {labels.addStudent}
+            </button>
+          </>
+        }
+      />
 
       <div className="students-toolbar">
         <div className="students-search">
+          <UiIcon icon={Search} className="students-search-icon" size={15} />
           <input
             type="search"
             value={query}
@@ -120,14 +124,14 @@ export function StudentsWorkspace({
       </div>
 
       <div className="panel">
-        <div className="panel-header">
-          <h2>{labels.title}</h2>
-          <span className="chip">{filtered.length}</span>
-        </div>
+        <PanelTitle
+          icon={Users}
+          trailing={<span className="chip">{filtered.length}</span>}
+        >
+          {labels.title}
+        </PanelTitle>
         {filtered.length === 0 ? (
-          <div className="empty-state">
-            <p>{labels.noItems}</p>
-          </div>
+          <EmptyState icon={Users}>{labels.noItems}</EmptyState>
         ) : (
           filtered.map((student) => (
             <div className="list-row" key={student.id}>
@@ -185,6 +189,7 @@ export function StudentsWorkspace({
             type="button"
             onClick={() => setDrawerOpen(false)}
           >
+            <UiIcon icon={X} size={15} />
             {labels.close}
           </button>
         </div>
@@ -220,6 +225,7 @@ export function StudentsWorkspace({
             {labels.consent}
           </label>
           <button className="btn" type="submit">
+            <UiIcon icon={Plus} size={15} />
             {labels.create}
           </button>
         </form>

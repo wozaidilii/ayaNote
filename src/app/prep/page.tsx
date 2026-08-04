@@ -4,6 +4,8 @@ import {
   PrepWorkspace,
   type PrepLessonItem,
 } from "@/components/prep-workspace";
+import { NotebookPen } from "@/components/icons";
+import { PageHeading } from "@/components/ui-heading";
 import { courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { parsePrepRefs } from "@/lib/prep-refs";
@@ -94,12 +96,11 @@ export default async function PrepPage({
 
   return (
     <AppShell active="prep" personName={teacher.name}>
-      <header className="page-header">
-        <div className="page-header-text">
-          <h1 className="h1">{t("title")}</h1>
-          <p className="muted">{t("subtitle")}</p>
-        </div>
-      </header>
+      <PageHeading
+        icon={NotebookPen}
+        title={t("title")}
+        subtitle={t("subtitle")}
+      />
 
       <PrepWorkspace
         lessons={items}

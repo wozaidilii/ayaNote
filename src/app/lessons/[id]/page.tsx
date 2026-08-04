@@ -2,6 +2,8 @@ import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 import { approveSummary, importTranscriptAndSummarize } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { BookOpen, Video, UiIcon } from "@/components/icons";
+import { PageHeading } from "@/components/ui-heading";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
@@ -100,16 +102,21 @@ export default async function LessonRoomPage({
 
   return (
     <AppShell active="today" personName={teacher.name}>
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {lesson.student.name} ·{" "}
-        {formatInTz(
-          lesson.startsAt,
-          "yyyy-MM-dd HH:mm",
-          normalizeTimezone(lesson.teacher.timezone),
-        )}{" "}
-        · {t("subtitle")}
-      </p>
+      <PageHeading
+        icon={BookOpen}
+        title={t("title")}
+        subtitle={
+          <>
+            {lesson.student.name} ·{" "}
+            {formatInTz(
+              lesson.startsAt,
+              "yyyy-MM-dd HH:mm",
+              normalizeTimezone(lesson.teacher.timezone),
+            )}{" "}
+            · {t("subtitle")}
+          </>
+        }
+      />
 
       <div
         style={{
@@ -133,6 +140,7 @@ export default async function LessonRoomPage({
           target="_blank"
           rel="noreferrer"
         >
+          <UiIcon icon={Video} size={15} />
           {t("openClassroomTab")}
         </a>
       </div>

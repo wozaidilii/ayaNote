@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
+import {
+  CalendarDays,
+  LayoutDashboard,
+  Users,
+  Video,
+  UiIcon,
+} from "@/components/icons";
+import { EmptyState, PageHeading, PanelTitle } from "@/components/ui-heading";
 import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
 import {
@@ -46,36 +54,44 @@ export default async function TodayPage() {
 
   return (
     <AppShell active="today" personName={teacher.name}>
-      <header className="page-header">
-        <div className="page-header-text">
-          <h1 className="h1">{t("title")}</h1>
-          <p className="muted">
+      <PageHeading
+        icon={LayoutDashboard}
+        title={t("title")}
+        subtitle={
+          <>
             {t("subtitle")} · {timeZone}
-          </p>
-        </div>
-        <div className="page-header-actions">
-          <Link className="btn secondary" href="/calendar">
-            {nav("calendar")}
-          </Link>
-          <Link className="btn secondary" href="/students">
-            {nav("students")}
-          </Link>
-        </div>
-      </header>
-
-      <div className="panel">
-        <div className="panel-header">
-          <h2>{t("title")}</h2>
-          <span className="chip">{lessons.length}</span>
-        </div>
-
-        {lessons.length === 0 ? (
-          <div className="empty-state">
-            <p>{common("noItems")}</p>
-            <Link className="btn secondary" href="/calendar?view=days">
+          </>
+        }
+        actions={
+          <>
+            <Link className="btn secondary" href="/calendar">
+              <UiIcon icon={CalendarDays} size={15} />
               {nav("calendar")}
             </Link>
-          </div>
+            <Link className="btn secondary" href="/students">
+              <UiIcon icon={Users} size={15} />
+              {nav("students")}
+            </Link>
+          </>
+        }
+      />
+
+      <div className="panel">
+        <PanelTitle
+          icon={LayoutDashboard}
+          trailing={<span className="chip">{lessons.length}</span>}
+        >
+          {t("title")}
+        </PanelTitle>
+
+        {lessons.length === 0 ? (
+          <EmptyState icon={CalendarDays}>
+            <p>{common("noItems")}</p>
+            <Link className="btn secondary" href="/calendar?view=days">
+              <UiIcon icon={CalendarDays} size={15} />
+              {nav("calendar")}
+            </Link>
+          </EmptyState>
         ) : (
           lessons.map((lesson) => {
             const last = lesson.student.lessons[0]?.summary;
@@ -109,6 +125,7 @@ export default async function TodayPage() {
                     target="_blank"
                     rel="noreferrer"
                   >
+                    <UiIcon icon={Video} size={14} />
                     {t("openClassroom")}
                   </a>
                   <Link

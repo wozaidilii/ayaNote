@@ -2,8 +2,16 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { saveTeacherTimezone } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import {
+  Clock3,
+  LayoutDashboard,
+  Settings,
+  Sparkles,
+  Video,
+  UiIcon,
+} from "@/components/icons";
+import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getAiProvider } from "@/lib/ai";
-import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
 import { TIMEZONE_OPTIONS, normalizeTimezone } from "@/lib/timezone";
 
@@ -24,11 +32,14 @@ export default async function SettingsPage({
 
   return (
     <AppShell active="settings" personName={teacher.name}>
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">{t("subtitle")}</p>
+      <PageHeading
+        icon={Settings}
+        title={t("title")}
+        subtitle={t("subtitle")}
+      />
 
-      <div className="panel" style={{ marginTop: "1.2rem" }}>
-        <h2 style={{ marginTop: 0 }}>{t("timezoneTitle")}</h2>
+      <div className="panel">
+        <PanelTitle icon={Clock3}>{t("timezoneTitle")}</PanelTitle>
         <p className="muted">{t("timezoneExplain")}</p>
         {sp.saved === "timezone" && (
           <p className="chip done">{t("timezoneSaved")}</p>
@@ -51,17 +62,18 @@ export default async function SettingsPage({
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("classroomTitle")}</h2>
+        <PanelTitle icon={Video}>{t("classroomTitle")}</PanelTitle>
         <p>{t("classroomExplain")}</p>
         <p className="muted">{t("stt")}</p>
         <p>{t("privacy")}</p>
         <Link className="btn secondary" href="/today">
+          <UiIcon icon={LayoutDashboard} size={15} />
           {t("openToday")}
         </Link>
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>AI</h2>
+        <PanelTitle icon={Sparkles}>AI</PanelTitle>
         <p>
           Active provider: <strong>{provider}</strong>{" "}
           <span className="chip sky">default: deepseek</span>

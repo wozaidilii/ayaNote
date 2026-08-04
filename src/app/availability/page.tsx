@@ -7,6 +7,8 @@ import {
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { AvailabilityForm } from "@/components/availability-form";
+import { Check, Clock3, Plus, X, UiIcon } from "@/components/icons";
+import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, ymdInTz } from "@/lib/timezone";
@@ -35,10 +37,15 @@ export default async function AvailabilityPage() {
 
   return (
     <AppShell active="availability" personName={teacher.name}>
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {t("subtitle")} · {timeZone}
-      </p>
+      <PageHeading
+        icon={Clock3}
+        title={t("title")}
+        subtitle={
+          <>
+            {t("subtitle")} · {timeZone}
+          </>
+        }
+      />
 
       <AvailabilityForm
         action={updateAvailability}
@@ -63,7 +70,7 @@ export default async function AvailabilityPage() {
       />
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("blackouts")}</h2>
+        <PanelTitle icon={Clock3}>{t("blackouts")}</PanelTitle>
         <form
           action={addBlackoutDate}
           style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}
@@ -75,6 +82,7 @@ export default async function AvailabilityPage() {
             style={{ flex: 1, minWidth: 160 }}
           />
           <button className="btn secondary" type="submit">
+            <UiIcon icon={Plus} size={15} />
             {t("addBlackout")}
           </button>
         </form>
@@ -100,7 +108,7 @@ export default async function AvailabilityPage() {
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("bookings")}</h2>
+        <PanelTitle icon={Clock3}>{t("bookings")}</PanelTitle>
         {bookings.length === 0 && <p className="muted">{common("noItems")}</p>}
         {bookings.map((b) => (
           <div className="list-row" key={b.id}>
@@ -118,6 +126,7 @@ export default async function AvailabilityPage() {
                 <input type="hidden" name="id" value={b.id} />
                 <input type="hidden" name="decision" value="approve" />
                 <button className="btn" type="submit">
+                  <UiIcon icon={Check} size={14} />
                   {common("approve")}
                 </button>
               </form>
@@ -125,6 +134,7 @@ export default async function AvailabilityPage() {
                 <input type="hidden" name="id" value={b.id} />
                 <input type="hidden" name="decision" value="decline" />
                 <button className="btn danger" type="submit">
+                  <UiIcon icon={X} size={14} />
                   {common("decline")}
                 </button>
               </form>

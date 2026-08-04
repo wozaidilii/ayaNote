@@ -1,5 +1,7 @@
 import { acceptInvite } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { GraduationCap, LogIn, UiIcon } from "@/components/icons";
+import { PageHeading } from "@/components/ui-heading";
 import { prisma } from "@/lib/db";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -23,19 +25,26 @@ export default async function InvitePage({
   ) {
     return (
       <AppShell>
-        <h1 className="h1">{t("expiredTitle")}</h1>
-        <p className="muted">{t("expiredBody")}</p>
+        <PageHeading
+          icon={GraduationCap}
+          title={t("expiredTitle")}
+          subtitle={t("expiredBody")}
+        />
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-      <h1 className="h1">{t("welcome", { name: student.name })}</h1>
-      <p className="muted">{t("body", { teacher: student.teacher.name })}</p>
-      <form action={acceptInvite} style={{ marginTop: "1.2rem" }}>
+      <PageHeading
+        icon={GraduationCap}
+        title={t("welcome", { name: student.name })}
+        subtitle={t("body", { teacher: student.teacher.name })}
+      />
+      <form action={acceptInvite} style={{ marginTop: "0.4rem" }}>
         <input type="hidden" name="token" value={token} />
         <button className="btn" type="submit">
+          <UiIcon icon={LogIn} size={15} />
           {t("enter")}
         </button>
       </form>

@@ -1,5 +1,13 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
+import {
+  BookOpen,
+  CalendarPlus,
+  Home,
+  Video,
+  UiIcon,
+} from "@/components/icons";
+import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
@@ -35,14 +43,19 @@ export default async function StudentHomePage() {
 
   return (
     <AppShell active="home" personName={student.name}>
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {student.name} · {student.email} · {timeZone}
-      </p>
+      <PageHeading
+        icon={Home}
+        title={t("title")}
+        subtitle={
+          <>
+            {student.name} · {student.email} · {timeZone}
+          </>
+        }
+      />
 
-      <div className="grid-2" style={{ marginTop: "1.2rem" }}>
+      <div className="grid-2">
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>{t("next")}</h2>
+          <PanelTitle icon={CalendarPlus}>{t("next")}</PanelTitle>
           {next ? (
             <>
               <p style={{ fontSize: "1.2rem", fontWeight: 700 }}>
@@ -66,6 +79,7 @@ export default async function StudentHomePage() {
                   target="_blank"
                   rel="noreferrer"
                 >
+                  <UiIcon icon={Video} size={15} />
                   {t("enterClassroom")}
                 </a>
               </p>
@@ -86,7 +100,7 @@ export default async function StudentHomePage() {
           )}
         </div>
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>{t("progress")}</h2>
+          <PanelTitle icon={BookOpen}>{t("progress")}</PanelTitle>
           <p>
             <strong>{common("attendance")}:</strong>{" "}
             {student.progress?.attendanceCount ?? 0}

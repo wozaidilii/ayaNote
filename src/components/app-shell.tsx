@@ -1,6 +1,7 @@
 import { logout, setLocale } from "@/app/actions";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { Languages, LogOut, UiIcon, navIcons } from "@/components/icons";
 import { getSession } from "@/lib/session";
 
 export async function AppShell({
@@ -54,6 +55,7 @@ export async function AppShell({
           <nav aria-label="Pages">
             {links.map((link) => {
               const isActive = active === link.key;
+              const Icon = navIcons[link.key];
               return (
                 <Link
                   key={link.href}
@@ -62,7 +64,8 @@ export async function AppShell({
                   data-active={isActive}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  {t(`nav.${link.key}`)}
+                  <UiIcon icon={Icon} className="nav-link-icon" size={17} />
+                  <span>{t(`nav.${link.key}`)}</span>
                 </Link>
               );
             })}
@@ -76,6 +79,7 @@ export async function AppShell({
               type="submit"
               style={{ width: "100%" }}
             >
+              <UiIcon icon={Languages} size={15} />
               {t("common.language")}: {locale.toUpperCase()}
             </button>
           </form>
@@ -86,6 +90,7 @@ export async function AppShell({
                 type="submit"
                 style={{ width: "100%" }}
               >
+                <UiIcon icon={LogOut} size={15} />
                 {t("nav.logout")}
               </button>
             </form>

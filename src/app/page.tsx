@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { GraduationCap, LogIn, UiIcon } from "@/components/icons";
 
 export default async function HomePage() {
   const t = await getTranslations("landing");
@@ -13,7 +14,10 @@ export default async function HomePage() {
           <span>/</span>
           <span>Home</span>
         </p>
-        <h1>{brand("brand")}</h1>
+        <h1 className="page-title">
+          <UiIcon icon={GraduationCap} className="page-title-icon" size={28} />
+          <span>{brand("brand")}</span>
+        </h1>
         <p className="muted" style={{ margin: "0 0 16px", maxWidth: "34rem" }}>
           {brand("tagline")}
         </p>
@@ -35,6 +39,7 @@ export default async function HomePage() {
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <Link className="btn" href="/login">
+            <UiIcon icon={LogIn} size={15} />
             {t("ctaTeacher")}
           </Link>
         </div>

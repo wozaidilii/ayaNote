@@ -1,6 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
+import { CalendarPlus } from "@/components/icons";
 import { SlotPicker } from "@/components/slot-picker";
+import { EmptyState, PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
@@ -79,12 +81,17 @@ export default async function StudentBookPage() {
 
   return (
     <AppShell active="book" personName={student.name}>
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {t("subtitle")} · {student.name}
-      </p>
+      <PageHeading
+        icon={CalendarPlus}
+        title={t("title")}
+        subtitle={
+          <>
+            {t("subtitle")} · {student.name}
+          </>
+        }
+      />
 
-      <div className="panel" style={{ marginTop: "1.1rem" }}>
+      <div className="panel">
         <span className="pixel-banner">{t("slotRule")}</span>
         <p style={{ marginBottom: 0, marginTop: "0.7rem" }}>{t("slotHint")}</p>
       </div>
@@ -116,8 +123,8 @@ export default async function StudentBookPage() {
 
       {student.bookingRequests.length === 0 && (
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>{t("myBookings")}</h2>
-          <p className="muted">{common("noItems")}</p>
+          <PanelTitle icon={CalendarPlus}>{t("myBookings")}</PanelTitle>
+          <EmptyState icon={CalendarPlus}>{common("noItems")}</EmptyState>
         </div>
       )}
     </AppShell>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { loginTeacher } from "@/app/actions";
+import { LogIn, UiIcon } from "@/components/icons";
 import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 
@@ -23,7 +24,10 @@ export default async function LoginPage({
   return (
     <div className="hero">
       <div className="hero-card">
-        <h1 className="h1">{t("title")}</h1>
+        <h1 className="h1 page-title">
+          <UiIcon icon={LogIn} className="page-title-icon" size={22} />
+          <span>{t("title")}</span>
+        </h1>
         <p className="muted">{t("subtitle")}</p>
 
         {sp.err === "missing" && <p className="chip">{t("errMissing")}</p>}
@@ -55,6 +59,7 @@ export default async function LoginPage({
             />
           </div>
           <button className="btn" type="submit">
+            <UiIcon icon={LogIn} size={15} />
             {t("submit")}
           </button>
         </form>

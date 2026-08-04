@@ -3,10 +3,12 @@ import { getTranslations } from "next-intl/server";
 import { decideBooking } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { FiveDayCalendar } from "@/components/five-day-calendar";
+import { CalendarDays, Check, Clock3, X, UiIcon } from "@/components/icons";
 import {
   MonthCalendar,
   type CalendarLessonItem,
 } from "@/components/month-calendar";
+import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
 import {
@@ -126,20 +128,15 @@ export default async function CalendarPage({
 
   return (
     <AppShell active="calendar" personName={teacher.name}>
-      <header className="page-header">
-        <div className="page-header-text">
-          <h1 className="h1">{t("title")}</h1>
-          <p className="muted">{t("subtitle")}</p>
-        </div>
-        <div className="page-header-actions">
-          <span className="chip">{timeZone}</span>
-        </div>
-      </header>
+      <PageHeading
+        icon={CalendarDays}
+        title={t("title")}
+        subtitle={t("subtitle")}
+        actions={<span className="chip">{timeZone}</span>}
+      />
 
       <div className="panel">
-        <div className="panel-header">
-          <h2>{t("localCalendar")}</h2>
-        </div>
+        <PanelTitle icon={CalendarDays}>{t("localCalendar")}</PanelTitle>
         <p className="muted" style={{ marginTop: 0 }}>
           {t("syncNote")}
         </p>
@@ -147,10 +144,12 @@ export default async function CalendarPage({
 
       {pending.length > 0 && (
         <div className="panel">
-          <div className="panel-header">
-            <h2>{t("pending")}</h2>
-            <span className="chip soon">{pending.length}</span>
-          </div>
+          <PanelTitle
+            icon={Clock3}
+            trailing={<span className="chip soon">{pending.length}</span>}
+          >
+            {t("pending")}
+          </PanelTitle>
           {pending.map((b) => (
             <div className="list-row" key={b.id}>
               <div className="list-row-main">
@@ -166,6 +165,7 @@ export default async function CalendarPage({
                   <input type="hidden" name="id" value={b.id} />
                   <input type="hidden" name="decision" value="approve" />
                   <button className="btn sm" type="submit">
+                    <UiIcon icon={Check} size={14} />
                     {common("approve")}
                   </button>
                 </form>
@@ -173,6 +173,7 @@ export default async function CalendarPage({
                   <input type="hidden" name="id" value={b.id} />
                   <input type="hidden" name="decision" value="decline" />
                   <button className="btn danger sm" type="submit">
+                    <UiIcon icon={X} size={14} />
                     {common("decline")}
                   </button>
                 </form>
@@ -194,6 +195,7 @@ export default async function CalendarPage({
             role="tab"
             aria-selected={view === "days"}
           >
+            <UiIcon icon={CalendarDays} size={14} />
             {t("viewWeek")}
           </Link>
           <Link
@@ -202,6 +204,7 @@ export default async function CalendarPage({
             role="tab"
             aria-selected={view === "month"}
           >
+            <UiIcon icon={CalendarDays} size={14} />
             {t("viewMonth")}
           </Link>
         </div>

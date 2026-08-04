@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft, ChevronRight, UiIcon } from "@/components/icons";
 import { formatInTz, wallTimeToUtc, ymdInTz } from "@/lib/timezone";
 
 export type CalendarLessonItem = {
@@ -72,7 +73,7 @@ export function MonthCalendar({
             href={`/calendar?month=${prevMonth}`}
             aria-label="Previous month"
           >
-            ‹
+            <UiIcon icon={ChevronLeft} size={18} />
           </Link>
           <h2 className="month-cal-title">{monthLabel}</h2>
           <Link
@@ -80,7 +81,7 @@ export function MonthCalendar({
             href={`/calendar?month=${nextMonth}`}
             aria-label="Next month"
           >
-            ›
+            <UiIcon icon={ChevronRight} size={18} />
           </Link>
           <Link
             className="btn secondary"

@@ -8,6 +8,8 @@ import {
   updateStudent,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { Users } from "@/components/icons";
+import { PageHeading } from "@/components/ui-heading";
 import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
@@ -52,12 +54,17 @@ export default async function StudentDetailPage({
 
   return (
     <AppShell active="students" personName={teacher.name}>
-      <h1 className="h1">{student.name}</h1>
-      <p className="muted">
-        {common("course")}: {courseTypeLabel(student.courseType)} ·{" "}
-        {common("level")}: {student.level} · {student.email}
-        {student.archivedAt && ` · ${t("archived")}`}
-      </p>
+      <PageHeading
+        icon={Users}
+        title={student.name}
+        subtitle={
+          <>
+            {common("course")}: {courseTypeLabel(student.courseType)} ·{" "}
+            {common("level")}: {student.level} · {student.email}
+            {student.archivedAt && ` · ${t("archived")}`}
+          </>
+        }
+      />
 
       <div
         style={{
