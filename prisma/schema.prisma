@@ -91,7 +91,7 @@ model Lesson {
 model Transcript {
   id        String   @id @default(cuid())
   lessonId  String   @unique
-  source    String   @default("meet_import") // meet_import | drive_import | upload | manual
+  source    String   @default("meet_import") // meet_import | drive_import | upload | manual | livekit
   rawText   String   @default("")
   editedText String  @default("")
   createdAt DateTime @default(now())

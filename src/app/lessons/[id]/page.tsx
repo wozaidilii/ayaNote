@@ -8,9 +8,11 @@ import {
   updateLessonStatus,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { ClassroomVideo } from "@/components/classroom-video";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
-import { isHeuristicSummaryNotes } from "@/lib/student-memory";
+import { livekitConfigured } from "@/lib/livekit";
+import { sttConfigured } from "@/lib/stt";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -43,7 +45,12 @@ export default async function LessonRoomPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; err?: string; warn?: string; file?: string }>;
+  searchParams: Promise<{
+    ok?: string;
+    err?: string;
+    warn?: string;
+    file?: string;
+  }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -74,12 +81,23 @@ export default async function LessonRoomPage({
   if (!lesson) notFound();
 
   const lastFocus = lesson.student.lessons[0]?.summary?.nextFocus;
-  const topics = lesson.summary ? parseJsonArray(lesson.summary.topicsJson) : [];
-  const mistakes = lesson.summary ? parseJsonArray(lesson.summary.mistakesJson) : [];
-  const vocab = lesson.summary ? parseObjectArray<VocabRow>(lesson.summary.vocabJson) : [];
-  const grammar = lesson.summary ? parseObjectArray<GrammarRow>(lesson.summary.grammarJson) : [];
-  const examples = lesson.summary ? parseObjectArray<ExampleRow>(lesson.summary.examplesJson) : [];
-  const statusKey = TRANSCRIPT_STATUS_KEY[lesson.transcriptStatus] ?? "statusNone";
+  const topics = lesson.summary
+    ? parseJsonArray(lesson.summary.topicsJson)
+    : [];
+  const mistakes = lesson.summary
+    ? parseJsonArray(lesson.summary.mistakesJson)
+    : [];
+  const vocab = lesson.summary
+    ? parseObjectArray<VocabRow>(lesson.summary.vocabJson)
+    : [];
+  const grammar = lesson.summary
+    ? parseObjectArray<GrammarRow>(lesson.summary.grammarJson)
+    : [];
+  const examples = lesson.summary
+    ? parseObjectArray<ExampleRow>(lesson.summary.examplesJson)
+    : [];
+  const statusKey =
+    TRANSCRIPT_STATUS_KEY[lesson.transcriptStatus] ?? "statusNone";
   const provider = getAiProvider();
   const hasAiKey =
     provider === "deepseek"
@@ -88,62 +106,44 @@ export default async function LessonRoomPage({
   const googleConnected = Boolean(
     lesson.teacher.googleConnectedEmail || lesson.teacher.googleRefreshToken,
   );
-  const heuristic = isHeuristicSummaryNotes(lesson.summary?.notes);
+  const livekitReady = livekitConfigured();
+  const sttReady = sttConfigured();
 
   return (
     <AppShell active="today">
       <h1 className="h1">{t("title")}</h1>
       <p className="muted">
         {lesson.student.name} ·{" "}
-        {formatInTz(lesson.startsAt, "yyyy-MM-dd HH:mm", normalizeTimezone(lesson.teacher.timezone))} ·{" "}
-        {t("subtitle")}
+        {formatInTz(
+          lesson.startsAt,
+          "yyyy-MM-dd HH:mm",
+          normalizeTimezone(lesson.teacher.timezone),
+        )}{" "}
+        · {t("subtitle")}
       </p>
 
-      <div style={{ marginTop: "0.8rem", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+      <div
+        style={{
+          marginTop: "0.8rem",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "0.35rem",
+        }}
+      >
         <span className="chip">{t(statusKey)}</span>
-        <span className="chip sky">{courseTypeLabel(lesson.student.courseType)}</span>
-        <span className={`chip ${lesson.status === "completed" ? "done" : "soon"}`}>
-          {t("lessonStatus")}: {lesson.status}
+        <span className="chip sky">
+          {courseTypeLabel(lesson.student.courseType)}
         </span>
         {lesson.driveFileId && (
           <span className="chip">Drive: {lesson.driveFileId.slice(0, 8)}…</span>
         )}
-        <span className="chip">{hasAiKey ? t("aiReady", { provider }) : t("aiMissing", { provider })}</span>
-        {heuristic && <span className="chip">{t("heuristicBadge")}</span>}
-        {!lesson.student.recordingConsent && (
-          <span className="chip">{t("noConsent")}</span>
-        )}
-      </div>
-
-      <div className="panel" style={{ marginTop: "0.85rem" }}>
-        <div className="panel-header">
-          <h2 style={{ margin: 0 }}>{t("pipelineTitle")}</h2>
-        </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          {t("pipelineHint")}
-        </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-          <form action={updateLessonStatus}>
-            <input type="hidden" name="lessonId" value={lesson.id} />
-            <input type="hidden" name="status" value="in_progress" />
-            <button className="btn secondary sm" type="submit" disabled={lesson.status === "in_progress"}>
-              {t("markInProgress")}
-            </button>
-          </form>
-          <form action={updateLessonStatus}>
-            <input type="hidden" name="lessonId" value={lesson.id} />
-            <input type="hidden" name="status" value="completed" />
-            <button className="btn secondary sm" type="submit" disabled={lesson.status === "completed"}>
-              {t("markComplete")}
-            </button>
-          </form>
-          <Link className="btn secondary sm" href={`/prep?lesson=${lesson.id}`}>
-            {t("openPrep")}
-          </Link>
-        </div>
+        <span className="chip">
+          {hasAiKey ? t("aiReady", { provider }) : t("aiMissing", { provider })}
+        </span>
       </div>
 
       {sp.ok === "summary" && <p className="chip done">{t("okSummary")}</p>}
+      {sp.ok === "livekit" && <p className="chip done">{t("okLivekit")}</p>}
       {sp.ok === "drive" && (
         <p className="chip done">
           {t("okDrive")}
@@ -154,18 +154,49 @@ export default async function LessonRoomPage({
       {sp.ok === "status" && <p className="chip done">{t("okStatus")}</p>}
       {sp.warn === "no_ai_key" && <p className="chip">{t("warnNoAiKey")}</p>}
       {sp.err === "empty_transcript" && <p className="chip">{t("errEmpty")}</p>}
-      {sp.err === "drive_not_found" && <p className="chip">{t("errDriveNotFound")}</p>}
-      {sp.err === "drive_empty_doc" && <p className="chip">{t("errDriveEmpty")}</p>}
-      {sp.err === "drive_no_google_token" && <p className="chip">{t("errDriveNoGoogle")}</p>}
-      {sp.err === "drive_consent_denied" && <p className="chip">{t("errDriveConsent")}</p>}
+      {sp.err === "drive_not_found" && (
+        <p className="chip">{t("errDriveNotFound")}</p>
+      )}
+      {sp.err === "drive_empty_doc" && (
+        <p className="chip">{t("errDriveEmpty")}</p>
+      )}
+      {sp.err === "drive_no_google_token" && (
+        <p className="chip">{t("errDriveNoGoogle")}</p>
+      )}
       {sp.err?.startsWith("drive_") &&
-        !["drive_not_found", "drive_empty_doc", "drive_no_google_token", "drive_consent_denied"].includes(
-          sp.err,
-        ) && (
+        ![
+          "drive_not_found",
+          "drive_empty_doc",
+          "drive_no_google_token",
+        ].includes(sp.err) && (
           <p className="chip">
             {t("errDriveGeneric")}: {sp.err}
           </p>
         )}
+
+      <div style={{ marginTop: "1.2rem" }}>
+        <ClassroomVideo
+          lessonId={lesson.id}
+          livekitReady={livekitReady}
+          sttReady={sttReady}
+          labels={{
+            title: t("classroomTitle"),
+            join: t("classroomJoin"),
+            leave: t("classroomLeave"),
+            connecting: t("classroomConnecting"),
+            notConfigured: t("classroomNotConfigured"),
+            recording: t("classroomRecording"),
+            ending: t("classroomEnding"),
+            endAndTranscribe: t("classroomEndTranscribe"),
+            leaveOnly: t("classroomLeaveOnly"),
+            errorToken: t("classroomErrToken"),
+            errorTranscribe: t("classroomErrTranscribe"),
+            okTranscribed: t("okLivekit"),
+            sttMissing: t("classroomSttMissing"),
+            hint: t("classroomHint"),
+          }}
+        />
+      </div>
 
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div>
@@ -208,7 +239,11 @@ export default async function LessonRoomPage({
                 id="transcript"
                 name="transcript"
                 placeholder={t("placeholder")}
-                defaultValue={lesson.transcript?.editedText || lesson.transcript?.rawText || ""}
+                defaultValue={
+                  lesson.transcript?.editedText ||
+                  lesson.transcript?.rawText ||
+                  ""
+                }
                 required
               />
             </div>
@@ -222,7 +257,9 @@ export default async function LessonRoomPage({
               />
             </div>
             <button className="btn" type="submit">
-              {lesson.summary ? t("regenerateSummary") : `${common("import")} / ${common("generate")}`}
+              {lesson.summary
+                ? t("regenerateSummary")
+                : `${common("import")} / ${common("generate")}`}
             </button>
           </form>
 
@@ -290,7 +327,10 @@ export default async function LessonRoomPage({
                 <p className="muted">{t("noExamples")}</p>
               ) : (
                 examples.map((ex, i) => (
-                  <div key={`${ex.pattern}-${i}`} style={{ marginBottom: "0.85rem" }}>
+                  <div
+                    key={`${ex.pattern}-${i}`}
+                    style={{ marginBottom: "0.85rem" }}
+                  >
                     <div style={{ fontWeight: 650 }}>{ex.pattern}</div>
                     <ul style={{ margin: "0.35rem 0 0" }}>
                       {(ex.examples ?? []).map((line, j) => (
@@ -314,15 +354,27 @@ export default async function LessonRoomPage({
 
               <div className="field">
                 <label htmlFor="homework">{common("homework")}</label>
-                <textarea id="homework" name="homework" defaultValue={lesson.summary.homework} />
+                <textarea
+                  id="homework"
+                  name="homework"
+                  defaultValue={lesson.summary.homework}
+                />
               </div>
               <div className="field">
                 <label htmlFor="nextFocus">{common("nextFocus")}</label>
-                <textarea id="nextFocus" name="nextFocus" defaultValue={lesson.summary.nextFocus} />
+                <textarea
+                  id="nextFocus"
+                  name="nextFocus"
+                  defaultValue={lesson.summary.nextFocus}
+                />
               </div>
               <div className="field">
                 <label htmlFor="notes">{t("notes")}</label>
-                <textarea id="notes" name="notes" defaultValue={lesson.summary.notes} />
+                <textarea
+                  id="notes"
+                  name="notes"
+                  defaultValue={lesson.summary.notes}
+                />
               </div>
               <button className="btn" type="submit">
                 {t("saveSummary")}
@@ -339,7 +391,8 @@ export default async function LessonRoomPage({
         <aside className="panel">
           <h2 style={{ marginTop: 0 }}>{t("sidebar")}</h2>
           <p>
-            <strong>{common("course")}:</strong> {courseTypeLabel(lesson.student.courseType)}
+            <strong>{common("course")}:</strong>{" "}
+            {courseTypeLabel(lesson.student.courseType)}
           </p>
           <p>
             <strong>{common("level")}:</strong> {lesson.student.level}
@@ -356,7 +409,9 @@ export default async function LessonRoomPage({
           </p>
           <p>
             <strong>{common("weaknesses")}:</strong>{" "}
-            {parseJsonArray(lesson.student.progress?.weaknessesJson).join(" · ") || "—"}
+            {parseJsonArray(lesson.student.progress?.weaknessesJson).join(
+              " · ",
+            ) || "—"}
           </p>
           <h3>{common("vocab")}</h3>
           <ul>
@@ -366,7 +421,12 @@ export default async function LessonRoomPage({
           </ul>
           {lesson.meetLink && (
             <p>
-              <a href={lesson.meetLink} target="_blank" rel="noreferrer" className="btn">
+              <a
+                href={lesson.meetLink}
+                target="_blank"
+                rel="noreferrer"
+                className="btn"
+              >
                 {t("joinMeet")}
               </a>
             </p>

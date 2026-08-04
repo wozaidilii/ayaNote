@@ -16,6 +16,8 @@
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.13",
     "@ai-sdk/openai": "^4.0.18",
+    "@livekit/components-react": "^2.9.23",
+    "@livekit/components-styles": "^1.2.0",
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/adapter-neon": "^7.9.0",
     "@prisma/client": "^7.9.0",
@@ -24,6 +26,8 @@
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^17.4.2",
+    "livekit-client": "^2.21.0",
+    "livekit-server-sdk": "^2.17.0",
     "next": "16.2.11",
     "next-intl": "^4.13.3",
     "react": "19.2.4",
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/dom-mediacapture-record": "^1.0.22",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
