@@ -1027,68 +1027,228 @@ a {
   margin-bottom: 0;
 }
 
-.classroom-video {
-  margin-top: 0.5rem;
-}
-
-.classroom-video [data-lk-theme] {
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-
-.classroom-video .lk-grid-layout {
-  min-height: 280px;
-}
-
 .classroom-page {
   min-height: 100vh;
-  padding: 1rem 1.25rem 2rem;
-  max-width: 1280px;
-  margin: 0 auto;
-  background: var(--page);
+  padding: 0.65rem 0.85rem 1rem;
+  max-width: none;
+  margin: 0;
+  background: var(--canvas);
+  box-sizing: border-box;
 }
 
-.classroom-page-header {
+.classroom-meet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: calc(100vh - 1.3rem);
+}
+
+.classroom-meet-top {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  align-items: flex-start;
-  margin-bottom: 1rem;
+  gap: 0.5rem 0.75rem;
+  padding: 0.35rem 0.15rem;
 }
 
-.classroom-page-actions {
+.classroom-meet-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.classroom-meet-meta {
+  font-size: 12px;
+  margin-top: 0.1rem;
+}
+
+.classroom-meet-top-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.classroom-layout {
+.classroom-meet-status {
+  font-size: 12px;
+  margin-right: 0.25rem;
+}
+
+.classroom-livekit-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.classroom-meet-body {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr);
-  gap: 1rem;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 0.65rem;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.classroom-meet-body.is-solo {
+  grid-template-columns: 1fr;
+}
+
+.classroom-stage {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.classroom-past-banner {
+  font-size: 12px;
+  margin: 0 0 0.5rem;
+}
+
+.classroom-doc-surface {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.classroom-tiptap {
+  outline: none;
+  min-height: 60vh;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.classroom-tiptap h1,
+.classroom-tiptap h2,
+.classroom-tiptap h3 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.1em 0 0.4em;
+}
+
+.classroom-tiptap h1 {
+  font-size: 1.45rem;
+}
+
+.classroom-tiptap h2 {
+  font-size: 1.2rem;
+}
+
+.classroom-tiptap h3 {
+  font-size: 1.05rem;
+}
+
+.classroom-tiptap p {
+  margin: 0.25em 0;
+}
+
+.classroom-tiptap ul,
+.classroom-tiptap ol {
+  padding-left: 1.35rem;
+  margin: 0.4em 0;
+}
+
+.classroom-tiptap .is-empty::before {
+  color: var(--ink-subtle);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.classroom-caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid;
+  word-break: normal;
+  pointer-events: none;
+}
+
+.classroom-caret-label {
+  position: absolute;
+  top: -1.3em;
+  left: -1px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  color: #fff;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.classroom-filmstrip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  padding: 0.5rem;
+  background: var(--page);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: auto;
+}
+
+.classroom-filmstrip-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+}
+
+.classroom-filmstrip-tile {
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #111;
+  min-height: 110px;
+}
+
+.classroom-filmstrip-controls {
+  margin-top: auto !important;
+  padding: 0.25rem 0 !important;
+  border-top: 1px solid var(--line);
+  background: transparent !important;
+}
+
+.classroom-filmstrip-controls .lk-button {
+  transform: scale(0.92);
 }
 
 @media (max-width: 900px) {
-  .classroom-layout {
+  .classroom-meet-body {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
-}
 
-.classroom-board-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
+  .classroom-filmstrip {
+    flex-direction: row;
+    align-items: stretch;
+    overflow-x: auto;
+    max-height: 180px;
+  }
 
-.classroom-plan .field textarea {
-  min-height: 72px;
-  font-size: 14px;
-  line-height: 1.5;
+  .classroom-filmstrip-tiles {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .classroom-filmstrip-tile {
+    width: 160px;
+    min-width: 160px;
+    min-height: 100px;
+    aspect-ratio: 16 / 10;
+  }
+
+  .classroom-tiptap {
+    min-height: 45vh;
+  }
 }
 
 .day5-cal {

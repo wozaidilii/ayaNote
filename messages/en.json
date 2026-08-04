@@ -283,16 +283,22 @@
     "viewClassroom": "View classroom & plan"
   },
   "classroom": {
-    "planTitle": "Lesson plan",
-    "notesTitle": "Shared notes",
-    "notesHint": "Teacher and student can both edit. Changes autosave and sync every few seconds.",
-    "saving": "Saving…",
-    "saved": "Saved",
-    "peerUpdated": "Updated from the other side",
-    "saveError": "Save failed — retry by editing again",
-    "pastBanner": "Past classroom — video ended. Lesson plan and notes from this session stay below.",
-    "pastChip": "Past session",
-    "openLessonRoom": "Lesson room (transcript)",
-    "back": "Back"
+    "pastBanner": "Past classroom — video ended. This session’s board stays here.",
+    "pastChip": "Past",
+    "connecting": "Connecting video…",
+    "notConfigured": "LiveKit not configured — board still works offline.",
+    "recording": "Recording",
+    "ending": "Transcribing…",
+    "endAndTranscribe": "End & transcribe",
+    "leaveOnly": "Leave call",
+    "errorToken": "Could not join video",
+    "errorTranscribe": "Transcription failed",
+    "sttMissing": "STT key missing — call works; set OPENAI_API_KEY to transcribe",
+    "docPlaceholder": "Write the lesson board together… Use headings for Warmup, Review, New focus…",
+    "statusSaving": "Saving…",
+    "statusSaved": "Saved",
+    "statusLive": "Live",
+    "statusError": "Save failed",
+    "okTranscribed": "Audio transcribed and summarized. Board stays open."
   }
 }

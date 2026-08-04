@@ -283,16 +283,22 @@
     "viewClassroom": "Classroomと教案を見る"
   },
   "classroom": {
-    "planTitle": "教案",
-    "notesTitle": "共有ノート",
-    "notesHint": "先生と生徒の両方が編集できます。自動保存し、数秒ごとに同期します。",
-    "saving": "保存中…",
-    "saved": "保存済み",
-    "peerUpdated": "相手側の更新を反映",
-    "saveError": "保存に失敗 — もう一度編集してください",
-    "pastBanner": "過去のClassroom — ビデオは終了。この回の教案とノートは下に残っています。",
-    "pastChip": "過去の授業",
-    "openLessonRoom": "レッスンルーム（書き起こし）",
-    "back": "戻る"
+    "pastBanner": "過去のClassroom — ビデオは終了。この回のボードはここに残っています。",
+    "pastChip": "過去",
+    "connecting": "ビデオ接続中…",
+    "notConfigured": "LiveKit未設定 — ボードはオフラインで使えます。",
+    "recording": "録音中",
+    "ending": "文字起こし中…",
+    "endAndTranscribe": "終了して文字起こし",
+    "leaveOnly": "通話のみ退出",
+    "errorToken": "ビデオに入れませんでした",
+    "errorTranscribe": "文字起こしに失敗",
+    "sttMissing": "STTキー未設定 — 通話は可能。文字起こしには OPENAI_API_KEY が必要",
+    "docPlaceholder": "一緒に教案ボードを書いてください… Warmup / Review / New focus は見出しで",
+    "statusSaving": "保存中…",
+    "statusSaved": "保存済み",
+    "statusLive": "ライブ",
+    "statusError": "保存失敗",
+    "okTranscribed": "音声を文字起こし・要約しました。ボードはそのままです。"
   }
 }
