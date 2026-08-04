@@ -31,7 +31,7 @@ export function FiveDayCalendar({
   nextStart,
   labels,
 }: {
-  days: string[]; // yyyy-MM-dd × 5
+  days: string[]; // yyyy-MM-dd × 7 (week)
   lessons: CalendarLessonItem[];
   timeZone: string;
   todayYmd: string;

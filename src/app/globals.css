@@ -243,6 +243,111 @@ a {
   align-items: center;
 }
 
+.students-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.students-search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.students-search input {
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--page);
+  font-size: 14px;
+}
+
+.students-search input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+}
+
+.students-level {
+  flex: 0 0 auto;
+  min-width: 8rem;
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--page);
+  font-size: 13px;
+}
+
+.students-archived {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.students-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(15, 23, 42, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.students-drawer-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.students-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 50;
+  width: min(400px, 100vw);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.12);
+  transform: translateX(100%);
+  transition: transform 0.22s ease;
+}
+
+.students-drawer.is-open {
+  transform: translateX(0);
+}
+
+.students-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.students-drawer-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.students-drawer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem 1.1rem 1.5rem;
+}
+
 .h1 {
   margin: 0 0 6px;
   color: var(--ink);
@@ -1427,8 +1532,8 @@ a {
 
 .day5-grid {
   display: grid;
-  grid-template-columns: 52px repeat(5, minmax(110px, 1fr));
-  min-width: 720px;
+  grid-template-columns: 52px repeat(7, minmax(96px, 1fr));
+  min-width: 820px;
 }
 
 .day5-gutter {

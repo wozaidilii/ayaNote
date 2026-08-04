@@ -65,9 +65,9 @@ export default async function CalendarPage({
 
   const daysStart =
     sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : todayYmd;
-  const fiveDays = consecutiveYmds(daysStart, 5, timeZone);
-  const prevStart = shiftYmd(daysStart, -5, timeZone);
-  const nextStart = shiftYmd(daysStart, 5, timeZone);
+  const weekDays = consecutiveYmds(daysStart, 7, timeZone);
+  const prevStart = shiftYmd(daysStart, -7, timeZone);
+  const nextStart = shiftYmd(daysStart, 7, timeZone);
 
   const monthStartYmd = `${month.year}-${String(month.monthIndex0 + 1).padStart(2, "0")}-01`;
   const nextMonthKey = shiftMonth(month.year, month.monthIndex0, 1);
@@ -82,9 +82,9 @@ export default async function CalendarPage({
     timeZone,
   ).end;
 
-  const daysRangeStart = dayBoundsInTz(fiveDays[0], timeZone).start;
+  const daysRangeStart = dayBoundsInTz(weekDays[0], timeZone).start;
   const daysRangeEnd = dayBoundsInTz(
-    shiftYmd(fiveDays[fiveDays.length - 1], 1, timeZone),
+    shiftYmd(weekDays[weekDays.length - 1], 1, timeZone),
     timeZone,
   ).start;
 
@@ -194,7 +194,7 @@ export default async function CalendarPage({
             role="tab"
             aria-selected={view === "days"}
           >
-            {t("viewDays")}
+            {t("viewWeek")}
           </Link>
           <Link
             className={`btn ${view === "month" ? "" : "secondary"}`}
@@ -208,7 +208,7 @@ export default async function CalendarPage({
 
         {view === "days" ? (
           <FiveDayCalendar
-            days={fiveDays}
+            days={weekDays}
             lessons={calendarLessons}
             timeZone={timeZone}
             todayYmd={todayYmd}
