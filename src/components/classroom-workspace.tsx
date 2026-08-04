@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  ControlBar,
   LiveKitRoom,
   ParticipantTile,
   RoomAudioRenderer,
+  TrackToggle,
   useRoomContext,
   useTracks,
 } from "@livekit/components-react";
@@ -43,6 +43,10 @@ type Labels = {
   statusSaved: string;
   statusLive: string;
   statusError: string;
+  screenShare: string;
+  enlargeVideo: string;
+  restoreBoard: string;
+  clickBoardReturn: string;
 };
 
 function MixedAudioRecorder({
@@ -175,7 +179,7 @@ function MixedAudioRecorder({
   return null;
 }
 
-function Filmstrip() {
+function VideoTiles() {
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -185,22 +189,42 @@ function Filmstrip() {
   );
 
   return (
-    <>
-      <div className="classroom-filmstrip-tiles">
-        {tracks.map((trackRef) => (
-          <ParticipantTile
-            key={`${trackRef.participant.identity}-${trackRef.source}`}
-            trackRef={trackRef}
-            className="classroom-filmstrip-tile"
-          />
-        ))}
-      </div>
-      <ControlBar
-        variation="minimal"
-        controls={{ chat: false, screenShare: true }}
-        className="classroom-filmstrip-controls"
+    <div className="classroom-filmstrip-tiles">
+      {tracks.map((trackRef) => (
+        <ParticipantTile
+          key={`${trackRef.participant.identity}-${trackRef.source}`}
+          trackRef={trackRef}
+          className="classroom-filmstrip-tile"
+        />
+      ))}
+    </div>
+  );
+}
+
+function HoverAvControls() {
+  return (
+    <div className="classroom-av-tray" aria-label="Camera and microphone">
+      <TrackToggle
+        source={Track.Source.Microphone}
+        className="classroom-av-toggle"
       />
-    </>
+      <TrackToggle
+        source={Track.Source.Camera}
+        className="classroom-av-toggle"
+      />
+    </div>
+  );
+}
+
+function ScreenShareButton({ label }: { label: string }) {
+  return (
+    <TrackToggle
+      source={Track.Source.ScreenShare}
+      className="btn secondary sm classroom-screenshare-btn"
+      showIcon
+    >
+      {label}
+    </TrackToggle>
   );
 }
 
@@ -210,6 +234,73 @@ function statusLabel(status: ClassroomSaveStatus, labels: Labels) {
   if (status === "live") return labels.statusLive;
   if (status === "error") return labels.statusError;
   return "";
+}
+
+function CallLayout({
+  videoExpanded,
+  setVideoExpanded,
+  board,
+  labels,
+  error,
+}: {
+  videoExpanded: boolean;
+  setVideoExpanded: (v: boolean) => void;
+  board: ReactNode;
+  labels: Labels;
+  error: string | null;
+}) {
+  return (
+    <div
+      className={
+        videoExpanded
+          ? "classroom-meet-body is-call is-video-expanded"
+          : "classroom-meet-body is-call"
+      }
+    >
+      <aside className="classroom-float-dock" role="complementary">
+        <VideoTiles />
+        <HoverAvControls />
+        {error && <p className="chip">{error}</p>}
+      </aside>
+
+      <section
+        className="classroom-stage panel"
+        onClick={
+          videoExpanded
+            ? () => {
+                setVideoExpanded(false);
+              }
+            : undefined
+        }
+        role={videoExpanded ? "button" : undefined}
+        tabIndex={videoExpanded ? 0 : undefined}
+        onKeyDown={
+          videoExpanded
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setVideoExpanded(false);
+                }
+              }
+            : undefined
+        }
+        aria-label={videoExpanded ? labels.clickBoardReturn : undefined}
+      >
+        {videoExpanded && (
+          <p className="classroom-dock-hint muted">{labels.clickBoardReturn}</p>
+        )}
+        <div
+          className={
+            videoExpanded
+              ? "classroom-board-wrap is-compact-preview"
+              : "classroom-board-wrap"
+          }
+        >
+          {board}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export function ClassroomWorkspace({
@@ -251,6 +342,7 @@ export function ClassroomWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [recordActive, setRecordActive] = useState(false);
   const [userLeftCall, setUserLeftCall] = useState(false);
+  const [videoExpanded, setVideoExpanded] = useState(false);
   const pendingUploadRef = useRef(false);
 
   const docKey = useMemo(() => JSON.stringify(initialDoc), [initialDoc]);
@@ -277,6 +369,7 @@ export function ClassroomWorkspace({
       }
       setTokenInfo({ token: data.token, url: data.url });
       setRecordActive(true);
+      setVideoExpanded(false);
     } catch {
       setError(labels.errorToken);
     } finally {
@@ -310,7 +403,12 @@ export function ClassroomWorkspace({
       }
       setTokenInfo(null);
       setRecordActive(false);
-      router.push(`/classroom/${lessonId}?ok=livekit`);
+      setVideoExpanded(false);
+      if (role === "teacher") {
+        router.push(`/lessons/${lessonId}?ok=summary`);
+      } else {
+        router.push(`/student/history`);
+      }
       router.refresh();
     } catch {
       setError(labels.errorTranscribe);
@@ -343,6 +441,7 @@ export function ClassroomWorkspace({
     pendingUploadRef.current = false;
     setUserLeftCall(true);
     setRecordActive(false);
+    setVideoExpanded(false);
     setTokenInfo(null);
   };
 
@@ -353,8 +452,27 @@ export function ClassroomWorkspace({
     }
   }, [ending, recordActive, tokenInfo]);
 
-  const topBar = (
-    <header className="classroom-meet-top">
+  const board = (
+    <>
+      {isPast && (
+        <p className="classroom-past-banner muted">{labels.pastBanner}</p>
+      )}
+      <ClassroomDocEditor
+        key={docKey + (tokenInfo ? "-live" : "-solo")}
+        lessonId={lessonId}
+        initialDoc={initialDoc}
+        userName={userName}
+        userColor={userColor}
+        placeholder={labels.docPlaceholder}
+        onStatus={setSaveStatus}
+        autofocus
+        enableLivekitSync={Boolean(tokenInfo)}
+      />
+    </>
+  );
+
+  const topBar = (inCall: boolean) => (
+    <header className="classroom-meet-top panel">
       <div className="classroom-meet-top-text">
         <div className="classroom-meet-title">{titleLine}</div>
         <div className="classroom-meet-meta muted">{metaLine}</div>
@@ -366,8 +484,17 @@ export function ClassroomWorkspace({
           {ending ? ` · ${labels.ending}` : ""}
           {recordActive && tokenInfo ? ` · ${labels.recording}` : ""}
         </span>
-        {!isPast && tokenInfo && (
+        {inCall && (
           <>
+            <ScreenShareButton label={labels.screenShare} />
+            <button
+              className="btn secondary sm"
+              type="button"
+              disabled={ending}
+              onClick={() => setVideoExpanded(!videoExpanded)}
+            >
+              {videoExpanded ? labels.restoreBoard : labels.enlargeVideo}
+            </button>
             <button
               className="btn sm"
               type="button"
@@ -408,55 +535,38 @@ export function ClassroomWorkspace({
     </header>
   );
 
-  const docPane = (live: boolean) => (
-    <section className="classroom-stage panel">
-      {isPast && (
-        <p className="classroom-past-banner muted">{labels.pastBanner}</p>
-      )}
-      <ClassroomDocEditor
-        key={docKey + (live ? "-live" : "-solo")}
-        lessonId={lessonId}
-        initialDoc={initialDoc}
-        userName={userName}
-        userColor={userColor}
-        placeholder={labels.docPlaceholder}
-        onStatus={setSaveStatus}
-        autofocus
-        enableLivekitSync={live}
-      />
-    </section>
-  );
-
-  const floatingDock = (content: ReactNode) => (
-    <div className="classroom-float-dock" role="complementary">
-      {content}
-    </div>
-  );
-
   let body: ReactNode;
 
   if (isPast || !livekitReady) {
     body = (
-      <div className="classroom-meet-body is-solo">
-        {docPane(false)}
-        {!isPast &&
-          !livekitReady &&
-          floatingDock(<p className="muted">{labels.notConfigured}</p>)}
-      </div>
+      <>
+        {topBar(false)}
+        <div className="classroom-meet-body is-solo">
+          <section className="classroom-stage panel">{board}</section>
+          {!isPast && !livekitReady && (
+            <aside className="classroom-float-dock" role="complementary">
+              <p className="muted" style={{ margin: 0 }}>
+                {labels.notConfigured}
+              </p>
+            </aside>
+          )}
+        </div>
+      </>
     );
   } else if (!tokenInfo) {
     body = (
-      <div className="classroom-meet-body is-solo">
-        {docPane(false)}
-        {floatingDock(
-          <>
+      <>
+        {topBar(false)}
+        <div className="classroom-meet-body is-solo">
+          <section className="classroom-stage panel">{board}</section>
+          <aside className="classroom-float-dock" role="complementary">
             <p className="muted" style={{ margin: 0 }}>
               {userLeftCall ? labels.leftCall : labels.connecting}
             </p>
             {error && <p className="chip">{error}</p>}
-          </>,
-        )}
-      </div>
+          </aside>
+        </div>
+      </>
     );
   } else {
     body = (
@@ -472,27 +582,26 @@ export function ClassroomWorkspace({
           if (!pendingUploadRef.current) {
             setTokenInfo(null);
             setRecordActive(false);
+            setVideoExpanded(false);
           }
         }}
       >
         <MixedAudioRecorder active={recordActive} onChunk={onChunk} />
         <RoomAudioRenderer />
-        <div className="classroom-meet-body is-solo">
-          {docPane(true)}
-          {floatingDock(
-            <>
-              <Filmstrip />
-              {error && <p className="chip">{error}</p>}
-            </>,
-          )}
-        </div>
+        {topBar(true)}
+        <CallLayout
+          videoExpanded={videoExpanded}
+          setVideoExpanded={setVideoExpanded}
+          board={board}
+          labels={labels}
+          error={error}
+        />
       </LiveKitRoom>
     );
   }
 
   return (
     <div className="classroom-meet">
-      {topBar}
       {error && !tokenInfo && <p className="chip">{error}</p>}
       {body}
     </div>

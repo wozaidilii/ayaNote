@@ -1,6 +1,6 @@
+import { logout, setLocale } from "@/app/actions";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { setLocale, setRole } from "@/app/actions";
 import { getSession } from "@/lib/session";
 
 export async function AppShell({
@@ -13,7 +13,9 @@ export async function AppShell({
   personName?: string;
 }) {
   const t = await getTranslations();
-  const { role, locale } = await getSession();
+  const session = await getSession();
+  const role = session.role ?? "teacher";
+  const locale = session.locale;
 
   const teacherLinks = [
     { href: "/today", key: "today" },
@@ -32,7 +34,7 @@ export async function AppShell({
 
   const links = role === "teacher" ? teacherLinks : studentLinks;
   const spaceLabel = role === "teacher" ? "Teacher" : "Student";
-  const who = personName || (role === "teacher" ? "Ayano" : "Student");
+  const who = personName || (role === "teacher" ? "Teacher" : "Student");
 
   return (
     <div className="shell">
@@ -69,15 +71,25 @@ export async function AppShell({
 
         <div className="sidebar-actions">
           <form action={setLocale.bind(null, locale === "ja" ? "en" : "ja")}>
-            <button className="btn secondary sm" type="submit" style={{ width: "100%" }}>
+            <button
+              className="btn secondary sm"
+              type="submit"
+              style={{ width: "100%" }}
+            >
               {t("common.language")}: {locale.toUpperCase()}
             </button>
           </form>
-          <form action={setRole.bind(null, role === "teacher" ? "student" : "teacher")}>
-            <button className="btn ghost sm" type="submit" style={{ width: "100%" }}>
-              {role === "teacher" ? t("nav.switchStudent") : t("nav.switchTeacher")}
-            </button>
-          </form>
+          {session.authenticated && (
+            <form action={logout}>
+              <button
+                className="btn ghost sm"
+                type="submit"
+                style={{ width: "100%" }}
+              >
+                {t("nav.logout")}
+              </button>
+            </form>
+          )}
         </div>
       </aside>
       <main className="main">

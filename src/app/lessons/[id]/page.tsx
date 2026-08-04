@@ -1,13 +1,10 @@
 import { getTranslations } from "next-intl/server";
-import { notFound } from "next/navigation";
-import {
-  approveSummary,
-  fetchDriveTranscriptForLesson,
-  importTranscriptAndSummarize,
-} from "@/app/actions";
+import { notFound, redirect } from "next/navigation";
+import { approveSummary, importTranscriptAndSummarize } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -49,6 +46,7 @@ export default async function LessonRoomPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
+  const teacher = await requireTeacher();
   const t = await getTranslations("lessonRoom");
   const common = await getTranslations("common");
 
@@ -74,6 +72,7 @@ export default async function LessonRoomPage({
     },
   });
   if (!lesson) notFound();
+  if (lesson.teacherId !== teacher.id) redirect("/today");
 
   const lastFocus = lesson.student.lessons[0]?.summary?.nextFocus;
   const topics = lesson.summary
@@ -98,12 +97,9 @@ export default async function LessonRoomPage({
     provider === "deepseek"
       ? Boolean(process.env.DEEPSEEK_API_KEY)
       : Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
-  const googleConnected = Boolean(
-    lesson.teacher.googleConnectedEmail || lesson.teacher.googleRefreshToken,
-  );
 
   return (
-    <AppShell active="today">
+    <AppShell active="today" personName={teacher.name}>
       <h1 className="h1">{t("title")}</h1>
       <p className="muted">
         {lesson.student.name} ·{" "}
@@ -128,9 +124,6 @@ export default async function LessonRoomPage({
         <span className="chip sky">
           {courseTypeLabel(lesson.student.courseType)}
         </span>
-        {lesson.driveFileId && (
-          <span className="chip">Drive: {lesson.driveFileId.slice(0, 8)}…</span>
-        )}
         <span className="chip">
           {hasAiKey ? t("aiReady", { provider }) : t("aiMissing", { provider })}
         </span>
@@ -146,55 +139,11 @@ export default async function LessonRoomPage({
 
       {sp.ok === "summary" && <p className="chip done">{t("okSummary")}</p>}
       {sp.ok === "livekit" && <p className="chip done">{t("okLivekit")}</p>}
-      {sp.ok === "drive" && (
-        <p className="chip done">
-          {t("okDrive")}
-          {sp.file ? ` · ${decodeURIComponent(sp.file)}` : ""}
-        </p>
-      )}
       {sp.warn === "no_ai_key" && <p className="chip">{t("warnNoAiKey")}</p>}
       {sp.err === "empty_transcript" && <p className="chip">{t("errEmpty")}</p>}
-      {sp.err === "drive_not_found" && (
-        <p className="chip">{t("errDriveNotFound")}</p>
-      )}
-      {sp.err === "drive_empty_doc" && (
-        <p className="chip">{t("errDriveEmpty")}</p>
-      )}
-      {sp.err === "drive_no_google_token" && (
-        <p className="chip">{t("errDriveNoGoogle")}</p>
-      )}
-      {sp.err?.startsWith("drive_") &&
-        ![
-          "drive_not_found",
-          "drive_empty_doc",
-          "drive_no_google_token",
-        ].includes(sp.err) && (
-          <p className="chip">
-            {t("errDriveGeneric")}: {sp.err}
-          </p>
-        )}
 
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div>
-          <div className="panel">
-            <h2 style={{ marginTop: 0 }}>{t("driveTitle")}</h2>
-            <p className="muted">{t("driveHint")}</p>
-            {googleConnected ? (
-              <form action={fetchDriveTranscriptForLesson}>
-                <input type="hidden" name="lessonId" value={lesson.id} />
-                <button className="btn" type="submit">
-                  {t("fetchDrive")}
-                </button>
-              </form>
-            ) : (
-              <p>
-                <a className="btn secondary" href="/settings">
-                  {t("connectGoogleFirst")}
-                </a>
-              </p>
-            )}
-          </div>
-
           <form className="panel" action={importTranscriptAndSummarize}>
             <input type="hidden" name="lessonId" value={lesson.id} />
             <h2 style={{ marginTop: 0 }}>{t("pasteTitle")}</h2>
@@ -381,18 +330,6 @@ export default async function LessonRoomPage({
               <li key={v.id}>{v.term}</li>
             ))}
           </ul>
-          {lesson.meetLink && (
-            <p>
-              <a
-                href={lesson.meetLink}
-                target="_blank"
-                rel="noreferrer"
-                className="btn"
-              >
-                {t("joinMeet")}
-              </a>
-            </p>
-          )}
           {lesson.prepDraft && (
             <div style={{ marginTop: "1rem" }}>
               <h3>Prep draft</h3>

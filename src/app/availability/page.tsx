@@ -8,16 +8,17 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { AvailabilityForm } from "@/components/availability-form";
 import { prisma } from "@/lib/db";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, ymdInTz } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function AvailabilityPage() {
+  const sessionTeacher = await requireTeacher();
   const [t, common, teacher] = await Promise.all([
     getTranslations("availability"),
     getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({
-      where: { email: DEMO_TEACHER_EMAIL },
+      where: { id: sessionTeacher.id },
       include: {
         availabilityRules: true,
         blackoutDates: { orderBy: { date: "asc" } },
@@ -33,7 +34,7 @@ export default async function AvailabilityPage() {
   });
 
   return (
-    <AppShell active="availability">
+    <AppShell active="availability" personName={teacher.name}>
       <h1 className="h1">{t("title")}</h1>
       <p className="muted">
         {t("subtitle")} · {timeZone}
@@ -46,7 +47,9 @@ export default async function AvailabilityPage() {
           endTime: rules?.endTime ?? "20:00",
           minNoticeHours: rules?.minNoticeHours ?? 24,
           maxWeeklyLessons: rules?.maxWeeklyLessons ?? 6,
-          weekdays: parseJsonArray(rules?.weekdaysJson ?? "[1,2,3,4,5,6]").map(Number),
+          weekdays: parseJsonArray(rules?.weekdaysJson ?? "[1,2,3,4,5,6]").map(
+            Number,
+          ),
           timezone: timeZone,
         }}
         labels={{
@@ -61,9 +64,16 @@ export default async function AvailabilityPage() {
 
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>{t("blackouts")}</h2>
-        <form action={addBlackoutDate} style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+        <form
+          action={addBlackoutDate}
+          style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}
+        >
           <input name="date" type="date" required />
-          <input name="reason" placeholder={t("blackoutReason")} style={{ flex: 1, minWidth: 160 }} />
+          <input
+            name="reason"
+            placeholder={t("blackoutReason")}
+            style={{ flex: 1, minWidth: 160 }}
+          />
           <button className="btn secondary" type="submit">
             {t("addBlackout")}
           </button>
@@ -99,7 +109,8 @@ export default async function AvailabilityPage() {
                 {b.student.name} · {b.type}
               </div>
               <div className="muted">
-                {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)} — {b.note || "—"}
+                {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)} —{" "}
+                {b.note || "—"}
               </div>
             </div>
             <div style={{ display: "flex", gap: "0.4rem" }}>

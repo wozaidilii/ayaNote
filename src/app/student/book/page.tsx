@@ -4,7 +4,6 @@ import { SlotPicker } from "@/components/slot-picker";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function StudentBookPage() {
   const active = await getActiveStudent();
@@ -12,7 +11,7 @@ export default async function StudentBookPage() {
     getTranslations("studentBook"),
     getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({
-      where: { email: DEMO_TEACHER_EMAIL },
+      where: { id: active.teacherId },
       include: {
         availabilityRules: true,
         blackoutDates: true,
@@ -37,7 +36,8 @@ export default async function StudentBookPage() {
     minNoticeHours: teacher.availabilityRules?.minNoticeHours ?? 24,
     slotMinutes: 60,
     maxWeeklyLessons: teacher.availabilityRules?.maxWeeklyLessons ?? 6,
-    timezone: teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
+    timezone:
+      teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
   };
 
   const [busyLessons, pending] = await Promise.all([

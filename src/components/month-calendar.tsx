@@ -7,10 +7,8 @@ export type CalendarLessonItem = {
   endsAt: string;
   studentName: string;
   status: string;
-  meetLink?: string | null;
   prepStatus?: string;
   hasSummary?: boolean;
-  fromGoogle?: boolean;
 };
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -42,7 +40,6 @@ export function MonthCalendar({
     today: string;
     openRecord: string;
     openLesson: string;
-    joinMeet: string;
     openPrep: string;
     finished: string;
     upcoming: string;
@@ -185,25 +182,12 @@ export function MonthCalendar({
                   <span className={`chip ${past ? "done" : "soon"}`}>
                     {past ? labels.finished : labels.upcoming}
                   </span>
-                  {lesson.fromGoogle && (
-                    <span className="chip sky">Google</span>
-                  )}
                   {lesson.prepStatus && (
                     <span className="chip">Prep: {lesson.prepStatus}</span>
                   )}
                 </div>
               </div>
               <div style={{ display: "grid", gap: "0.35rem" }}>
-                {lesson.meetLink && !past && (
-                  <a
-                    className="btn"
-                    href={lesson.meetLink}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {labels.joinMeet}
-                  </a>
-                )}
                 {!past && (
                   <Link
                     className="btn secondary"

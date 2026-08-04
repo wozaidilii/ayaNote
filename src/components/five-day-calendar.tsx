@@ -42,7 +42,6 @@ export function FiveDayCalendar({
     today: string;
     openRecord: string;
     openLesson: string;
-    joinMeet: string;
   };
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now());

@@ -1,20 +1,15 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
-import { StudentSwitcher } from "@/components/student-switcher";
-import {
-  getActiveStudent,
-  listActiveStudentsForTeacher,
-} from "@/lib/active-student";
+import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentHomePage() {
-  const [t, common, active, roster] = await Promise.all([
+  const [t, common, active] = await Promise.all([
     getTranslations("studentHome"),
     getTranslations("common"),
     getActiveStudent(),
-    listActiveStudentsForTeacher(),
   ]);
 
   const student = await prisma.student.findFirstOrThrow({
@@ -45,19 +40,6 @@ export default async function StudentHomePage() {
         {student.name} · {student.email} · {timeZone}
       </p>
 
-      <StudentSwitcher
-        activeId={student.id}
-        label={t("switchStudent")}
-        students={roster.map((s) => ({
-          id: s.id,
-          name: s.name,
-          email: s.email,
-          nextLabel: s.lessons[0]
-            ? formatInTz(s.lessons[0].startsAt, "MMM d HH:mm", timeZone)
-            : undefined,
-        }))}
-      />
-
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>{t("next")}</h2>
@@ -77,23 +59,9 @@ export default async function StudentHomePage() {
                 <strong>{t("whatNext")}:</strong>{" "}
                 {next.prepDraft?.newFocus || next.summary?.nextFocus || "—"}
               </p>
-              {next.meetLink ? (
-                <p>
-                  <a
-                    className="btn"
-                    href={next.meetLink}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {t("joinMeet")}
-                  </a>
-                </p>
-              ) : (
-                <p className="muted">{t("noMeetYet")}</p>
-              )}
               <p>
                 <a
-                  className="btn secondary"
+                  className="btn"
                   href={`/classroom/${next.id}`}
                   target="_blank"
                   rel="noreferrer"

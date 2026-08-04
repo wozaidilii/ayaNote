@@ -1,4 +1,4 @@
-import { setRole } from "@/app/actions";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 export default async function HomePage() {
@@ -20,7 +20,13 @@ export default async function HomePage() {
 
         <div className="panel" style={{ marginBottom: 16 }}>
           <h2 style={{ marginTop: 0 }}>Overview</h2>
-          <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "var(--ink-soft)" }}>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: "1.2rem",
+              color: "var(--ink-soft)",
+            }}
+          >
             <li>{t("bullets.memory")}</li>
             <li>{t("bullets.prep")}</li>
             <li>{t("bullets.booking")}</li>
@@ -28,17 +34,13 @@ export default async function HomePage() {
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <form action={setRole.bind(null, "teacher")}>
-            <button className="btn" type="submit">
-              {t("ctaTeacher")}
-            </button>
-          </form>
-          <form action={setRole.bind(null, "student")}>
-            <button className="btn secondary" type="submit">
-              {t("ctaStudent")}
-            </button>
-          </form>
+          <Link className="btn" href="/login">
+            {t("ctaTeacher")}
+          </Link>
         </div>
+        <p className="muted" style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
+          {t("studentInviteHint")}
+        </p>
       </div>
     </div>
   );

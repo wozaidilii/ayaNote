@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { requireTeacher } from "@/lib/session";
 import {
   formatInTz,
   normalizeTimezone,
@@ -11,11 +11,11 @@ import {
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function TodayPage() {
-  const [t, common, nav, teacher] = await Promise.all([
+  const teacher = await requireTeacher();
+  const [t, common, nav] = await Promise.all([
     getTranslations("today"),
     getTranslations("common"),
     getTranslations("nav"),
-    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
 
   const timeZone = normalizeTimezone(teacher.timezone);
@@ -45,7 +45,7 @@ export default async function TodayPage() {
   });
 
   return (
-    <AppShell active="today">
+    <AppShell active="today" personName={teacher.name}>
       <header className="page-header">
         <div className="page-header-text">
           <h1 className="h1">{t("title")}</h1>
@@ -111,16 +111,6 @@ export default async function TodayPage() {
                   >
                     {t("openClassroom")}
                   </a>
-                  {lesson.meetLink && (
-                    <a
-                      className="btn secondary sm"
-                      href={lesson.meetLink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {t("joinMeet")}
-                    </a>
-                  )}
                   <Link
                     className="btn secondary sm"
                     href={`/lessons/${lesson.id}`}

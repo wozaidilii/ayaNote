@@ -5,40 +5,62 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
 import { courseTypeLabel, generatePrepDraft, getAiProvider } from "@/lib/ai";
-import { applyTranscriptToLesson, fetchAndImportDriveTranscript, seedMemoryFromDriveForTeacher } from "@/lib/drive-transcript";
+import { applyTranscriptToLesson } from "@/lib/drive-transcript";
+import { clearAuthSession, setAuthSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import {
-  createCalendarMeetEvent,
-  getValidAccessToken,
-  updateCalendarEvent,
-} from "@/lib/google";
-import { syncTeacherCalendar } from "@/lib/calendar-sync";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
 import type { PrepRefs } from "@/lib/prep-refs";
 import { LESSON_MINUTES, blackoutDateFromYmd } from "@/lib/scheduling";
-import { DEMO_TEACHER_EMAIL, type AppRole } from "@/lib/session";
-import { getActiveStudent } from "@/lib/active-student";
+import { requireStudent, requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, parseIsoOrLocal } from "@/lib/timezone";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
-export async function setRole(role: AppRole) {
-  const jar = await cookies();
-  jar.set("ayanote_role", role, { path: "/" });
-  redirect(role === "teacher" ? "/today" : "/student");
+export async function loginTeacher(formData: FormData) {
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  if (!email || !password) {
+    redirect("/login?err=missing");
+  }
+
+  const teacher = await prisma.teacher.findUnique({ where: { email } });
+  if (!teacher?.passwordHash) {
+    redirect("/login?err=invalid");
+  }
+  const ok = await verifyPassword(password, teacher.passwordHash);
+  if (!ok) redirect("/login?err=invalid");
+
+  await setAuthSession({ role: "teacher", teacherId: teacher.id });
+  redirect("/today");
 }
 
-export async function setActiveStudent(formData: FormData) {
-  const studentId = String(formData.get("studentId") ?? "");
-  if (!studentId) throw new Error("Student required");
-  const student = await prisma.student.findFirst({
-    where: { id: studentId, archivedAt: null },
+export async function logout() {
+  await clearAuthSession();
+  redirect("/");
+}
+
+/** Bind student session from invite token (reusable until regenerated/expired). */
+export async function acceptInvite(formData: FormData) {
+  const token = String(formData.get("token") ?? "");
+  if (!token) redirect("/?err=invite_invalid");
+  const student = await prisma.student.findUnique({
+    where: { inviteToken: token },
   });
-  if (!student) throw new Error("Student not found");
-  const jar = await cookies();
-  jar.set("ayanote_student_id", student.id, { path: "/" });
-  revalidatePath("/student");
-  revalidatePath("/student/book");
-  revalidatePath("/student/history");
+  if (!student || student.archivedAt) {
+    redirect("/?err=invite_invalid");
+  }
+  if (
+    student.inviteTokenExpiresAt &&
+    student.inviteTokenExpiresAt < new Date()
+  ) {
+    redirect("/?err=invite_expired");
+  }
+  await setAuthSession({
+    role: "student",
+    studentId: student.id,
+    teacherId: student.teacherId,
+  });
   redirect("/student");
 }
 
@@ -49,63 +71,7 @@ export async function setLocale(locale: "ja" | "en") {
 }
 
 async function getTeacher() {
-  return prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } });
-}
-
-async function getDemoStudent() {
-  return getActiveStudent();
-}
-
-async function teacherAccessToken(teacherId: string) {
-  const teacher = await prisma.teacher.findUniqueOrThrow({ where: { id: teacherId } });
-  const token = await getValidAccessToken(teacher);
-  if (
-    token &&
-    teacher.googleRefreshToken &&
-    (!teacher.googleAccessToken ||
-      !teacher.googleTokenExpiry ||
-      teacher.googleTokenExpiry.getTime() <= Date.now() + 60_000)
-  ) {
-    await prisma.teacher.update({
-      where: { id: teacherId },
-      data: {
-        googleAccessToken: token,
-        googleTokenExpiry: new Date(Date.now() + 3500_000),
-      },
-    });
-  }
-  return token;
-}
-
-async function attachMeetToLesson(opts: {
-  lessonId: string;
-  teacherId: string;
-  studentName: string;
-  studentEmail: string;
-  startsAt: Date;
-  endsAt: Date;
-  timeZone?: string;
-}) {
-  const accessToken = await teacherAccessToken(opts.teacherId);
-  const meet = await createCalendarMeetEvent({
-    accessToken,
-    summary: `AyaNote · ${opts.studentName}`,
-    description: "Japanese lesson via AyaNote",
-    start: opts.startsAt,
-    end: opts.endsAt,
-    timeZone: opts.timeZone,
-    attendeeEmail: opts.studentEmail,
-    fallbackId: opts.lessonId,
-  });
-  await prisma.lesson.update({
-    where: { id: opts.lessonId },
-    data: {
-      meetLink: meet.meetLink,
-      calendarEventId: meet.calendarEventId,
-      transcriptStatus: "waiting_drive",
-    },
-  });
-  return meet;
+  return requireTeacher();
 }
 
 export async function importTranscriptAndSummarize(formData: FormData) {
@@ -140,32 +106,6 @@ export async function importTranscriptAndSummarize(formData: FormData) {
       ? Boolean(process.env.DEEPSEEK_API_KEY)
       : Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
   redirect(`/lessons/${lessonId}?ok=summary${hasKey ? "" : "&warn=no_ai_key"}`);
-}
-
-export async function fetchDriveTranscriptForLesson(formData: FormData) {
-  const lessonId = String(formData.get("lessonId") ?? "");
-  if (!lessonId) redirect("/today?err=missing_lesson");
-
-  const result = await fetchAndImportDriveTranscript(lessonId);
-  revalidatePath(`/lessons/${lessonId}`);
-  revalidatePath("/students");
-  revalidatePath("/today");
-
-  if (result.status === "imported") {
-    redirect(`/lessons/${lessonId}?ok=drive&file=${encodeURIComponent(result.fileName ?? "")}`);
-  }
-  redirect(`/lessons/${lessonId}?err=drive_${result.status}`);
-}
-
-export async function saveTranscriptFolderId(formData: FormData) {
-  const teacher = await getTeacher();
-  const folderId = String(formData.get("googleTranscriptFolderId") ?? "").trim() || null;
-  await prisma.teacher.update({
-    where: { id: teacher.id },
-    data: { googleTranscriptFolderId: folderId },
-  });
-  revalidatePath("/settings");
-  redirect("/settings?google=folder_saved");
 }
 
 export async function approveSummary(formData: FormData) {
@@ -245,7 +185,12 @@ export async function approveSummary(formData: FormData) {
   const existing = await prisma.progressSnapshot.findUnique({
     where: { studentId: lesson.studentId },
   });
-  const covered = Array.from(new Set([...(existing ? parseJsonArray(existing.topicsCoveredJson) : []), ...topics]));
+  const covered = Array.from(
+    new Set([
+      ...(existing ? parseJsonArray(existing.topicsCoveredJson) : []),
+      ...topics,
+    ]),
+  );
 
   await prisma.progressSnapshot.upsert({
     where: { studentId: lesson.studentId },
@@ -305,7 +250,9 @@ async function writePrepDraftForLesson(lessonId: string) {
   const vocab = lesson.student.vocabItems.map((v) => v.term);
   const pastLessons = lesson.student.lessons.map((l) => {
     const focus = l.summary?.nextFocus?.trim();
-    const topics = l.summary ? parseJsonArray(l.summary.topicsJson).slice(0, 2) : [];
+    const topics = l.summary
+      ? parseJsonArray(l.summary.topicsJson).slice(0, 2)
+      : [];
     const label = focus || topics.join(" / ") || "past lesson";
     return label;
   });
@@ -364,7 +311,10 @@ export async function generateMissingPrepBatch(lessonIds: string[]) {
   const teacher = await getTeacher();
   const uniqueIds = [...new Set(lessonIds.filter(Boolean))].slice(0, 4);
   if (uniqueIds.length === 0) {
-    return { generated: [] as Awaited<ReturnType<typeof writePrepDraftForLesson>>[], skipped: 0 };
+    return {
+      generated: [] as Awaited<ReturnType<typeof writePrepDraftForLesson>>[],
+      skipped: 0,
+    };
   }
 
   const owned = await prisma.lesson.findMany({
@@ -385,11 +335,11 @@ export async function generateMissingPrepBatch(lessonIds: string[]) {
     const existing = lesson.prepDraft;
     const hasContent = Boolean(
       existing &&
-        (existing.warmup.trim() ||
-          existing.review.trim() ||
-          existing.newFocus.trim() ||
-          existing.practice.trim() ||
-          existing.homeworkSeed.trim()),
+      (existing.warmup.trim() ||
+        existing.review.trim() ||
+        existing.newFocus.trim() ||
+        existing.practice.trim() ||
+        existing.homeworkSeed.trim()),
     );
     if (hasContent) {
       skipped += 1;
@@ -475,7 +425,9 @@ export async function updateAvailability(formData: FormData) {
 
 export async function saveTeacherTimezone(formData: FormData) {
   const teacher = await getTeacher();
-  const timezone = normalizeTimezone(String(formData.get("timezone") ?? "Asia/Tokyo"));
+  const timezone = normalizeTimezone(
+    String(formData.get("timezone") ?? "Asia/Tokyo"),
+  );
   await prisma.teacher.update({
     where: { id: teacher.id },
     data: { timezone },
@@ -490,7 +442,7 @@ export async function saveTeacherTimezone(formData: FormData) {
   revalidatePath("/today");
   revalidatePath("/availability");
   revalidatePath("/student/book");
-  redirect("/settings?google=timezone_saved");
+  redirect("/settings?saved=timezone");
 }
 
 export async function addBlackoutDate(formData: FormData) {
@@ -515,12 +467,14 @@ export async function removeBlackoutDate(formData: FormData) {
 }
 
 export async function decideBooking(formData: FormData) {
+  const teacher = await requireTeacher();
   const id = String(formData.get("id") ?? "");
   const decision = String(formData.get("decision") ?? "");
   const request = await prisma.bookingRequest.findUniqueOrThrow({
     where: { id },
     include: { student: true },
   });
+  if (request.teacherId !== teacher.id) throw new Error("Not your booking");
 
   if (decision === "approve") {
     const conflict = await prisma.lesson.findFirst({
@@ -536,44 +490,21 @@ export async function decideBooking(formData: FormData) {
       throw new Error("Time conflict with an existing lesson");
     }
 
-    await prisma.bookingRequest.update({ where: { id }, data: { status: "approved" } });
-
-    const teacherTz = await prisma.teacher.findUnique({
-      where: { id: request.teacherId },
-      select: { timezone: true },
+    await prisma.bookingRequest.update({
+      where: { id },
+      data: { status: "approved" },
     });
-    const timeZone = normalizeTimezone(teacherTz?.timezone);
 
     if (request.type === "reschedule" && request.lessonId) {
-      const lesson = await prisma.lesson.update({
+      await prisma.lesson.update({
         where: { id: request.lessonId },
         data: {
           startsAt: request.requestedStart,
           endsAt: request.requestedEnd,
         },
       });
-      const accessToken = await teacherAccessToken(request.teacherId);
-      if (accessToken && lesson.calendarEventId) {
-        await updateCalendarEvent({
-          accessToken,
-          eventId: lesson.calendarEventId,
-          start: request.requestedStart,
-          end: request.requestedEnd,
-          timeZone,
-        });
-      } else {
-        await attachMeetToLesson({
-          lessonId: lesson.id,
-          teacherId: request.teacherId,
-          studentName: request.student.name,
-          studentEmail: request.student.email,
-          startsAt: request.requestedStart,
-          endsAt: request.requestedEnd,
-          timeZone,
-        });
-      }
     } else if (request.type === "book") {
-      const lesson = await prisma.lesson.create({
+      await prisma.lesson.create({
         data: {
           teacherId: request.teacherId,
           studentId: request.studentId,
@@ -581,21 +512,15 @@ export async function decideBooking(formData: FormData) {
           endsAt: request.requestedEnd,
           status: "scheduled",
           prepStatus: "none",
-          transcriptStatus: "waiting_drive",
+          transcriptStatus: "none",
         },
-      });
-      await attachMeetToLesson({
-        lessonId: lesson.id,
-        teacherId: request.teacherId,
-        studentName: request.student.name,
-        studentEmail: request.student.email,
-        startsAt: request.requestedStart,
-        endsAt: request.requestedEnd,
-        timeZone,
       });
     }
   } else {
-    await prisma.bookingRequest.update({ where: { id }, data: { status: "declined" } });
+    await prisma.bookingRequest.update({
+      where: { id },
+      data: { status: "declined" },
+    });
   }
 
   revalidatePath("/availability");
@@ -606,8 +531,10 @@ export async function decideBooking(formData: FormData) {
 }
 
 export async function createBookingRequest(formData: FormData) {
-  const teacher = await getTeacher();
-  const student = await getDemoStudent();
+  const student = await requireStudent();
+  const teacher = await prisma.teacher.findUniqueOrThrow({
+    where: { id: student.teacherId },
+  });
   const type = String(formData.get("type") ?? "book");
   const start = parseIsoOrLocal(String(formData.get("requestedStart") ?? ""));
   const note = String(formData.get("note") ?? "");
@@ -616,7 +543,9 @@ export async function createBookingRequest(formData: FormData) {
   const tz = normalizeTimezone(teacher.timezone);
   const minute = formatInTz(start, "mm", tz);
   if (minute !== "00" && minute !== "30") {
-    throw new Error("Lessons must start on the hour or half-hour (e.g. 15:00 / 15:30)");
+    throw new Error(
+      "Lessons must start on the hour or half-hour (e.g. 15:00 / 15:30)",
+    );
   }
 
   await prisma.bookingRequest.create({
@@ -628,7 +557,10 @@ export async function createBookingRequest(formData: FormData) {
       requestedEnd: addMinutes(start, LESSON_MINUTES),
       note,
       status: "pending",
-      lessonId: type === "reschedule" ? String(formData.get("lessonId") || "") || null : null,
+      lessonId:
+        type === "reschedule"
+          ? String(formData.get("lessonId") || "") || null
+          : null,
     },
   });
 
@@ -639,12 +571,18 @@ export async function createBookingRequest(formData: FormData) {
 
 export async function cancelBookingRequest(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const student = await getDemoStudent();
-  const booking = await prisma.bookingRequest.findUniqueOrThrow({ where: { id } });
+  const student = await requireStudent();
+  const booking = await prisma.bookingRequest.findUniqueOrThrow({
+    where: { id },
+  });
   if (booking.studentId !== student.id) throw new Error("Not your booking");
-  if (booking.status !== "pending") throw new Error("Only pending requests can be cancelled");
+  if (booking.status !== "pending")
+    throw new Error("Only pending requests can be cancelled");
 
-  await prisma.bookingRequest.update({ where: { id }, data: { status: "cancelled" } });
+  await prisma.bookingRequest.update({
+    where: { id },
+    data: { status: "cancelled" },
+  });
   revalidatePath("/student/book");
   revalidatePath("/availability");
   revalidatePath("/calendar");
@@ -653,7 +591,9 @@ export async function cancelBookingRequest(formData: FormData) {
 export async function createStudent(formData: FormData) {
   const teacher = await getTeacher();
   const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
   const level = String(formData.get("level") ?? "N4");
   const courseType = String(formData.get("courseType") ?? "jlpt_n4");
   const goals = String(formData.get("goals") ?? "");
@@ -672,7 +612,7 @@ export async function createStudent(formData: FormData) {
       goals,
       recordingConsent,
       inviteToken: token,
-      inviteTokenExpiresAt: inviteExpiry(14),
+      inviteTokenExpiresAt: inviteExpiry(90),
     },
   });
 
@@ -686,7 +626,9 @@ export async function updateStudent(formData: FormData) {
     where: { id: studentId },
     data: {
       name: String(formData.get("name") ?? "").trim(),
-      email: String(formData.get("email") ?? "").trim().toLowerCase(),
+      email: String(formData.get("email") ?? "")
+        .trim()
+        .toLowerCase(),
       goals: String(formData.get("goals") ?? ""),
       privateNotes: String(formData.get("privateNotes") ?? ""),
       level: String(formData.get("level") ?? "N4"),
@@ -707,7 +649,11 @@ export async function archiveStudent(formData: FormData) {
   const studentId = String(formData.get("studentId") ?? "");
   await prisma.student.update({
     where: { id: studentId },
-    data: { archivedAt: new Date(), inviteToken: null, inviteTokenExpiresAt: null },
+    data: {
+      archivedAt: new Date(),
+      inviteToken: null,
+      inviteTokenExpiresAt: null,
+    },
   });
   revalidatePath("/students");
   revalidatePath(`/students/${studentId}`);
@@ -730,57 +676,8 @@ export async function regenerateInviteToken(formData: FormData) {
     where: { id: studentId },
     data: {
       inviteToken: createInviteToken(),
-      inviteTokenExpiresAt: inviteExpiry(14),
+      inviteTokenExpiresAt: inviteExpiry(90),
     },
   });
   revalidatePath(`/students/${studentId}`);
-}
-
-export async function disconnectGoogle() {
-  const teacher = await getTeacher();
-  await prisma.teacher.update({
-    where: { id: teacher.id },
-    data: {
-      googleRefreshToken: null,
-      googleAccessToken: null,
-      googleTokenExpiry: null,
-      googleConnectedEmail: null,
-    },
-  });
-  revalidatePath("/settings");
-  revalidatePath("/calendar");
-}
-
-export async function syncGoogleCalendar() {
-  const teacher = await getTeacher();
-  await syncTeacherCalendar(teacher.id);
-  revalidatePath("/calendar");
-  revalidatePath("/today");
-  revalidatePath("/students");
-  revalidatePath("/prep");
-  revalidatePath("/student");
-  redirect("/calendar?synced=1");
-}
-
-export async function seedMemoryFromDrive(formData: FormData) {
-  const teacher = await getTeacher();
-  const force = String(formData.get("force") ?? "") === "1";
-  const result = await seedMemoryFromDriveForTeacher(teacher.id, { force, maxDocsPerStudent: 4 });
-
-  revalidatePath("/students");
-  revalidatePath("/calendar");
-  revalidatePath("/today");
-  revalidatePath("/student");
-  revalidatePath("/student/history");
-  revalidatePath("/prep");
-
-  const q = new URLSearchParams({
-    seeded: "1",
-    created: String(result.lessonsCreated),
-    students: String(result.studentsProcessed),
-    skipped: String(result.skippedStudents),
-    scanned: String(result.docsScanned),
-  });
-  if (result.errors.length) q.set("seedErr", result.errors[0].slice(0, 120));
-  redirect(`/students?${q.toString()}`);
 }

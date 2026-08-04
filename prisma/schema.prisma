@@ -13,6 +13,8 @@ model Teacher {
   id                   String    @id @default(cuid())
   name                 String
   email                String    @unique
+  /** bcrypt hash for email/password login */
+  passwordHash         String    @default("")
   locale               String    @default("ja")
   /** IANA timezone for display & scheduling, e.g. Asia/Tokyo */
   timezone             String    @default("Asia/Tokyo")

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { createStudent, seedMemoryFromDrive } from "@/app/actions";
+import { createStudent } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { requireTeacher } from "@/lib/session";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentsPage({
@@ -14,12 +14,6 @@ export default async function StudentsPage({
     q?: string;
     level?: string;
     archived?: string;
-    seeded?: string;
-    created?: string;
-    students?: string;
-    skipped?: string;
-    scanned?: string;
-    seedErr?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -27,13 +21,11 @@ export default async function StudentsPage({
   const level = (sp.level ?? "").trim();
   const showArchived = sp.archived === "1";
 
-  const [t, common, teacher] = await Promise.all([
+  const teacher = await requireTeacher();
+  const [t, common] = await Promise.all([
     getTranslations("students"),
     getTranslations("common"),
-    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
-
-  const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
 
   const [students, levels] = await Promise.all([
     prisma.student.findMany({
@@ -61,7 +53,7 @@ export default async function StudentsPage({
   ]);
 
   return (
-    <AppShell active="students">
+    <AppShell active="students" personName={teacher.name}>
       <header className="page-header">
         <div className="page-header-text">
           <h1 className="h1">{t("title")}</h1>
@@ -72,55 +64,6 @@ export default async function StudentsPage({
         </div>
       </header>
 
-      {sp.seeded === "1" && (
-        <p className="chip done" style={{ marginBottom: "1rem" }}>
-          {t("seedDone", {
-            created: sp.created ?? "0",
-            students: sp.students ?? "0",
-            scanned: sp.scanned ?? "0",
-            skipped: sp.skipped ?? "0",
-          })}
-        </p>
-      )}
-      {sp.seedErr && (
-        <p className="chip" style={{ marginBottom: "1rem" }}>
-          {t("seedError")}: {decodeURIComponent(sp.seedErr)}
-        </p>
-      )}
-
-      <div className="panel">
-        <div className="panel-header">
-          <h2>{t("seedDriveTitle")}</h2>
-        </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          {t("seedDriveHint")}
-        </p>
-        {googleConnected ? (
-          <form action={seedMemoryFromDrive} style={{ marginTop: "12px" }}>
-            <label
-              style={{
-                display: "flex",
-                gap: "0.5rem",
-                alignItems: "center",
-                marginBottom: "0.8rem",
-                color: "var(--ink-soft)",
-                fontSize: "13px",
-              }}
-            >
-              <input type="checkbox" name="force" value="1" />
-              {t("seedDriveForce")}
-            </label>
-            <button className="btn" type="submit">
-              {t("seedDrive")}
-            </button>
-          </form>
-        ) : (
-          <a className="btn secondary" href="/settings">
-            Connect Google in Settings
-          </a>
-        )}
-      </div>
-
       <form className="panel" method="get">
         <div className="panel-header">
           <h2>{t("search")}</h2>
@@ -128,7 +71,12 @@ export default async function StudentsPage({
         <div className="grid-2">
           <div className="field">
             <label htmlFor="q">{t("search")}</label>
-            <input id="q" name="q" defaultValue={q} placeholder="Name or email" />
+            <input
+              id="q"
+              name="q"
+              defaultValue={q}
+              placeholder="Name or email"
+            />
           </div>
           <div className="field">
             <label htmlFor="level">{t("filterLevel")}</label>
@@ -152,7 +100,12 @@ export default async function StudentsPage({
             fontSize: "13px",
           }}
         >
-          <input type="checkbox" name="archived" value="1" defaultChecked={showArchived} />
+          <input
+            type="checkbox"
+            name="archived"
+            value="1"
+            defaultChecked={showArchived}
+          />
           {t("showArchived")}
         </label>
         <button className="btn secondary" type="submit">
@@ -234,8 +187,9 @@ export default async function StudentsPage({
                   )}
                 </div>
                 <div className="list-row-meta">
-                  {student.email} · {courseTypeLabel(student.courseType)} · {common("level")}:{" "}
-                  {student.level} · {common("attendance")}: {student.progress?.attendanceCount ?? 0}
+                  {student.email} · {courseTypeLabel(student.courseType)} ·{" "}
+                  {common("level")}: {student.level} · {common("attendance")}:{" "}
+                  {student.progress?.attendanceCount ?? 0}
                 </div>
                 <div className="list-row-tags">
                   {parseJsonArray(student.progress?.weaknessesJson)
@@ -248,7 +202,10 @@ export default async function StudentsPage({
                 </div>
               </div>
               <div className="list-row-actions">
-                <Link className="btn secondary sm" href={`/students/${student.id}`}>
+                <Link
+                  className="btn secondary sm"
+                  href={`/students/${student.id}`}
+                >
                   Open
                 </Link>
               </div>

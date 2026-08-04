@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   archiveStudent,
   regenerateInviteToken,
@@ -10,6 +10,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { COURSE_TYPES, courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, ymdInTz } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ export default async function StudentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const teacher = await requireTeacher();
   const t = await getTranslations("students");
   const common = await getTranslations("common");
   const student = await prisma.student.findUnique({
@@ -36,6 +38,7 @@ export default async function StudentDetailPage({
     },
   });
   if (!student) notFound();
+  if (student.teacherId !== teacher.id) redirect("/students");
 
   const timeZone = normalizeTimezone(student.teacher.timezone);
 
@@ -48,7 +51,7 @@ export default async function StudentDetailPage({
     `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/invite/${student.inviteToken}`;
 
   return (
-    <AppShell active="students">
+    <AppShell active="students" personName={teacher.name}>
       <h1 className="h1">{student.name}</h1>
       <p className="muted">
         {common("course")}: {courseTypeLabel(student.courseType)} ·{" "}

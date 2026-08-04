@@ -1,9 +1,3 @@
 {
-  "regions": ["hnd1"],
-  "crons": [
-    {
-      "path": "/api/cron/transcripts",
-      "schedule": "0 15 * * *"
-    }
-  ]
+  "regions": ["hnd1"]
 }
