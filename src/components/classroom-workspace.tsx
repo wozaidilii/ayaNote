@@ -7,6 +7,7 @@ import {
   TrackToggle,
   useRoomContext,
   useTracks,
+  type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { DisconnectReason, RoomEvent, Track } from "livekit-client";
@@ -25,6 +26,8 @@ import {
   type ClassroomSaveStatus,
 } from "@/components/classroom-doc-editor";
 import type { TiptapDoc } from "@/lib/classroom-doc";
+
+const CLASS_CONTROL_TOPIC = "ayanote-classroom-control";
 
 type Labels = {
   connecting: string;
@@ -46,6 +49,9 @@ type Labels = {
   statusLive: string;
   statusError: string;
   screenShare: string;
+  restoreBoard: string;
+  focusHint: string;
+  classEnded: string;
   copyLink: string;
   linkCopied: string;
 };
@@ -180,7 +186,17 @@ function MixedAudioRecorder({
   return null;
 }
 
-function VideoTiles() {
+function trackKey(trackRef: TrackReferenceOrPlaceholder) {
+  return `${trackRef.participant.identity}-${trackRef.source}`;
+}
+
+function VideoTiles({
+  focusedKey,
+  onSelect,
+}: {
+  focusedKey: string | null;
+  onSelect: (trackRef: TrackReferenceOrPlaceholder) => void;
+}) {
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -191,13 +207,24 @@ function VideoTiles() {
 
   return (
     <div className="classroom-filmstrip-tiles">
-      {tracks.map((trackRef) => (
-        <ParticipantTile
-          key={`${trackRef.participant.identity}-${trackRef.source}`}
-          trackRef={trackRef}
-          className="classroom-filmstrip-tile"
-        />
-      ))}
+      {tracks.map((trackRef) => {
+        const key = trackKey(trackRef);
+        return (
+          <button
+            key={key}
+            type="button"
+            className={`classroom-filmstrip-pick${focusedKey === key ? " is-focused" : ""}`}
+            onClick={() => onSelect(trackRef)}
+            aria-pressed={focusedKey === key}
+            title={trackRef.participant.name || trackRef.participant.identity}
+          >
+            <ParticipantTile
+              trackRef={trackRef}
+              className="classroom-filmstrip-tile"
+            />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -229,6 +256,104 @@ function ScreenShareButton({ label }: { label: string }) {
   );
 }
 
+function AutoPromoteScreenShare({
+  onSelect,
+  onClearIfGone,
+  focusedKey,
+}: {
+  onSelect: (trackRef: TrackReferenceOrPlaceholder) => void;
+  onClearIfGone: () => void;
+  focusedKey: string | null;
+}) {
+  const shares = useTracks(
+    [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
+    { onlySubscribed: false },
+  );
+  const seenRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const liveKeys = new Set(shares.map(trackKey));
+    for (const trackRef of shares) {
+      const key = trackKey(trackRef);
+      if (!seenRef.current.has(key)) {
+        seenRef.current.add(key);
+        onSelect(trackRef);
+      }
+    }
+    for (const key of [...seenRef.current]) {
+      if (!liveKeys.has(key)) seenRef.current.delete(key);
+    }
+    if (focusedKey && !liveKeys.has(focusedKey)) {
+      onClearIfGone();
+    }
+  }, [focusedKey, onClearIfGone, onSelect, shares]);
+
+  return null;
+}
+
+/** Broadcast class end + kick room; listeners leave to summary. */
+function ClassEndController({
+  lessonId,
+  role,
+  ending,
+  onRemoteClassEnded,
+}: {
+  lessonId: string;
+  role: "teacher" | "student" | "guest";
+  ending: boolean;
+  onRemoteClassEnded: () => void;
+}) {
+  const room = useRoomContext();
+  const publishedRef = useRef(false);
+
+  useEffect(() => {
+    if (!ending || role !== "teacher" || publishedRef.current) return;
+    publishedRef.current = true;
+    const payload = new TextEncoder().encode(
+      JSON.stringify({ type: "class_ended", lessonId }),
+    );
+    void room.localParticipant
+      .publishData(payload, {
+        reliable: true,
+        topic: CLASS_CONTROL_TOPIC,
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    window.setTimeout(() => {
+      void fetch(`/api/lessons/${lessonId}/end-call`, { method: "POST" });
+    }, 250);
+  }, [ending, lessonId, role, room]);
+
+  useEffect(() => {
+    const onData = (
+      payload: Uint8Array,
+      _participant: unknown,
+      _kind: unknown,
+      topic?: string,
+    ) => {
+      if (topic !== CLASS_CONTROL_TOPIC) return;
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload)) as {
+          type?: string;
+          lessonId?: string;
+        };
+        if (msg.type === "class_ended" && msg.lessonId === lessonId) {
+          onRemoteClassEnded();
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => {
+      room.off(RoomEvent.DataReceived, onData);
+    };
+  }, [lessonId, onRemoteClassEnded, room]);
+
+  return null;
+}
+
 function statusLabel(status: ClassroomSaveStatus, labels: Labels) {
   if (status === "saving") return labels.statusSaving;
   if (status === "saved") return labels.statusSaved;
@@ -241,25 +366,57 @@ function CallLayout({
   board,
   error,
   recording,
+  focusedTrack,
+  onSelectTrack,
+  onClearFocus,
+  restoreBoardLabel,
+  focusHint,
 }: {
   board: ReactNode;
   error: string | null;
   recording: boolean;
+  focusedTrack: TrackReferenceOrPlaceholder | null;
+  onSelectTrack: (trackRef: TrackReferenceOrPlaceholder) => void;
+  onClearFocus: () => void;
+  restoreBoardLabel: string;
+  focusHint: string;
 }) {
+  const focusedKey = focusedTrack ? trackKey(focusedTrack) : null;
+  const hasFocus = Boolean(focusedTrack);
+
   return (
-    <div className="classroom-meet-body is-call">
+    <div
+      className={`classroom-meet-body is-call${hasFocus ? " is-focus-stage" : ""}`}
+    >
       <aside
         className="classroom-float-dock"
         role="complementary"
         data-recording={recording ? "true" : undefined}
       >
-        <VideoTiles />
+        <VideoTiles focusedKey={focusedKey} onSelect={onSelectTrack} />
+        <p className="classroom-dock-hint muted">{focusHint}</p>
         <HoverAvControls />
         {error && <p className="chip">{error}</p>}
       </aside>
 
       <section className="classroom-stage panel">
-        <div className="classroom-board-wrap">{board}</div>
+        {hasFocus && focusedTrack ? (
+          <div className="classroom-focus-stage">
+            <ParticipantTile
+              trackRef={focusedTrack}
+              className="classroom-focus-tile"
+            />
+            <button
+              className="btn secondary sm classroom-restore-board"
+              type="button"
+              onClick={onClearFocus}
+            >
+              {restoreBoardLabel}
+            </button>
+          </div>
+        ) : (
+          <div className="classroom-board-wrap">{board}</div>
+        )}
       </section>
     </div>
   );
@@ -306,8 +463,33 @@ export function ClassroomWorkspace({
   const [recordActive, setRecordActive] = useState(false);
   const [userLeftCall, setUserLeftCall] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [focusedTrack, setFocusedTrack] =
+    useState<TrackReferenceOrPlaceholder | null>(null);
+  const [classEndedRemote, setClassEndedRemote] = useState(false);
   const pendingUploadRef = useRef(false);
   const canEndAndTranscribe = role === "teacher";
+
+  const leaveToSummary = useCallback(() => {
+    setUserLeftCall(true);
+    setRecordActive(false);
+    setTokenInfo(null);
+    setFocusedTrack(null);
+    if (role === "teacher") {
+      router.replace(`/lessons/${lessonId}?ok=summarizing`);
+      return;
+    }
+    if (role === "student") {
+      router.replace(`/student/lessons/${lessonId}?ok=summarizing`);
+      return;
+    }
+    router.replace("/?ended=1");
+  }, [lessonId, role, router]);
+
+  const onRemoteClassEnded = useCallback(() => {
+    if (role === "teacher") return;
+    setClassEndedRemote(true);
+    leaveToSummary();
+  }, [leaveToSummary, role]);
 
   // Stable Y.Doc for this page mount — survives solo ↔ LiveKitRoom remounts.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- seed from first SSR doc only
@@ -548,6 +730,7 @@ export function ClassroomWorkspace({
           if (pendingUploadRef.current || ending) return;
           setTokenInfo(null);
           setRecordActive(false);
+          setFocusedTrack(null);
           // Same teacher/student identity on another device kicks this one.
           // Stop auto-rejoin or both sides fight forever.
           if (
@@ -559,14 +742,48 @@ export function ClassroomWorkspace({
             setUserLeftCall(true);
             if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
               setError(labels.errorDuplicate);
+              return;
+            }
+            if (
+              role !== "teacher" &&
+              (reason === DisconnectReason.ROOM_DELETED ||
+                reason === DisconnectReason.ROOM_CLOSED ||
+                reason === DisconnectReason.PARTICIPANT_REMOVED)
+            ) {
+              leaveToSummary();
             }
           }
         }}
       >
+        <ClassEndController
+          lessonId={lessonId}
+          role={role}
+          ending={ending}
+          onRemoteClassEnded={onRemoteClassEnded}
+        />
+        <AutoPromoteScreenShare
+          focusedKey={focusedTrack ? trackKey(focusedTrack) : null}
+          onSelect={setFocusedTrack}
+          onClearIfGone={() => setFocusedTrack(null)}
+        />
         <MixedAudioRecorder active={recordActive} onChunk={onChunk} />
         <RoomAudioRenderer />
         {topBar(true)}
-        <CallLayout board={board} error={error} recording={recordActive} />
+        {classEndedRemote && (
+          <p className="chip soon" style={{ margin: 0 }}>
+            {labels.classEnded}
+          </p>
+        )}
+        <CallLayout
+          board={board}
+          error={error}
+          recording={recordActive}
+          focusedTrack={focusedTrack}
+          onSelectTrack={setFocusedTrack}
+          onClearFocus={() => setFocusedTrack(null)}
+          restoreBoardLabel={labels.restoreBoard}
+          focusHint={labels.focusHint}
+        />
       </LiveKitRoom>
     );
   }

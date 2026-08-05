@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<{ err?: string; ended?: string }>;
 }) {
   const sp = await searchParams;
   const session = await getSession();
@@ -19,6 +19,7 @@ export default async function HomePage({
   }
 
   const t = await getTranslations("login");
+  const classroom = await getTranslations("classroom");
   const brand = await getTranslations();
 
   return (
@@ -30,6 +31,9 @@ export default async function HomePage({
         </h1>
         <p className="muted">{t("subtitle")}</p>
 
+        {sp.ended === "1" && (
+          <p className="chip done">{classroom("classEnded")}</p>
+        )}
         {sp.err === "missing" && <p className="chip">{t("errMissing")}</p>}
         {sp.err === "invalid" && <p className="chip">{t("errInvalid")}</p>}
 

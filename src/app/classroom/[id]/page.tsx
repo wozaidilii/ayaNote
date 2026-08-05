@@ -151,6 +151,9 @@ export default async function ClassroomPage({
           statusLive: t("statusLive"),
           statusError: t("statusError"),
           screenShare: t("screenShare"),
+          restoreBoard: t("restoreBoard"),
+          focusHint: t("focusHint"),
+          classEnded: t("classEnded"),
           copyLink: t("copyLink"),
           linkCopied: t("linkCopied"),
         }}

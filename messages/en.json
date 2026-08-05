@@ -258,6 +258,13 @@
     "subtitle": "Summaries only (no full transcripts)",
     "viewClassroom": "View classroom & plan"
   },
+  "studentLesson": {
+    "title": "Lesson summary",
+    "okSummary": "Summary ready",
+    "todayContent": "Today’s lesson",
+    "generatingBody": "Your teacher ended class. We’re preparing the lesson summary — this page will update when ready.",
+    "waiting": "Summary is not ready yet. Check back shortly."
+  },
   "classroom": {
     "classroomTitle": "AyaNote Classroom",
     "pastBanner": "Past classroom — video ended. This session’s board stays here.",
@@ -284,6 +291,8 @@
     "enlargeVideo": "Enlarge video",
     "restoreBoard": "Show board",
     "clickBoardReturn": "Click board to return",
+    "focusHint": "Click a video to enlarge it on the main screen",
+    "classEnded": "Class ended — opening summary…",
     "copyLink": "Copy link",
     "linkCopied": "Link copied",
     "guestJoinTitle": "Join classroom",

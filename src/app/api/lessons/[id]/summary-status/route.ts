@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getActiveStudentOrNull } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 
@@ -10,18 +11,12 @@ export async function GET(
 ) {
   const { id: lessonId } = await ctx.params;
   const session = await getSession();
-  if (
-    !session.authenticated ||
-    session.role !== "teacher" ||
-    !session.teacherId
-  ) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
 
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     select: {
       teacherId: true,
+      studentId: true,
       transcriptStatus: true,
       summary: { select: { id: true } },
       transcript: { select: { id: true } },
@@ -30,8 +25,18 @@ export async function GET(
   if (!lesson) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  if (lesson.teacherId !== session.teacherId) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+
+  if (session.role === "teacher" && session.teacherId) {
+    if (lesson.teacherId !== session.teacherId) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+  } else if (session.role === "student") {
+    const student = await getActiveStudentOrNull();
+    if (!student || student.teacherId !== lesson.teacherId) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+  } else {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   return NextResponse.json({

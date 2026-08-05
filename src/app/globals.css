@@ -1522,6 +1522,28 @@ a {
   min-height: 0;
 }
 
+.classroom-filmstrip-pick {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+
+.classroom-filmstrip-pick:hover,
+.classroom-filmstrip-pick:focus-visible {
+  border-color: rgba(91, 108, 255, 0.55);
+  outline: none;
+}
+
+.classroom-filmstrip-pick.is-focused {
+  border-color: var(--blue);
+}
+
 .classroom-filmstrip-tile {
   aspect-ratio: 16 / 10;
   border-radius: 12px;
@@ -1530,6 +1552,39 @@ a {
   min-height: 96px;
   width: 100%;
   border: 1px solid var(--line);
+  pointer-events: none;
+}
+
+.classroom-dock-hint {
+  margin: 0.15rem 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.classroom-focus-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  height: 100%;
+  min-height: 0;
+}
+
+.classroom-focus-tile {
+  flex: 1;
+  min-height: 240px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111;
+  border: 1px solid var(--line);
+}
+
+.classroom-restore-board {
+  align-self: flex-start;
+}
+
+.classroom-meet-body.is-focus-stage .classroom-float-dock {
+  max-width: 200px;
 }
 
 .classroom-meet-body.is-video-expanded .classroom-filmstrip-tiles {

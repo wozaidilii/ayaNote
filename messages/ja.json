@@ -239,6 +239,13 @@
     "subtitle": "要約のみ（全文書き起こしは非表示）",
     "viewClassroom": "Classroomと教案を見る"
   },
+  "studentLesson": {
+    "title": "レッスンまとめ",
+    "okSummary": "まとめの準備ができました",
+    "todayContent": "本日のレッスン",
+    "generatingBody": "先生が授業を終了しました。まとめを作成中です。準備でき次第このページが更新されます。",
+    "waiting": "まとめはまだ準備できていません。しばらくしてからもう一度確認してください。"
+  },
   "classroom": {
     "classroomTitle": "AyaNote Classroom",
     "pastBanner": "過去のClassroom — ビデオは終了。この回のボードはここに残っています。",
@@ -265,6 +272,8 @@
     "enlargeVideo": "ビデオを拡大",
     "restoreBoard": "教案に戻る",
     "clickBoardReturn": "教案をクリックして戻る",
+    "focusHint": "動画をクリックするとメイン画面に拡大表示します",
+    "classEnded": "授業終了 — まとめ画面へ移動します…",
     "copyLink": "リンクをコピー",
     "linkCopied": "コピーしました",
     "guestJoinTitle": "Classroomに参加",

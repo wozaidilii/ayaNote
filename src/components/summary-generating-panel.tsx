@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 
 export function SummaryGeneratingPanel({
   lessonId,
+  readyHref,
   labels,
 }: {
   lessonId: string;
+  /** Where to go when summary is ready. Defaults to teacher Lesson Room. */
+  readyHref?: string;
   labels: {
     generatingTitle: string;
     generatingBody: string;
@@ -16,6 +19,10 @@ export function SummaryGeneratingPanel({
 }) {
   const router = useRouter();
   const [failed, setFailed] = useState(false);
+  const doneHref = readyHref ?? `/lessons/${lessonId}?ok=summary`;
+  const failHref = readyHref
+    ? readyHref.replace(/\?.*$/, "")
+    : `/lessons/${lessonId}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -32,7 +39,7 @@ export function SummaryGeneratingPanel({
         const data = (await res.json()) as { ready?: boolean };
         if (cancelled) return true;
         if (data.ready) {
-          router.replace(`/lessons/${lessonId}?ok=summary`);
+          router.replace(doneHref);
           router.refresh();
           return true;
         }
@@ -42,7 +49,7 @@ export function SummaryGeneratingPanel({
       if (attempts >= maxAttempts) {
         if (!cancelled) {
           setFailed(true);
-          router.replace(`/lessons/${lessonId}`);
+          router.replace(failHref);
           router.refresh();
         }
         return true;
@@ -63,7 +70,7 @@ export function SummaryGeneratingPanel({
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [lessonId, router]);
+  }, [doneHref, failHref, lessonId, router]);
 
   return (
     <div className="panel summary-generating" aria-live="polite">
