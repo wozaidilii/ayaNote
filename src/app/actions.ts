@@ -14,6 +14,7 @@ import type { PrepRefs } from "@/lib/prep-refs";
 import { LESSON_MINUTES, blackoutDateFromYmd } from "@/lib/scheduling";
 import { requireStudent, requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, parseIsoOrLocal } from "@/lib/timezone";
+import { parseClassroomDoc, tiptapDocToPlainText } from "@/lib/classroom-doc";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
 export async function loginTeacher(formData: FormData) {
@@ -281,6 +282,20 @@ async function writePrepDraftForLesson(lessonId: string) {
     return label;
   });
 
+  const priorBoardLesson = await prisma.lesson.findFirst({
+    where: {
+      studentId: lesson.studentId,
+      id: { not: lessonId },
+      status: { in: ["completed", "scheduled", "in_progress"] },
+      classroomDoc: { not: "" },
+    },
+    orderBy: { startsAt: "desc" },
+    select: { classroomDoc: true },
+  });
+  const lastClassroomBoard = tiptapDocToPlainText(
+    parseClassroomDoc(priorBoardLesson?.classroomDoc),
+  );
+
   const draft = await generatePrepDraft({
     studentName: lesson.student.name,
     level: lesson.student.level,
@@ -289,6 +304,7 @@ async function writePrepDraftForLesson(lessonId: string) {
     lastTopics,
     weaknesses,
     vocab,
+    lastClassroomBoard,
   });
 
   const refs: PrepRefs = {

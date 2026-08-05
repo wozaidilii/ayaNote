@@ -1,4 +1,5 @@
 import { summarizeTranscript, type LessonSummaryPayload } from "@/lib/ai";
+import { parseClassroomDoc, tiptapDocToPlainText } from "@/lib/classroom-doc";
 import { prisma } from "@/lib/db";
 import {
   exportDriveDocText,
@@ -206,6 +207,10 @@ async function buildSummarizeContext(lessonId: string) {
     }
   });
 
+  const classroomBoard = tiptapDocToPlainText(
+    parseClassroomDoc(lesson.classroomDoc),
+  );
+
   return {
     studentName: lesson.student.name,
     level: lesson.student.level,
@@ -228,6 +233,7 @@ async function buildSummarizeContext(lessonId: string) {
             notes: g.notes,
           })),
     priorNextFocus: priorSummaries[0]?.nextFocus,
+    classroomBoard,
   };
 }
 

@@ -8,6 +8,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from "@tiptap/y-tiptap";
 import { useRoomContext } from "@livekit/components-react";
+import { ConnectionState, RoomEvent } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TiptapDoc } from "@/lib/classroom-doc";
 import { LiveKitYjsProvider } from "@/lib/livekit-yjs-provider";
@@ -21,9 +22,18 @@ const starter = StarterKit.configure({
   undoRedo: false,
 });
 
-function buildYDoc(initial: TiptapDoc): Y.Doc {
+/** Build a Y.Doc seeded from TipTap JSON (call once per lesson mount). */
+export function buildClassroomYDoc(initial: TiptapDoc): Y.Doc {
   const schema = getSchema([starter]);
   return prosemirrorJSONToYDoc(schema, initial, "default");
+}
+
+/** Drop local fragment so peer state becomes authoritative (avoids duplicate seed). */
+function clearYDocFragment(ydoc: Y.Doc) {
+  const fragment = ydoc.getXmlFragment("default");
+  if (fragment.length > 0) {
+    fragment.delete(0, fragment.length);
+  }
 }
 
 function DocEditorInner({
@@ -124,27 +134,32 @@ function DocEditorInner({
   return <EditorContent editor={editor} className="classroom-doc-surface" />;
 }
 
-/** Offline / past: Y.Doc local only */
+/**
+ * Shared classroom board. Pass a stable `ydoc` from the parent so remounting
+ * into LiveKitRoom does not wipe in-progress edits.
+ */
 export function ClassroomDocEditor({
   lessonId,
-  initialDoc,
+  ydoc,
   userName,
   userColor,
   placeholder,
   onStatus,
   autofocus = true,
   enableLivekitSync = false,
+  /** Teacher keeps seeded/local content; others clear and pull from peers. */
+  syncAuthority = false,
 }: {
   lessonId: string;
-  initialDoc: TiptapDoc;
+  ydoc: Y.Doc;
   userName: string;
   userColor: string;
   placeholder: string;
   onStatus: (s: SaveStatus) => void;
   autofocus?: boolean;
   enableLivekitSync?: boolean;
+  syncAuthority?: boolean;
 }) {
-  const ydoc = useMemo(() => buildYDoc(initialDoc), [initialDoc]);
   const user = useMemo(
     () => ({ name: userName, color: userColor }),
     [userName, userColor],
@@ -159,6 +174,7 @@ export function ClassroomDocEditor({
         placeholder={placeholder}
         onStatus={onStatus}
         autofocus={autofocus}
+        syncAuthority={syncAuthority}
       />
     );
   }
@@ -183,6 +199,7 @@ function LiveSyncedDoc({
   placeholder,
   onStatus,
   autofocus,
+  syncAuthority,
 }: {
   lessonId: string;
   ydoc: Y.Doc;
@@ -190,31 +207,53 @@ function LiveSyncedDoc({
   placeholder: string;
   onStatus: (s: SaveStatus) => void;
   autofocus: boolean;
+  syncAuthority: boolean;
 }) {
   const room = useRoomContext();
   const [provider, setProvider] = useState<LiveKitYjsProvider | null>(null);
 
   useEffect(() => {
-    const p = new LiveKitYjsProvider(ydoc, room, user);
-    setProvider(p);
-    onStatus("live");
+    let cancelled = false;
+    let p: LiveKitYjsProvider | null = null;
+
+    const attach = () => {
+      if (cancelled) return;
+      // Non-authority clients drop local TipTap seed so Yjs merge won't duplicate.
+      if (!syncAuthority) {
+        clearYDocFragment(ydoc);
+      }
+      p = new LiveKitYjsProvider(ydoc, room, user);
+      setProvider(p);
+      onStatus("live");
+    };
+
+    if (room.state === ConnectionState.Connected) {
+      const t = window.setTimeout(attach, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(t);
+        p?.destroy();
+        setProvider(null);
+      };
+    }
+
+    const onConnected = () => attach();
+    room.once(RoomEvent.Connected, onConnected);
     return () => {
-      p.destroy();
+      cancelled = true;
+      room.off(RoomEvent.Connected, onConnected);
+      p?.destroy();
       setProvider(null);
     };
-  }, [onStatus, room, user, ydoc]);
+  }, [onStatus, room, syncAuthority, user, ydoc]);
 
   if (!provider) {
     return (
-      <DocEditorInner
-        lessonId={lessonId}
-        ydoc={ydoc}
-        provider={null}
-        user={user}
-        placeholder={placeholder}
-        onStatus={onStatus}
-        autofocus={autofocus}
-      />
+      <div className="classroom-doc-surface classroom-doc-syncing" aria-busy>
+        <p className="muted" style={{ margin: "1rem" }}>
+          …
+        </p>
+      </div>
     );
   }
 

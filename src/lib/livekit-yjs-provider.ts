@@ -1,6 +1,6 @@
 "use client";
 
-import { Room, RoomEvent } from "livekit-client";
+import { ConnectionState, Room, RoomEvent } from "livekit-client";
 import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
@@ -12,8 +12,8 @@ const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
 
 /**
- * Minimal Yjs provider over LiveKit reliable data messages (1v1 classroom).
- * Mimics the subset TipTap CollaborationCaret expects (awareness + on/off).
+ * Yjs provider over LiveKit reliable data messages.
+ * Syncs document updates + awareness (remote carets) for everyone in the room.
  */
 export class LiveKitYjsProvider {
   doc: Y.Doc;
@@ -37,15 +37,13 @@ export class LiveKitYjsProvider {
     this.awareness.on("update", this.onAwarenessUpdate);
     room.on(RoomEvent.DataReceived, this.onData);
     room.on(RoomEvent.ParticipantConnected, this.onPeerConnected);
+    room.on(RoomEvent.ConnectionStateChanged, this.onConnectionStateChanged);
 
-    // Announce + request sync
-    queueMicrotask(() => {
-      this.broadcastSyncStep1();
-      this.broadcastAwareness();
-      this.synced = true;
-      this.emit("synced", [true]);
-      this.emit("status", [{ status: "connected" }]);
-    });
+    if (room.state === ConnectionState.Connected) {
+      queueMicrotask(() => this.bootstrapSync());
+    } else {
+      room.once(RoomEvent.Connected, () => this.bootstrapSync());
+    }
   }
 
   on(event: string, cb: (...args: unknown[]) => void) {
@@ -64,6 +62,10 @@ export class LiveKitYjsProvider {
     this.awareness.off("update", this.onAwarenessUpdate);
     this.room.off(RoomEvent.DataReceived, this.onData);
     this.room.off(RoomEvent.ParticipantConnected, this.onPeerConnected);
+    this.room.off(
+      RoomEvent.ConnectionStateChanged,
+      this.onConnectionStateChanged,
+    );
     awarenessProtocol.removeAwarenessStates(
       this.awareness,
       [this.doc.clientID],
@@ -84,13 +86,35 @@ export class LiveKitYjsProvider {
 
   private publish(bytes: Uint8Array) {
     if (this.destroyed) return;
+    if (this.room.state !== ConnectionState.Connected) return;
     const copy = new Uint8Array(bytes.byteLength);
     copy.set(bytes);
-    void this.room.localParticipant.publishData(copy, {
-      reliable: true,
-      topic: TOPIC,
-    });
+    void this.room.localParticipant
+      .publishData(copy, {
+        reliable: true,
+        topic: TOPIC,
+      })
+      .catch(() => {
+        /* room may disconnect mid-publish */
+      });
   }
+
+  /** Request peer state + announce ours (safe to call repeatedly). */
+  private bootstrapSync() {
+    if (this.destroyed) return;
+    this.broadcastSyncStep1();
+    this.broadcastSyncStep2();
+    this.broadcastAwareness();
+    this.synced = true;
+    this.emit("synced", [true]);
+    this.emit("status", [{ status: "connected" }]);
+  }
+
+  private onConnectionStateChanged = (state: ConnectionState) => {
+    if (state === ConnectionState.Connected) {
+      this.bootstrapSync();
+    }
+  };
 
   private onDocUpdate = (update: Uint8Array, origin: unknown) => {
     if (origin === this) return;
@@ -126,6 +150,13 @@ export class LiveKitYjsProvider {
     this.publish(encoding.toUint8Array(encoder));
   }
 
+  private broadcastSyncStep2() {
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, MSG_SYNC);
+    syncProtocol.writeSyncStep2(encoder, this.doc);
+    this.publish(encoding.toUint8Array(encoder));
+  }
+
   private broadcastAwareness() {
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MSG_AWARENESS);
@@ -140,11 +171,7 @@ export class LiveKitYjsProvider {
 
   private onPeerConnected = () => {
     this.broadcastSyncStep1();
-    // Also send full state so late joiners catch up quickly
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, MSG_SYNC);
-    syncProtocol.writeSyncStep2(encoder, this.doc);
-    this.publish(encoding.toUint8Array(encoder));
+    this.broadcastSyncStep2();
     this.broadcastAwareness();
   };
 

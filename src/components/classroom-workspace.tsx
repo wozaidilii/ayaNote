@@ -20,6 +20,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
+  buildClassroomYDoc,
   ClassroomDocEditor,
   type ClassroomSaveStatus,
 } from "@/components/classroom-doc-editor";
@@ -307,7 +308,9 @@ export function ClassroomWorkspace({
   const pendingUploadRef = useRef(false);
   const canEndAndTranscribe = role === "teacher";
 
-  const docKey = useMemo(() => JSON.stringify(initialDoc), [initialDoc]);
+  // Stable Y.Doc for this page mount — survives solo ↔ LiveKitRoom remounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- seed from first SSR doc only
+  const ydoc = useMemo(() => buildClassroomYDoc(initialDoc), [lessonId]);
 
   const join = useCallback(async () => {
     if (!livekitReady || isPast || ending) return;
@@ -417,15 +420,15 @@ export function ClassroomWorkspace({
         <p className="classroom-past-banner muted">{labels.pastBanner}</p>
       )}
       <ClassroomDocEditor
-        key={docKey + (tokenInfo ? "-live" : "-solo")}
         lessonId={lessonId}
-        initialDoc={initialDoc}
+        ydoc={ydoc}
         userName={userName}
         userColor={userColor}
         placeholder={labels.docPlaceholder}
         onStatus={setSaveStatus}
         autofocus
         enableLivekitSync={Boolean(tokenInfo)}
+        syncAuthority={role === "teacher"}
       />
     </>
   );

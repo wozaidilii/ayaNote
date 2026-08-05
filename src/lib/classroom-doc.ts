@@ -87,3 +87,58 @@ export function parseClassroomDoc(
 export function serializeClassroomDoc(doc: TiptapDoc): string {
   return JSON.stringify(doc);
 }
+
+/** Flatten TipTap JSON to plain text for AI prompts / search. */
+export function tiptapDocToPlainText(
+  doc: TiptapDoc | null | undefined,
+): string {
+  if (!doc?.content?.length) return "";
+  const lines: string[] = [];
+
+  const walk = (node: TiptapNode, depth = 0) => {
+    if (node.type === "text" && node.text) {
+      lines.push(node.text);
+      return;
+    }
+    if (node.type === "hardBreak") {
+      lines.push("\n");
+      return;
+    }
+    if (node.type === "heading") {
+      const level = Number(node.attrs?.level ?? 2);
+      const prefix = "#".repeat(Math.min(Math.max(level, 1), 3)) + " ";
+      const inner: string[] = [];
+      for (const child of node.content ?? []) {
+        if (child.type === "text" && child.text) inner.push(child.text);
+      }
+      lines.push(`\n${prefix}${inner.join("")}\n`);
+      return;
+    }
+    if (node.type === "paragraph" || node.type === "listItem") {
+      const inner: string[] = [];
+      for (const child of node.content ?? []) {
+        if (child.type === "text" && child.text) inner.push(child.text);
+        else if (child.content) {
+          for (const c of child.content) {
+            if (c.type === "text" && c.text) inner.push(c.text);
+          }
+        }
+      }
+      const text = inner.join("").trim();
+      if (text) lines.push(text);
+      else if (node.type === "paragraph") lines.push("");
+      return;
+    }
+    if (node.type === "bulletList" || node.type === "orderedList") {
+      for (const child of node.content ?? []) walk(child, depth + 1);
+      return;
+    }
+    for (const child of node.content ?? []) walk(child, depth);
+  };
+
+  for (const node of doc.content) walk(node);
+  return lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}

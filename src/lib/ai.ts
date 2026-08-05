@@ -62,7 +62,10 @@ export function courseTypeLabel(value: string) {
   return COURSE_TYPES.find((c) => c.value === value)?.label ?? value;
 }
 
-function heuristicSummary(transcript: string, reason?: string): LessonSummaryPayload {
+function heuristicSummary(
+  transcript: string,
+  reason?: string,
+): LessonSummaryPayload {
   const lines = transcript
     .split(/\n+/)
     .map((l) => l.trim())
@@ -77,7 +80,8 @@ function heuristicSummary(transcript: string, reason?: string): LessonSummaryPay
     grammar: [],
     examples: [],
     mistakes: [],
-    homework: "Review today's conversation phrases aloud once and write 5 example sentences.",
+    homework:
+      "Review today's conversation phrases aloud once and write 5 example sentences.",
     nextFocus: topics[0] ?? "Continue conversation practice",
     notes:
       reason ??
@@ -100,7 +104,8 @@ function heuristicPrep(input: {
     newFocus: input.weaknesses[0]
       ? `Focus on: ${input.weaknesses[0]}`
       : "Introduce one new practical phrase set.",
-    practice: "Role-play a short real-life dialogue; correct gently and recycle key forms.",
+    practice:
+      "Role-play a short real-life dialogue; correct gently and recycle key forms.",
     homeworkSeed: "Write 5 sentences using today's target phrases.",
   };
 }
@@ -144,6 +149,8 @@ export type SummarizeContext = {
   priorVocab?: Array<{ term: string; reading?: string; meaning?: string }>;
   priorGrammar?: Array<{ pattern: string; notes?: string }>;
   priorNextFocus?: string;
+  /** Plain text from the collaborative classroom board */
+  classroomBoard?: string;
 };
 
 export async function summarizeTranscript(
@@ -155,10 +162,14 @@ export async function summarizeTranscript(
     return heuristicSummary(transcript, missingKeyNote());
   }
 
-  const course = courseTypeLabel(context.courseType || context.level || "custom");
+  const course = courseTypeLabel(
+    context.courseType || context.level || "custom",
+  );
   const priorVocab = (context.priorVocab ?? [])
     .slice(0, 15)
-    .map((v) => `${v.term}${v.reading ? `(${v.reading})` : ""} ${v.meaning ?? ""}`)
+    .map(
+      (v) => `${v.term}${v.reading ? `(${v.reading})` : ""} ${v.meaning ?? ""}`,
+    )
     .join(" · ");
   const priorGrammar = (context.priorGrammar ?? [])
     .slice(0, 10)
@@ -180,6 +191,9 @@ Prior topics: ${(context.priorTopics ?? []).join(" · ") || "n/a"}
 Prior vocab bank: ${priorVocab || "n/a"}
 Prior grammar bank: ${priorGrammar || "n/a"}
 Last nextFocus: ${context.priorNextFocus || "n/a"}
+
+Classroom board notes (collaborative lesson board written during class — treat as ground truth for what was planned/practiced on the board):
+${(context.classroomBoard ?? "").trim().slice(0, 6000) || "n/a"}
 
 Return JSON with:
 - topics: 5–10 concrete topic phrases from TODAY (e.g. ビジネスメールの敬語 / 期間の表現)
@@ -225,11 +239,14 @@ export async function generatePrepDraft(input: {
   lastTopics: string[];
   weaknesses: string[];
   vocab: string[];
+  /** Recent classroom board plain text (last completed lesson) */
+  lastClassroomBoard?: string;
 }): Promise<PrepDraftPayload> {
   const model = getModel();
   if (!model) return heuristicPrep(input);
 
   const course = courseTypeLabel(input.courseType || input.level);
+  const board = (input.lastClassroomBoard ?? "").trim().slice(0, 5000);
 
   try {
     const { object } = await generateObject({
@@ -243,6 +260,8 @@ Goals: ${input.goals || "n/a"}
 Recent topics: ${input.lastTopics.join(", ") || "n/a"}
 Weak points: ${input.weaknesses.join(", ") || "n/a"}
 Recent vocab: ${input.vocab.join(", ") || "n/a"}
+Last classroom board (what was written together in the previous session — reuse unfinished threads):
+${board || "n/a"}
 
 Return warmup, review (include example sentences using last grammar), newFocus, practice, homeworkSeed.
 Match register to course (business keigo / casual / JLPT patterns / travel).
