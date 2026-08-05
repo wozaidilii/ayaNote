@@ -1,39 +1,49 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { disconnectGoogle, saveTeacherTimezone, saveTranscriptFolderId } from "@/app/actions";
+import { saveTeacherTimezone } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import {
+  Clock3,
+  LayoutDashboard,
+  Settings,
+  Sparkles,
+  Video,
+  UiIcon,
+} from "@/components/icons";
+import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getAiProvider } from "@/lib/ai";
-import { googleConfigured } from "@/lib/google";
-import { prisma } from "@/lib/db";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { requireTeacher } from "@/lib/session";
 import { TIMEZONE_OPTIONS, normalizeTimezone } from "@/lib/timezone";
 
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ google?: string }>;
+  searchParams: Promise<{ saved?: string }>;
 }) {
   const sp = await searchParams;
-  const [t, teacher] = await Promise.all([
-    getTranslations("settings"),
-    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
-  ]);
+  const teacher = await requireTeacher();
+  const t = await getTranslations("settings");
   const provider = getAiProvider();
   const hasDeepseek = Boolean(process.env.DEEPSEEK_API_KEY);
-  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
-  const connected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
-  const oauthReady = googleConfigured();
+  const hasOpenAI = Boolean(
+    process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY,
+  );
   const timeZone = normalizeTimezone(teacher.timezone);
 
   return (
-    <AppShell active="settings">
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">{t("subtitle")}</p>
+    <AppShell active="settings" personName={teacher.name}>
+      <PageHeading
+        icon={Settings}
+        title={t("title")}
+        subtitle={t("subtitle")}
+      />
 
-      <div className="panel" style={{ marginTop: "1.2rem" }}>
-        <h2 style={{ marginTop: 0 }}>{t("timezoneTitle")}</h2>
+      <div className="panel">
+        <PanelTitle icon={Clock3}>{t("timezoneTitle")}</PanelTitle>
         <p className="muted">{t("timezoneExplain")}</p>
-        {sp.google === "timezone_saved" && <p className="chip done">{t("timezoneSaved")}</p>}
+        {sp.saved === "timezone" && (
+          <p className="chip done">{t("timezoneSaved")}</p>
+        )}
         <form action={saveTeacherTimezone}>
           <div className="field">
             <label htmlFor="timezone">{t("timezoneLabel")}</label>
@@ -52,76 +62,29 @@ export default async function SettingsPage({
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("googleTitle")}</h2>
-        <p>{t("google")}</p>
-        {sp.google === "connected" && <p className="chip done">{t("googleConnectedBanner")}</p>}
-        {sp.google === "folder_saved" && <p className="chip done">{t("googleFolderSaved")}</p>}
-        {sp.google === "missing_creds" && <p className="chip">{t("googleMissingCreds")}</p>}
-        {sp.google &&
-          !["connected", "missing_creds", "folder_saved", "timezone_saved"].includes(sp.google) && (
-            <p className="chip">
-              {t("googleError")}: {sp.google}
-            </p>
-          )}
-        {connected ? (
-          <>
-            <p>
-              <span className="chip done">{t("connectedAs")}</span>{" "}
-              {teacher.googleConnectedEmail || "Workspace"}
-            </p>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              <Link className="btn" href="/calendar">
-                Open Calendar sync
-              </Link>
-              <form action={disconnectGoogle}>
-                <button className="btn danger" type="submit">
-                  {t("disconnectGoogle")}
-                </button>
-              </form>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="muted">{oauthReady ? t("googleReady") : t("googleMissingCreds")}</p>
-            <a className="btn" href="/api/google/connect">
-              {t("connectGoogle")}
-            </a>
-          </>
-        )}
-        <p style={{ marginTop: "1rem" }}>{t("stt")}</p>
+        <PanelTitle icon={Video}>{t("classroomTitle")}</PanelTitle>
+        <p>{t("classroomExplain")}</p>
+        <p className="muted">{t("stt")}</p>
         <p>{t("privacy")}</p>
+        <Link className="btn secondary" href="/today">
+          <UiIcon icon={LayoutDashboard} size={15} />
+          {t("openToday")}
+        </Link>
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>{t("driveTitle")}</h2>
-        <p className="muted">{t("driveExplain")}</p>
-        <form action={saveTranscriptFolderId}>
-          <div className="field">
-            <label htmlFor="googleTranscriptFolderId">{t("driveFolderLabel")}</label>
-            <input
-              id="googleTranscriptFolderId"
-              name="googleTranscriptFolderId"
-              placeholder={t("driveFolderPlaceholder")}
-              defaultValue={teacher.googleTranscriptFolderId ?? ""}
-            />
-          </div>
-          <button className="btn secondary" type="submit" disabled={!connected}>
-            {t("saveFolder")}
-          </button>
-        </form>
-      </div>
-
-      <div className="panel">
-        <h2 style={{ marginTop: 0 }}>AI</h2>
+        <PanelTitle icon={Sparkles}>AI</PanelTitle>
         <p>
           Active provider: <strong>{provider}</strong>{" "}
           <span className="chip sky">default: deepseek</span>
         </p>
         <p className="muted" style={{ marginBottom: 8 }}>
-          Set <code>AYANOTE_AI_PROVIDER=deepseek|openai</code>. Default is DeepSeek.
+          Set <code>AYANOTE_AI_PROVIDER=deepseek|openai</code>. Default is
+          DeepSeek.
         </p>
         <p className="muted">
-          DeepSeek key: {hasDeepseek ? "set" : "missing"} · OpenAI key: {hasOpenAI ? "set" : "missing"}
+          DeepSeek key: {hasDeepseek ? "set" : "missing"} · OpenAI key:{" "}
+          {hasOpenAI ? "set" : "missing"}
         </p>
       </div>
     </AppShell>

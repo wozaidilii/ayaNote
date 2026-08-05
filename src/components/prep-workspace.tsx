@@ -7,11 +7,9 @@ import {
   generateMissingPrepBatch,
   savePrepDraft,
 } from "@/app/actions";
-import {
-  emptyPrepRefs,
-  hasPrepRefs,
-  type PrepRefs,
-} from "@/lib/prep-refs";
+import { NotebookPen, Sparkles, UiIcon } from "@/components/icons";
+import { EmptyState, PanelTitle } from "@/components/ui-heading";
+import { emptyPrepRefs, hasPrepRefs, type PrepRefs } from "@/lib/prep-refs";
 
 export type PrepLessonItem = {
   id: string;
@@ -46,10 +44,10 @@ type DraftFields = PrepLessonItem["draft"];
 function hasDraftContent(draft: DraftFields) {
   return Boolean(
     draft.warmup.trim() ||
-      draft.review.trim() ||
-      draft.newFocus.trim() ||
-      draft.practice.trim() ||
-      draft.homeworkSeed.trim(),
+    draft.review.trim() ||
+    draft.newFocus.trim() ||
+    draft.practice.trim() ||
+    draft.homeworkSeed.trim(),
   );
 }
 
@@ -208,7 +206,9 @@ export function PrepWorkspace({
   }, [lessons]);
 
   function applyGenerated(
-    item: Awaited<ReturnType<typeof generateMissingPrepBatch>>["generated"][number],
+    item: Awaited<
+      ReturnType<typeof generateMissingPrepBatch>
+    >["generated"][number],
   ) {
     setDrafts((prev) => ({
       ...prev,
@@ -259,7 +259,9 @@ export function PrepWorkspace({
 
   useEffect(() => {
     if (autoStarted.current || lessons.length === 0) return;
-    const missing = lessons.filter((l) => !hasDraftContent(l.draft)).map((l) => l.id);
+    const missing = lessons
+      .filter((l) => !hasDraftContent(l.draft))
+      .map((l) => l.id);
     if (missing.length === 0) return;
     autoStarted.current = true;
     void runBatch(missing);
@@ -285,12 +287,16 @@ export function PrepWorkspace({
   );
 
   const currentDraft = selected ? drafts[selected.id] : null;
-  const currentRefs = selected ? (refsMap[selected.id] ?? emptyPrepRefs()) : emptyPrepRefs();
+  const currentRefs = selected
+    ? (refsMap[selected.id] ?? emptyPrepRefs())
+    : emptyPrepRefs();
   const missingCount = missingDraftIds(lessons, drafts).length;
   const selectedGenerating =
     Boolean(selected) &&
     (activeId === selected?.id ||
-      (batchRunning && pendingIds.includes(selected?.id ?? "") && !hasDraftContent(currentDraft!)));
+      (batchRunning &&
+        pendingIds.includes(selected?.id ?? "") &&
+        !hasDraftContent(currentDraft!)));
 
   function selectLesson(id: string) {
     setSelectedId(id);
@@ -309,9 +315,7 @@ export function PrepWorkspace({
   if (lessons.length === 0) {
     return (
       <div className="panel">
-        <div className="empty-state">
-          <p>{labels.empty}</p>
-        </div>
+        <EmptyState icon={NotebookPen}>{labels.empty}</EmptyState>
       </div>
     );
   }
@@ -335,10 +339,12 @@ export function PrepWorkspace({
   return (
     <div className="prep-layout">
       <aside className="prep-queue panel" aria-label={labels.queue}>
-        <div className="panel-header">
-          <h2>{labels.queue}</h2>
-          <span className="chip">{lessons.length}</span>
-        </div>
+        <PanelTitle
+          icon={NotebookPen}
+          trailing={<span className="chip">{lessons.length}</span>}
+        >
+          {labels.queue}
+        </PanelTitle>
 
         {(batchRunning || batchMessage || missingCount > 0) && (
           <div className="prep-batch-status">
@@ -351,7 +357,10 @@ export function PrepWorkspace({
                 </p>
                 {activeStudentName && (
                   <p className="prep-batch-current">
-                    {labels.generatingStudent.replace("{name}", activeStudentName)}
+                    {labels.generatingStudent.replace(
+                      "{name}",
+                      activeStudentName,
+                    )}
                   </p>
                 )}
               </>
@@ -364,7 +373,11 @@ export function PrepWorkspace({
                 className="btn secondary sm"
                 onClick={() => void runBatch(missingDraftIds(lessons, drafts))}
               >
-                {labels.generateMissing.replace("{count}", String(missingCount))}
+                <UiIcon icon={Sparkles} size={14} />
+                {labels.generateMissing.replace(
+                  "{count}",
+                  String(missingCount),
+                )}
               </button>
             )}
           </div>
@@ -416,7 +429,8 @@ export function PrepWorkspace({
           <div>
             <h2 className="prep-editor-title">{selected.studentName}</h2>
             <p className="muted">
-              {selected.startsAtLabel} · {selected.courseLabel} · {selected.level}
+              {selected.startsAtLabel} · {selected.courseLabel} ·{" "}
+              {selected.level}
             </p>
             {selected.lastFocus && (
               <p className="prep-last-focus">
@@ -444,6 +458,7 @@ export function PrepWorkspace({
               disabled={batchRunning || regenBusy}
               onClick={() => void onRegenerate()}
             >
+              <UiIcon icon={Sparkles} size={14} />
               {regenBusy ? "…" : labels.regenerate}
             </button>
           </div>
@@ -476,10 +491,9 @@ export function PrepWorkspace({
                 <div className="prep-refs-grid">
                   <RefGroup
                     label={labels.refsCourse}
-                    items={[
-                      currentRefs.course,
-                      currentRefs.level,
-                    ].filter(Boolean)}
+                    items={[currentRefs.course, currentRefs.level].filter(
+                      Boolean,
+                    )}
                     empty={labels.refsNone}
                   />
                   <RefGroup
@@ -519,7 +533,11 @@ export function PrepWorkspace({
               </div>
             )}
 
-            <div className="prep-section-tabs" role="tablist" aria-label={labels.sections}>
+            <div
+              className="prep-section-tabs"
+              role="tablist"
+              aria-label={labels.sections}
+            >
               {SECTIONS.map((s) => (
                 <button
                   key={s.key}
@@ -547,7 +565,9 @@ export function PrepWorkspace({
               ))}
 
               <div className="field">
-                <label htmlFor={`prep-${selected.id}-${section}`}>{sectionLabel(section)}</label>
+                <label htmlFor={`prep-${selected.id}-${section}`}>
+                  {sectionLabel(section)}
+                </label>
                 <textarea
                   id={`prep-${selected.id}-${section}`}
                   value={currentDraft[section]}
@@ -558,10 +578,20 @@ export function PrepWorkspace({
               </div>
 
               <div className="prep-editor-actions">
-                <button className="btn secondary" name="status" value="draft" type="submit">
+                <button
+                  className="btn secondary"
+                  name="status"
+                  value="draft"
+                  type="submit"
+                >
                   {labels.saveDraft}
                 </button>
-                <button className="btn" name="status" value="ready" type="submit">
+                <button
+                  className="btn"
+                  name="status"
+                  value="ready"
+                  type="submit"
+                >
                   {labels.markReady}
                 </button>
               </div>

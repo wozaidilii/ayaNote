@@ -1,22 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessibleLesson } from "@/lib/classroom-access";
+import {
+  emptyClassroomDoc,
+  parseClassroomDoc,
+  seedClassroomDoc,
+  serializeClassroomDoc,
+  type TiptapDoc,
+} from "@/lib/classroom-doc";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-export type ClassroomBoardPayload = {
-  warmup: string;
-  review: string;
-  newFocus: string;
-  practice: string;
-  homeworkSeed: string;
-  classroomNotes: string;
-  prepUpdatedAt: string | null;
-  notesUpdatedAt: string;
-  lessonUpdatedAt: string;
+export type ClassroomDocPayload = {
+  doc: TiptapDoc;
+  updatedAt: string;
+  seeded: boolean;
 };
 
-function boardFromLesson(lesson: {
+function resolveDoc(lesson: {
+  classroomDoc: string;
   classroomNotes: string;
   updatedAt: Date;
   prepDraft: {
@@ -25,20 +27,35 @@ function boardFromLesson(lesson: {
     newFocus: string;
     practice: string;
     homeworkSeed: string;
-    updatedAt: Date;
   } | null;
-}): ClassroomBoardPayload {
-  return {
-    warmup: lesson.prepDraft?.warmup ?? "",
-    review: lesson.prepDraft?.review ?? "",
-    newFocus: lesson.prepDraft?.newFocus ?? "",
-    practice: lesson.prepDraft?.practice ?? "",
-    homeworkSeed: lesson.prepDraft?.homeworkSeed ?? "",
-    classroomNotes: lesson.classroomNotes ?? "",
-    prepUpdatedAt: lesson.prepDraft?.updatedAt.toISOString() ?? null,
-    notesUpdatedAt: lesson.updatedAt.toISOString(),
-    lessonUpdatedAt: lesson.updatedAt.toISOString(),
-  };
+}): { doc: TiptapDoc; seeded: boolean; needsPersist: boolean } {
+  const existing = parseClassroomDoc(lesson.classroomDoc);
+  if (existing) {
+    return { doc: existing, seeded: false, needsPersist: false };
+  }
+
+  const hasPrep = Boolean(
+    lesson.prepDraft &&
+    (lesson.prepDraft.warmup ||
+      lesson.prepDraft.review ||
+      lesson.prepDraft.newFocus ||
+      lesson.prepDraft.practice ||
+      lesson.prepDraft.homeworkSeed ||
+      lesson.classroomNotes),
+  );
+
+  const doc = hasPrep
+    ? seedClassroomDoc({
+        warmup: lesson.prepDraft?.warmup,
+        review: lesson.prepDraft?.review,
+        newFocus: lesson.prepDraft?.newFocus,
+        practice: lesson.prepDraft?.practice,
+        homeworkSeed: lesson.prepDraft?.homeworkSeed,
+        classroomNotes: lesson.classroomNotes,
+      })
+    : emptyClassroomDoc();
+
+  return { doc, seeded: true, needsPersist: true };
 }
 
 export async function GET(
@@ -53,7 +70,25 @@ export async function GET(
       { status: access.status },
     );
   }
-  return NextResponse.json(boardFromLesson(access.lesson));
+
+  const resolved = resolveDoc(access.lesson);
+  let updatedAt = access.lesson.updatedAt;
+
+  if (resolved.needsPersist) {
+    const saved = await prisma.lesson.update({
+      where: { id },
+      data: { classroomDoc: serializeClassroomDoc(resolved.doc) },
+      select: { updatedAt: true },
+    });
+    updatedAt = saved.updatedAt;
+  }
+
+  const payload: ClassroomDocPayload = {
+    doc: resolved.doc,
+    updatedAt: updatedAt.toISOString(),
+    seeded: resolved.seeded,
+  };
+  return NextResponse.json(payload);
 }
 
 export async function PUT(
@@ -69,55 +104,31 @@ export async function PUT(
     );
   }
 
-  let body: Partial<ClassroomBoardPayload>;
+  let body: { doc?: TiptapDoc };
   try {
-    body = (await req.json()) as Partial<ClassroomBoardPayload>;
+    body = (await req.json()) as { doc?: TiptapDoc };
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const warmup = String(body.warmup ?? access.lesson.prepDraft?.warmup ?? "");
-  const review = String(body.review ?? access.lesson.prepDraft?.review ?? "");
-  const newFocus = String(
-    body.newFocus ?? access.lesson.prepDraft?.newFocus ?? "",
-  );
-  const practice = String(
-    body.practice ?? access.lesson.prepDraft?.practice ?? "",
-  );
-  const homeworkSeed = String(
-    body.homeworkSeed ?? access.lesson.prepDraft?.homeworkSeed ?? "",
-  );
-  const classroomNotes = String(
-    body.classroomNotes ?? access.lesson.classroomNotes ?? "",
-  );
+  if (
+    !body.doc ||
+    body.doc.type !== "doc" ||
+    !Array.isArray(body.doc.content)
+  ) {
+    return NextResponse.json({ error: "invalid_doc" }, { status: 400 });
+  }
 
-  const [lesson] = await prisma.$transaction([
-    prisma.lesson.update({
-      where: { id },
-      data: { classroomNotes },
-      include: { prepDraft: true },
-    }),
-    prisma.prepDraft.upsert({
-      where: { lessonId: id },
-      create: {
-        lessonId: id,
-        warmup,
-        review,
-        newFocus,
-        practice,
-        homeworkSeed,
-        status: access.lesson.prepDraft?.status ?? "draft",
-      },
-      update: { warmup, review, newFocus, practice, homeworkSeed },
-    }),
-  ]);
-
-  // Re-read with prep for consistent timestamps
-  const fresh = await prisma.lesson.findUniqueOrThrow({
+  const saved = await prisma.lesson.update({
     where: { id },
-    include: { prepDraft: true },
+    data: { classroomDoc: serializeClassroomDoc(body.doc) },
+    select: { updatedAt: true, classroomDoc: true },
   });
-  void lesson;
 
-  return NextResponse.json(boardFromLesson(fresh));
+  const payload: ClassroomDocPayload = {
+    doc: parseClassroomDoc(saved.classroomDoc) ?? body.doc,
+    updatedAt: saved.updatedAt.toISOString(),
+    seeded: false,
+  };
+  return NextResponse.json(payload);
 }

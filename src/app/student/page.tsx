@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
-import { StudentSwitcher } from "@/components/student-switcher";
 import {
-  getActiveStudent,
-  listActiveStudentsForTeacher,
-} from "@/lib/active-student";
+  BookOpen,
+  CalendarPlus,
+  Home,
+  Video,
+  UiIcon,
+} from "@/components/icons";
+import { PageHeading, PanelTitle } from "@/components/ui-heading";
+import { getActiveStudent } from "@/lib/active-student";
+import { selectBookingNotices } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
@@ -64,17 +69,24 @@ export default async function StudentHomePage() {
 
   return (
     <AppShell active="home" personName={student.name}>
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {student.name} · {student.email} · {timeZone}
-      </p>
+      <PageHeading
+        icon={Home}
+        title={t("title")}
+        subtitle={
+          <>
+            {student.name} · {student.email} · {timeZone}
+          </>
+        }
+      />
 
       {notices.length > 0 && (
-        <div className="panel" style={{ marginTop: "1rem" }}>
-          <h2 style={{ marginTop: 0 }}>{t("notices")}</h2>
+        <div className="panel" style={{ marginBottom: "1rem" }}>
+          <PanelTitle icon={CalendarPlus}>{t("notices")}</PanelTitle>
           {notices.map((n) => (
             <p key={n.id} className="muted" style={{ margin: "0.35rem 0" }}>
-              <span className={`chip ${n.status === "approved" ? "done" : ""}`}>{n.status}</span>{" "}
+              <span className={`chip ${n.status === "approved" ? "done" : ""}`}>
+                {n.status}
+              </span>{" "}
               {n.type} · {formatInTz(n.requestedStart, "MMM d HH:mm", timeZone)}
               {n.note ? ` — ${n.note}` : ""}
             </p>
@@ -82,9 +94,9 @@ export default async function StudentHomePage() {
         </div>
       )}
 
-      <div className="grid-2" style={{ marginTop: "1.2rem" }}>
+      <div className="grid-2">
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>{t("next")}</h2>
+          <PanelTitle icon={CalendarPlus}>{t("next")}</PanelTitle>
           {next ? (
             <>
               <p style={{ fontSize: "1.2rem", fontWeight: 700 }}>
@@ -100,27 +112,14 @@ export default async function StudentHomePage() {
               <p>
                 <strong>{t("whatNext")}:</strong> {whatNext}
               </p>
-              {next.meetLink ? (
-                <p>
-                  <a
-                    className="btn"
-                    href={next.meetLink}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {t("joinMeet")}
-                  </a>
-                </p>
-              ) : (
-                <p className="muted">{t("noMeetYet")}</p>
-              )}
               <p>
                 <a
-                  className="btn secondary"
+                  className="btn"
                   href={`/classroom/${next.id}`}
                   target="_blank"
                   rel="noreferrer"
                 >
+                  <UiIcon icon={Video} size={15} />
                   {t("enterClassroom")}
                 </a>
               </p>
@@ -149,7 +148,7 @@ export default async function StudentHomePage() {
           )}
         </div>
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>{t("progress")}</h2>
+          <PanelTitle icon={BookOpen}>{t("progress")}</PanelTitle>
           <p>
             <strong>{common("attendance")}:</strong>{" "}
             {student.progress?.attendanceCount ?? 0}

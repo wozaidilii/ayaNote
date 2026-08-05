@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   approveSummary,
-  fetchDriveTranscriptForLesson,
   importTranscriptAndSummarize,
   updateLessonStatus,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { BookOpen, NotebookPen, Video, UiIcon } from "@/components/icons";
+import { SummaryGeneratingPanel } from "@/components/summary-generating-panel";
+import { PageHeading } from "@/components/ui-heading";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { requireTeacher } from "@/lib/session";
+import { isHeuristicSummaryNotes } from "@/lib/student-memory";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -51,6 +55,7 @@ export default async function LessonRoomPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
+  const teacher = await requireTeacher();
   const t = await getTranslations("lessonRoom");
   const common = await getTranslations("common");
 
@@ -76,6 +81,7 @@ export default async function LessonRoomPage({
     },
   });
   if (!lesson) notFound();
+  if (lesson.teacherId !== teacher.id) redirect("/today");
 
   const lastFocus = lesson.student.lessons[0]?.summary?.nextFocus;
   const topics = lesson.summary
@@ -100,22 +106,26 @@ export default async function LessonRoomPage({
     provider === "deepseek"
       ? Boolean(process.env.DEEPSEEK_API_KEY)
       : Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
-  const googleConnected = Boolean(
-    lesson.teacher.googleConnectedEmail || lesson.teacher.googleRefreshToken,
-  );
+  const summarizing = sp.ok === "summarizing" && !lesson.summary;
+  const heuristic = isHeuristicSummaryNotes(lesson.summary?.notes);
 
   return (
-    <AppShell active="today">
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {lesson.student.name} ·{" "}
-        {formatInTz(
-          lesson.startsAt,
-          "yyyy-MM-dd HH:mm",
-          normalizeTimezone(lesson.teacher.timezone),
-        )}{" "}
-        · {t("subtitle")}
-      </p>
+    <AppShell active="today" personName={teacher.name}>
+      <PageHeading
+        icon={BookOpen}
+        title={t("title")}
+        subtitle={
+          <>
+            {lesson.student.name} ·{" "}
+            {formatInTz(
+              lesson.startsAt,
+              "yyyy-MM-dd HH:mm",
+              normalizeTimezone(lesson.teacher.timezone),
+            )}{" "}
+            · {t("subtitle")}
+          </>
+        }
+      />
 
       <div
         style={{
@@ -130,120 +140,118 @@ export default async function LessonRoomPage({
         <span className="chip sky">
           {courseTypeLabel(lesson.student.courseType)}
         </span>
-        {lesson.driveFileId && (
-          <span className="chip">Drive: {lesson.driveFileId.slice(0, 8)}…</span>
-        )}
+        <span className={`chip ${lesson.status === "completed" ? "done" : "soon"}`}>
+          {t("lessonStatus")}: {lesson.status}
+        </span>
         <span className="chip">
           {hasAiKey ? t("aiReady", { provider }) : t("aiMissing", { provider })}
         </span>
+        {heuristic && <span className="chip">{t("heuristicBadge")}</span>}
         <a
           className="btn"
           href={`/classroom/${lesson.id}`}
           target="_blank"
           rel="noreferrer"
         >
+          <UiIcon icon={Video} size={15} />
           {t("openClassroomTab")}
         </a>
+        <Link className="btn secondary" href={`/prep?lesson=${lesson.id}`}>
+          <UiIcon icon={NotebookPen} size={15} />
+          {t("openPrep")}
+        </Link>
+      </div>
+
+      <div className="panel" style={{ marginTop: "0.85rem" }}>
+        <h2 style={{ margin: 0 }}>{t("pipelineTitle")}</h2>
+        <p className="muted" style={{ marginTop: "0.4rem" }}>
+          {t("pipelineHint")}
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+          <form action={updateLessonStatus}>
+            <input type="hidden" name="lessonId" value={lesson.id} />
+            <input type="hidden" name="status" value="in_progress" />
+            <button
+              className="btn secondary sm"
+              type="submit"
+              disabled={lesson.status === "in_progress"}
+            >
+              {t("markInProgress")}
+            </button>
+          </form>
+          <form action={updateLessonStatus}>
+            <input type="hidden" name="lessonId" value={lesson.id} />
+            <input type="hidden" name="status" value="completed" />
+            <button
+              className="btn secondary sm"
+              type="submit"
+              disabled={lesson.status === "completed"}
+            >
+              {t("markComplete")}
+            </button>
+          </form>
+        </div>
       </div>
 
       {sp.ok === "summary" && <p className="chip done">{t("okSummary")}</p>}
-      {sp.ok === "livekit" && <p className="chip done">{t("okLivekit")}</p>}
-      {sp.ok === "drive" && (
-        <p className="chip done">
-          {t("okDrive")}
-          {sp.file ? ` · ${decodeURIComponent(sp.file)}` : ""}
-        </p>
-      )}
       {sp.ok === "approved" && <p className="chip done">{t("okApproved")}</p>}
       {sp.ok === "status" && <p className="chip done">{t("okStatus")}</p>}
+      {summarizing && <p className="chip soon">{t("summarizingChip")}</p>}
+      {sp.ok === "livekit" && <p className="chip done">{t("okLivekit")}</p>}
       {sp.warn === "no_ai_key" && <p className="chip">{t("warnNoAiKey")}</p>}
       {sp.err === "empty_transcript" && <p className="chip">{t("errEmpty")}</p>}
-      {sp.err === "drive_not_found" && (
-        <p className="chip">{t("errDriveNotFound")}</p>
-      )}
-      {sp.err === "drive_empty_doc" && (
-        <p className="chip">{t("errDriveEmpty")}</p>
-      )}
-      {sp.err === "drive_no_google_token" && (
-        <p className="chip">{t("errDriveNoGoogle")}</p>
-      )}
-      {sp.err?.startsWith("drive_") &&
-        ![
-          "drive_not_found",
-          "drive_empty_doc",
-          "drive_no_google_token",
-        ].includes(sp.err) && (
-          <p className="chip">
-            {t("errDriveGeneric")}: {sp.err}
-          </p>
-        )}
 
       <div className="grid-2" style={{ marginTop: "1.2rem" }}>
         <div>
-          <div className="panel">
-            <h2 style={{ marginTop: 0 }}>{t("driveTitle")}</h2>
-            <p className="muted">{t("driveHint")}</p>
-            {googleConnected ? (
-              <form action={fetchDriveTranscriptForLesson}>
-                <input type="hidden" name="lessonId" value={lesson.id} />
-                <button
-                  className="btn"
-                  type="submit"
-                  disabled={!lesson.student.recordingConsent}
-                >
-                  {t("fetchDrive")}
-                </button>
-              </form>
-            ) : (
-              <p>
-                <a className="btn secondary" href="/settings">
-                  {t("connectGoogleFirst")}
-                </a>
-              </p>
-            )}
-            {!lesson.student.recordingConsent && (
-              <p className="muted" style={{ marginTop: "0.6rem" }}>
-                {t("consentRequired")}
-              </p>
-            )}
-          </div>
+          {summarizing ? (
+            <SummaryGeneratingPanel
+              lessonId={lesson.id}
+              labels={{
+                generatingTitle: t("generatingTitle"),
+                generatingBody: t("generatingBody"),
+                generatingFailed: t("generatingFailed"),
+              }}
+            />
+          ) : null}
 
-          <form className="panel" action={importTranscriptAndSummarize}>
-            <input type="hidden" name="lessonId" value={lesson.id} />
-            <h2 style={{ marginTop: 0 }}>{t("pasteTitle")}</h2>
-            <p className="muted">{t("manualFallback")}</p>
-            {lesson.summary && <p className="chip">{t("regenNote")}</p>}
-            <div className="field">
-              <label htmlFor="transcript">{t("paste")}</label>
-              <textarea
-                id="transcript"
-                name="transcript"
-                placeholder={t("placeholder")}
-                defaultValue={
-                  lesson.transcript?.editedText ||
-                  lesson.transcript?.rawText ||
-                  ""
-                }
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="tags">{t("tags")}</label>
-              <input
-                id="tags"
-                name="tags"
-                placeholder="て形, keigo, travel"
-                defaultValue={parseJsonArray(lesson.tagsJson).join(", ")}
-              />
-            </div>
-            <button className="btn" type="submit">
-              {lesson.summary
-                ? t("regenerateSummary")
-                : `${common("import")} / ${common("generate")}`}
-            </button>
-          </form>
+          {!summarizing && (
+            <form className="panel" action={importTranscriptAndSummarize}>
+              <input type="hidden" name="lessonId" value={lesson.id} />
+              <h2 style={{ marginTop: 0 }}>{t("pasteTitle")}</h2>
+              <p className="muted">{t("manualFallback")}</p>
+              {lesson.summary && <p className="chip">{t("regenNote")}</p>}
+              <div className="field">
+                <label htmlFor="transcript">{t("paste")}</label>
+                <textarea
+                  id="transcript"
+                  name="transcript"
+                  placeholder={t("placeholder")}
+                  defaultValue={
+                    lesson.transcript?.editedText ||
+                    lesson.transcript?.rawText ||
+                    ""
+                  }
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="tags">{t("tags")}</label>
+                <input
+                  id="tags"
+                  name="tags"
+                  placeholder="て形, keigo, travel"
+                  defaultValue={parseJsonArray(lesson.tagsJson).join(", ")}
+                />
+              </div>
+              <button className="btn" type="submit">
+                {lesson.summary
+                  ? t("regenerateSummary")
+                  : `${common("import")} / ${common("generate")}`}
+              </button>
+            </form>
+          )}
 
-          {lesson.summary && (
+          {!summarizing && lesson.summary && (
             <form className="panel" action={approveSummary}>
               <input type="hidden" name="lessonId" value={lesson.id} />
 
@@ -399,18 +407,6 @@ export default async function LessonRoomPage({
               <li key={v.id}>{v.term}</li>
             ))}
           </ul>
-          {lesson.meetLink && (
-            <p>
-              <a
-                href={lesson.meetLink}
-                target="_blank"
-                rel="noreferrer"
-                className="btn"
-              >
-                {t("joinMeet")}
-              </a>
-            </p>
-          )}
           {lesson.prepDraft && (
             <div style={{ marginTop: "1rem" }}>
               <h3>{t("prepSidebar")}</h3>

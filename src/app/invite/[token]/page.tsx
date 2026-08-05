@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { acceptInvite } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { GraduationCap, LogIn, UiIcon } from "@/components/icons";
+import { PageHeading } from "@/components/ui-heading";
 import { prisma } from "@/lib/db";
+import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
-/** Invite landing — binds student cookie + role for the lite portal. */
 export default async function InvitePage({
   params,
   searchParams,
@@ -13,43 +14,45 @@ export default async function InvitePage({
   searchParams: Promise<{ err?: string }>;
 }) {
   const { token } = await params;
-  const sp = await searchParams;
+  const t = await getTranslations("invite");
   const student = await prisma.student.findUnique({
     where: { inviteToken: token },
     include: { teacher: true },
   });
   if (!student || student.archivedAt) notFound();
 
-  const expired =
-    Boolean(student.inviteTokenExpiresAt && student.inviteTokenExpiresAt < new Date()) ||
-    sp.err === "expired";
-
-  if (expired) {
+  if (
+    student.inviteTokenExpiresAt &&
+    student.inviteTokenExpiresAt < new Date()
+  ) {
     return (
       <AppShell>
-        <h1 className="h1">Invite expired</h1>
-        <p className="muted">Ask your teacher to regenerate the invite link.</p>
+        <PageHeading
+          icon={GraduationCap}
+          title={t("expiredTitle")}
+          subtitle={t("expiredBody")}
+        />
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-      <h1 className="h1">Welcome, {student.name}</h1>
-      <p className="muted">
-        You&apos;re invited to AyaNote with {student.teacher.name}. Opening the portal binds this
-        invite to your session (lite student view).
+      <PageHeading
+        icon={GraduationCap}
+        title={t("welcome", { name: student.name })}
+        subtitle={t("body", { teacher: student.teacher.name })}
+      />
+      <form action={acceptInvite} style={{ marginTop: "0.4rem" }}>
+        <input type="hidden" name="token" value={token} />
+        <button className="btn" type="submit">
+          <UiIcon icon={LogIn} size={15} />
+          {t("enter")}
+        </button>
+      </form>
+      <p className="muted" style={{ marginTop: "1rem", fontSize: "0.85rem" }}>
+        {t("reuseHint")}
       </p>
-      <div style={{ marginTop: "1.2rem", display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-        <form action={acceptInvite.bind(null, token)}>
-          <button className="btn" type="submit">
-            Open student home
-          </button>
-        </form>
-        <Link className="btn secondary" href="/student/book">
-          Book a lesson
-        </Link>
-      </div>
     </AppShell>
   );
 }

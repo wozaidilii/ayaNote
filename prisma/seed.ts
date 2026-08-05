@@ -1,17 +1,50 @@
+import { hashPassword } from "../src/lib/auth";
 import { prisma } from "../src/lib/db";
-import { DEMO_STUDENT_EMAIL, DEMO_TEACHER_EMAIL } from "../src/lib/session";
+import {
+  DEMO_STUDENT_EMAIL,
+  DEMO_TEACHER_EMAIL,
+  DEMO_TEACHER_PASSWORD,
+} from "../src/lib/session";
 import { toJson } from "../src/lib/utils";
 
-/** Minimal bootstrap — no fake lessons. Classes come from Google Calendar sync. */
+/** Previous trial login id — migrate to DEMO_TEACHER_EMAIL when present. */
+const LEGACY_TEACHER_EMAIL = "ayano@ayanote.app";
+
+/** Minimal bootstrap — classes come from in-app booking + Classroom. */
 async function main() {
+  const passwordHash = await hashPassword(DEMO_TEACHER_PASSWORD);
+  const loginId = DEMO_TEACHER_EMAIL as string;
+
+  // Migrate previous trial account if still present under the old email.
+  const legacy = await prisma.teacher.findUnique({
+    where: { email: LEGACY_TEACHER_EMAIL },
+  });
+  if (legacy && loginId !== LEGACY_TEACHER_EMAIL) {
+    const taken = await prisma.teacher.findUnique({
+      where: { email: loginId },
+    });
+    if (!taken) {
+      await prisma.teacher.update({
+        where: { id: legacy.id },
+        data: {
+          email: loginId,
+          name: "Admin",
+          passwordHash,
+          locale: "ja",
+        },
+      });
+    }
+  }
+
   const teacher = await prisma.teacher.upsert({
-    where: { email: DEMO_TEACHER_EMAIL },
+    where: { email: loginId },
     create: {
-      name: "Ayano",
-      email: DEMO_TEACHER_EMAIL,
+      name: "Admin",
+      email: loginId,
+      passwordHash,
       locale: "ja",
     },
-    update: { name: "Ayano", locale: "ja" },
+    update: { name: "Admin", locale: "ja", passwordHash },
   });
 
   await prisma.availabilityRule.upsert({
@@ -30,7 +63,9 @@ async function main() {
   });
 
   await prisma.student.upsert({
-    where: { teacherId_email: { teacherId: teacher.id, email: DEMO_STUDENT_EMAIL } },
+    where: {
+      teacherId_email: { teacherId: teacher.id, email: DEMO_STUDENT_EMAIL },
+    },
     create: {
       teacherId: teacher.id,
       name: "Alex Chen",
@@ -44,35 +79,11 @@ async function main() {
     update: {},
   });
 
-  const dummyLessons = await prisma.lesson.findMany({
-    where: {
-      teacherId: teacher.id,
-      OR: [
-        { calendarEventId: null },
-        { calendarEventId: { startsWith: "demo-" } },
-        { calendarEventId: { startsWith: "fallback-" } },
-        { meetLink: { contains: "aya-note" } },
-      ],
-    },
-    select: { id: true },
+  console.log("Bootstrapped trial teacher (password login).");
+  console.log({
+    teacher: teacher.email,
+    password: DEMO_TEACHER_PASSWORD,
   });
-  const ids = dummyLessons.map((l) => l.id);
-  if (ids.length) {
-    await prisma.bookingRequest.deleteMany({ where: { lessonId: { in: ids } } });
-    await prisma.prepDraft.deleteMany({ where: { lessonId: { in: ids } } });
-    await prisma.summary.deleteMany({ where: { lessonId: { in: ids } } });
-    await prisma.transcript.deleteMany({ where: { lessonId: { in: ids } } });
-    await prisma.lesson.deleteMany({ where: { id: { in: ids } } });
-  }
-  await prisma.bookingRequest.deleteMany({
-    where: { teacherId: teacher.id, note: { contains: "Work meeting conflict" } },
-  });
-  await prisma.student.deleteMany({
-    where: { teacherId: teacher.id, email: "mina@example.com" },
-  });
-
-  console.log("Bootstrapped teacher (no dummy lessons). Connect Google Calendar to import classes.");
-  console.log({ teacher: teacher.email, clearedLessons: ids.length });
 }
 
 main()

@@ -13,6 +13,8 @@ model Teacher {
   id                   String    @id @default(cuid())
   name                 String
   email                String    @unique
+  /** bcrypt hash for email/password login */
+  passwordHash         String    @default("")
   locale               String    @default("ja")
   /** IANA timezone for display & scheduling, e.g. Asia/Tokyo */
   timezone             String    @default("Asia/Tokyo")
@@ -75,6 +77,8 @@ model Lesson {
   driveFileId      String?
   /** Shared live notes during / after classroom (teacher + student) */
   classroomNotes   String   @default("")
+  /** TipTap JSON document for classroom board (single Notion-like page) */
+  classroomDoc     String   @default("")
   tagsJson         String   @default("[]")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

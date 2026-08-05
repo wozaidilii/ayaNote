@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { applyTranscriptToLesson } from "@/lib/drive-transcript";
-import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { getAiProvider } from "@/lib/ai";
 import { sttConfigured, transcribeAudioFile } from "@/lib/stt";
-import { DEMO_TEACHER_EMAIL, getSession } from "@/lib/session";
+import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -16,22 +15,22 @@ async function canAccessLesson(lessonId: string) {
   });
   if (!lesson) return { ok: false as const, status: 404, error: "not_found" };
 
-  const { role } = await getSession();
-  if (role === "teacher") {
-    const teacher = await prisma.teacher.findUnique({
-      where: { email: DEMO_TEACHER_EMAIL },
-    });
-    if (!teacher || lesson.teacherId !== teacher.id) {
+  const session = await getSession();
+  if (session.role === "teacher" && session.teacherId) {
+    if (lesson.teacherId !== session.teacherId) {
       return { ok: false as const, status: 403, error: "forbidden" };
     }
     return { ok: true as const, lesson };
   }
 
-  const student = await getActiveStudent();
-  if (lesson.studentId !== student.id) {
-    return { ok: false as const, status: 403, error: "forbidden" };
+  if (session.role === "student" && session.studentId) {
+    if (lesson.studentId !== session.studentId) {
+      return { ok: false as const, status: 403, error: "forbidden" };
+    }
+    return { ok: true as const, lesson };
   }
-  return { ok: true as const, lesson };
+
+  return { ok: false as const, status: 401, error: "unauthorized" };
 }
 
 export async function POST(

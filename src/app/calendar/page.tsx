@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { decideBooking, syncGoogleCalendar } from "@/app/actions";
+import { decideBooking } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { FiveDayCalendar } from "@/components/five-day-calendar";
-import { MonthCalendar, type CalendarLessonItem } from "@/components/month-calendar";
-import { syncTeacherCalendar } from "@/lib/calendar-sync";
+import { CalendarDays, Check, Clock3, X, UiIcon } from "@/components/icons";
+import {
+  MonthCalendar,
+  type CalendarLessonItem,
+} from "@/components/month-calendar";
+import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { prisma } from "@/lib/db";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { requireTeacher } from "@/lib/session";
 import {
   consecutiveYmds,
   dayBoundsInTz,
@@ -24,8 +28,6 @@ export default async function CalendarPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    synced?: string;
-    sync?: string;
     month?: string;
     day?: string;
     view?: string;
@@ -36,51 +38,38 @@ export default async function CalendarPage({
   const now = new Date();
   const view = sp.view === "month" ? "month" : "days";
 
-  const [t, common, teacher] = await Promise.all([
+  const teacher = await requireTeacher();
+  const teacherFull = await prisma.teacher.findUniqueOrThrow({
+    where: { id: teacher.id },
+    include: { availabilityRules: true },
+  });
+
+  const [t, common] = await Promise.all([
     getTranslations("calendar"),
     getTranslations("common"),
-    prisma.teacher.findUniqueOrThrow({
-      where: { email: DEMO_TEACHER_EMAIL },
-      include: { availabilityRules: true },
-    }),
   ]);
 
   const timeZone = normalizeTimezone(
-    teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
+    teacherFull.timezone ||
+      teacherFull.availabilityRules?.timezone ||
+      "Asia/Tokyo",
   );
   const todayYmd = ymdInTz(now, timeZone);
-  const month = parseMonthParam(sp.month, timeZone, now, teacher.locale || "ja");
+  const month = parseMonthParam(
+    sp.month,
+    timeZone,
+    now,
+    teacherFull.locale || "ja",
+  );
   const weeks = monthGridYm(month.year, month.monthIndex0, timeZone);
   const prevMonth = shiftMonth(month.year, month.monthIndex0, -1);
   const nextMonth = shiftMonth(month.year, month.monthIndex0, 1);
 
   const daysStart =
     sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : todayYmd;
-  const fiveDays = consecutiveYmds(daysStart, 5, timeZone);
-  const prevStart = shiftYmd(daysStart, -5, timeZone);
-  const nextStart = shiftYmd(daysStart, 5, timeZone);
-
-  const googleConnected = Boolean(teacher.googleConnectedEmail || teacher.googleRefreshToken);
-
-  let syncMeta: {
-    imported: number;
-    updated: number;
-    purged: number;
-    scanned: number;
-    skipped: number;
-  } | null = null;
-  if (googleConnected && sp.sync === "1") {
-    const result = await syncTeacherCalendar(teacher.id);
-    if (result.ok) {
-      syncMeta = {
-        imported: result.imported,
-        updated: result.updated,
-        purged: result.purged,
-        scanned: result.scanned,
-        skipped: result.skipped,
-      };
-    }
-  }
+  const weekDays = consecutiveYmds(daysStart, 7, timeZone);
+  const prevStart = shiftYmd(daysStart, -7, timeZone);
+  const nextStart = shiftYmd(daysStart, 7, timeZone);
 
   const monthStartYmd = `${month.year}-${String(month.monthIndex0 + 1).padStart(2, "0")}-01`;
   const nextMonthKey = shiftMonth(month.year, month.monthIndex0, 1);
@@ -95,9 +84,11 @@ export default async function CalendarPage({
     timeZone,
   ).end;
 
-  const daysRangeStart = dayBoundsInTz(fiveDays[0], timeZone).start;
-  const daysRangeEnd = dayBoundsInTz(shiftYmd(fiveDays[fiveDays.length - 1], 1, timeZone), timeZone)
-    .start;
+  const daysRangeStart = dayBoundsInTz(weekDays[0], timeZone).start;
+  const daysRangeEnd = dayBoundsInTz(
+    shiftYmd(weekDays[weekDays.length - 1], 1, timeZone),
+    timeZone,
+  ).start;
 
   const rangeStart = view === "month" ? monthPaddedStart : daysRangeStart;
   const rangeEnd = view === "month" ? monthPaddedEnd : daysRangeEnd;
@@ -129,68 +120,36 @@ export default async function CalendarPage({
     endsAt: lesson.endsAt.toISOString(),
     studentName: lesson.student.name,
     status: lesson.status,
-    meetLink: lesson.meetLink,
     prepStatus: lesson.prepStatus,
     hasSummary: Boolean(lesson.summary),
-    fromGoogle: Boolean(lesson.calendarEventId && !lesson.calendarEventId.startsWith("demo-")),
   }));
 
-  const locale = teacher.locale || "ja";
+  const locale = teacherFull.locale || "ja";
 
   return (
-    <AppShell active="calendar">
-      <header className="page-header">
-        <div className="page-header-text">
-          <h1 className="h1">{t("title")}</h1>
-          <p className="muted">{t("subtitle")}</p>
-        </div>
-        <div className="page-header-actions">
-          {!googleConnected ? (
-            <a className="btn" href="/api/google/connect">
-              {t("connectGoogle")}
-            </a>
-          ) : (
-            <form action={syncGoogleCalendar}>
-              <button className="btn" type="submit">
-                {t("syncNow")}
-              </button>
-            </form>
-          )}
-          <a className="btn secondary" href="https://calendar.google.com/" target="_blank" rel="noreferrer">
-            {t("openGoogle")}
-          </a>
-        </div>
-      </header>
+    <AppShell active="calendar" personName={teacher.name}>
+      <PageHeading
+        icon={CalendarDays}
+        title={t("title")}
+        subtitle={t("subtitle")}
+        actions={<span className="chip">{timeZone}</span>}
+      />
 
       <div className="panel">
-        <div className="panel-header">
-          <h2>{googleConnected ? t("connected") : t("notConnected")}</h2>
-          <span className={`chip ${googleConnected ? "done" : "soon"}`}>
-            {timeZone}
-          </span>
-        </div>
+        <PanelTitle icon={CalendarDays}>{t("localCalendar")}</PanelTitle>
         <p className="muted" style={{ marginTop: 0 }}>
-          {googleConnected ? t("syncNoteConnected") : t("syncNote")}
+          {t("syncNote")}
         </p>
-        {sp.synced === "1" && <p className="chip done">{t("justSynced")}</p>}
-        {syncMeta && (
-          <p className="muted" style={{ marginTop: "0.5rem", fontSize: "0.85rem" }}>
-            {t("syncStats", {
-              scanned: syncMeta.scanned,
-              imported: syncMeta.imported,
-              updated: syncMeta.updated,
-              purged: syncMeta.purged,
-            })}
-          </p>
-        )}
       </div>
 
       {pending.length > 0 && (
         <div className="panel">
-          <div className="panel-header">
-            <h2>{t("pending")}</h2>
-            <span className="chip soon">{pending.length}</span>
-          </div>
+          <PanelTitle
+            icon={Clock3}
+            trailing={<span className="chip soon">{pending.length}</span>}
+          >
+            {t("pending")}
+          </PanelTitle>
           {pending.map((b) => (
             <div className="list-row" key={b.id}>
               <div className="list-row-main">
@@ -206,6 +165,7 @@ export default async function CalendarPage({
                   <input type="hidden" name="id" value={b.id} />
                   <input type="hidden" name="decision" value="approve" />
                   <button className="btn sm" type="submit">
+                    <UiIcon icon={Check} size={14} />
                     {common("approve")}
                   </button>
                 </form>
@@ -213,6 +173,7 @@ export default async function CalendarPage({
                   <input type="hidden" name="id" value={b.id} />
                   <input type="hidden" name="decision" value="decline" />
                   <button className="btn danger sm" type="submit">
+                    <UiIcon icon={X} size={14} />
                     {common("decline")}
                   </button>
                 </form>
@@ -223,14 +184,19 @@ export default async function CalendarPage({
       )}
 
       <div className="panel">
-        <div className="cal-view-tabs" role="tablist" aria-label="Calendar view">
+        <div
+          className="cal-view-tabs"
+          role="tablist"
+          aria-label="Calendar view"
+        >
           <Link
             className={`btn ${view === "days" ? "" : "secondary"}`}
             href={`/calendar?view=days&start=${todayYmd}`}
             role="tab"
             aria-selected={view === "days"}
           >
-            {t("viewDays")}
+            <UiIcon icon={CalendarDays} size={14} />
+            {t("viewWeek")}
           </Link>
           <Link
             className={`btn ${view === "month" ? "" : "secondary"}`}
@@ -238,13 +204,14 @@ export default async function CalendarPage({
             role="tab"
             aria-selected={view === "month"}
           >
+            <UiIcon icon={CalendarDays} size={14} />
             {t("viewMonth")}
           </Link>
         </div>
 
         {view === "days" ? (
           <FiveDayCalendar
-            days={fiveDays}
+            days={weekDays}
             lessons={calendarLessons}
             timeZone={timeZone}
             todayYmd={todayYmd}
@@ -255,7 +222,6 @@ export default async function CalendarPage({
               today: t("todayBtn"),
               openRecord: t("openRecord"),
               openLesson: common("openLesson"),
-              joinMeet: t("joinMeet"),
             }}
           />
         ) : (
@@ -274,7 +240,6 @@ export default async function CalendarPage({
               today: t("todayBtn"),
               openRecord: t("openRecord"),
               openLesson: common("openLesson"),
-              joinMeet: t("joinMeet"),
               openPrep: t("openPrep"),
               finished: t("finished"),
               upcoming: t("upcoming"),

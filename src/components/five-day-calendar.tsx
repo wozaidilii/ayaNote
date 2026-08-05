@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, UiIcon } from "@/components/icons";
 import type { CalendarLessonItem } from "@/components/month-calendar";
 import { formatInTz, wallTimeToUtc, ymdInTz } from "@/lib/timezone";
 
@@ -31,7 +32,7 @@ export function FiveDayCalendar({
   nextStart,
   labels,
 }: {
-  days: string[]; // yyyy-MM-dd × 5
+  days: string[]; // yyyy-MM-dd × 7 (week)
   lessons: CalendarLessonItem[];
   timeZone: string;
   todayYmd: string;
@@ -42,7 +43,6 @@ export function FiveDayCalendar({
     today: string;
     openRecord: string;
     openLesson: string;
-    joinMeet: string;
   };
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -89,7 +89,7 @@ export function FiveDayCalendar({
             href={`/calendar?view=days&start=${prevStart}`}
             aria-label="Previous days"
           >
-            ‹
+            <UiIcon icon={ChevronLeft} size={18} />
           </Link>
           <h2 className="month-cal-title">
             {formatInTz(
@@ -109,7 +109,7 @@ export function FiveDayCalendar({
             href={`/calendar?view=days&start=${nextStart}`}
             aria-label="Next days"
           >
-            ›
+            <UiIcon icon={ChevronRight} size={18} />
           </Link>
           <Link
             className="btn secondary"

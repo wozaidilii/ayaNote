@@ -1,10 +1,11 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
+import { CalendarPlus } from "@/components/icons";
 import { SlotPicker } from "@/components/slot-picker";
+import { EmptyState, PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
 
 export default async function StudentBookPage({
   searchParams,
@@ -17,7 +18,7 @@ export default async function StudentBookPage({
     getTranslations("studentBook"),
     getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({
-      where: { email: DEMO_TEACHER_EMAIL },
+      where: { id: active.teacherId },
       include: {
         availabilityRules: true,
         blackoutDates: true,
@@ -42,7 +43,8 @@ export default async function StudentBookPage({
     minNoticeHours: teacher.availabilityRules?.minNoticeHours ?? 24,
     slotMinutes: 60,
     maxWeeklyLessons: teacher.availabilityRules?.maxWeeklyLessons ?? 6,
-    timezone: teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
+    timezone:
+      teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
   };
 
   const [busyLessons, pending] = await Promise.all([
@@ -84,17 +86,17 @@ export default async function StudentBookPage({
 
   return (
     <AppShell active="book" personName={student.name}>
-      <h1 className="h1">{t("title")}</h1>
-      <p className="muted">
-        {t("subtitle")} · {student.name}
-      </p>
+      <PageHeading
+        icon={CalendarPlus}
+        title={t("title")}
+        subtitle={
+          <>
+            {t("subtitle")} · {student.name}
+          </>
+        }
+      />
 
-      {sp.ok === "requested" && <p className="chip done">{t("okRequested")}</p>}
-      {sp.err === "booking_conflict" && <p className="chip">{t("errConflict")}</p>}
-      {sp.err === "half_hour" && <p className="chip">{t("errHalfHour")}</p>}
-      {sp.err === "invalid_time" && <p className="chip">{t("errInvalidTime")}</p>}
-
-      <div className="panel" style={{ marginTop: "1.1rem" }}>
+      <div className="panel">
         <span className="pixel-banner">{t("slotRule")}</span>
         <p style={{ marginBottom: 0, marginTop: "0.7rem" }}>{t("slotHint")}</p>
       </div>
@@ -126,8 +128,8 @@ export default async function StudentBookPage({
 
       {student.bookingRequests.length === 0 && (
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>{t("myBookings")}</h2>
-          <p className="muted">{common("noItems")}</p>
+          <PanelTitle icon={CalendarPlus}>{t("myBookings")}</PanelTitle>
+          <EmptyState icon={CalendarPlus}>{common("noItems")}</EmptyState>
         </div>
       )}
     </AppShell>

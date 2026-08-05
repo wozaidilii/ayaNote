@@ -1,10 +1,15 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
-import { PrepWorkspace, type PrepLessonItem } from "@/components/prep-workspace";
+import {
+  PrepWorkspace,
+  type PrepLessonItem,
+} from "@/components/prep-workspace";
+import { NotebookPen } from "@/components/icons";
+import { PageHeading } from "@/components/ui-heading";
 import { courseTypeLabel } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { parsePrepRefs } from "@/lib/prep-refs";
-import { DEMO_TEACHER_EMAIL } from "@/lib/session";
+import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 
 export const maxDuration = 60;
@@ -15,10 +20,10 @@ export default async function PrepPage({
   searchParams: Promise<{ lesson?: string }>;
 }) {
   const sp = await searchParams;
-  const [t, common, teacher] = await Promise.all([
+  const teacher = await requireTeacher();
+  const [t, common] = await Promise.all([
     getTranslations("prep"),
     getTranslations("common"),
-    prisma.teacher.findUniqueOrThrow({ where: { email: DEMO_TEACHER_EMAIL } }),
   ]);
   const timeZone = normalizeTimezone(teacher.timezone);
 
@@ -56,7 +61,11 @@ export default async function PrepPage({
   let queue = nextByStudent;
   if (sp.lesson && !queue.some((l) => l.id === sp.lesson)) {
     const linked = upcoming.find((l) => l.id === sp.lesson);
-    if (linked) queue = [linked, ...queue.filter((l) => l.studentId !== linked.studentId)];
+    if (linked)
+      queue = [
+        linked,
+        ...queue.filter((l) => l.studentId !== linked.studentId),
+      ];
   }
 
   const items: PrepLessonItem[] = queue.map((lesson) => ({
@@ -80,17 +89,18 @@ export default async function PrepPage({
 
   // Put requested lesson first in client selection via URL; component reads ?lesson=
   if (sp.lesson && items.length > 1) {
-    items.sort((a, b) => (a.id === sp.lesson ? -1 : b.id === sp.lesson ? 1 : 0));
+    items.sort((a, b) =>
+      a.id === sp.lesson ? -1 : b.id === sp.lesson ? 1 : 0,
+    );
   }
 
   return (
-    <AppShell active="prep">
-      <header className="page-header">
-        <div className="page-header-text">
-          <h1 className="h1">{t("title")}</h1>
-          <p className="muted">{t("subtitle")}</p>
-        </div>
-      </header>
+    <AppShell active="prep" personName={teacher.name}>
+      <PageHeading
+        icon={NotebookPen}
+        title={t("title")}
+        subtitle={t("subtitle")}
+      />
 
       <PrepWorkspace
         lessons={items}

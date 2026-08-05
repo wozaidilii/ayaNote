@@ -1,6 +1,6 @@
-import { getActiveStudent } from "@/lib/active-student";
+import { getActiveStudentOrNull } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
-import { DEMO_TEACHER_EMAIL, getSession } from "@/lib/session";
+import { getSession } from "@/lib/session";
 
 export async function getAccessibleLesson(lessonId: string) {
   const lesson = await prisma.lesson.findUnique({
@@ -25,12 +25,15 @@ export async function getAccessibleLesson(lessonId: string) {
   if (!lesson)
     return { ok: false as const, status: 404 as const, error: "not_found" };
 
-  const { role } = await getSession();
-  if (role === "teacher") {
+  const session = await getSession();
+  if (session.role === "teacher" && session.teacherId) {
+    if (lesson.teacherId !== session.teacherId) {
+      return { ok: false as const, status: 403 as const, error: "forbidden" };
+    }
     const teacher = await prisma.teacher.findUnique({
-      where: { email: DEMO_TEACHER_EMAIL },
+      where: { id: session.teacherId },
     });
-    if (!teacher || lesson.teacherId !== teacher.id) {
+    if (!teacher) {
       return { ok: false as const, status: 403 as const, error: "forbidden" };
     }
     return {
@@ -41,14 +44,18 @@ export async function getAccessibleLesson(lessonId: string) {
     };
   }
 
-  const student = await getActiveStudent();
-  if (lesson.studentId !== student.id) {
-    return { ok: false as const, status: 403 as const, error: "forbidden" };
+  if (session.role === "student") {
+    const student = await getActiveStudentOrNull();
+    if (!student || lesson.studentId !== student.id) {
+      return { ok: false as const, status: 403 as const, error: "forbidden" };
+    }
+    return {
+      ok: true as const,
+      role: "student" as const,
+      lesson,
+      actorName: student.name,
+    };
   }
-  return {
-    ok: true as const,
-    role: "student" as const,
-    lesson,
-    actorName: student.name,
-  };
+
+  return { ok: false as const, status: 403 as const, error: "forbidden" };
 }
