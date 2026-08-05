@@ -16,15 +16,9 @@ async function canAccessLesson(lessonId: string) {
   if (!lesson) return { ok: false as const, status: 404, error: "not_found" };
 
   const session = await getSession();
+  // Transcription / summary is teacher-only (not student, not guest).
   if (session.role === "teacher" && session.teacherId) {
     if (lesson.teacherId !== session.teacherId) {
-      return { ok: false as const, status: 403, error: "forbidden" };
-    }
-    return { ok: true as const, lesson };
-  }
-
-  if (session.role === "student" && session.studentId) {
-    if (lesson.studentId !== session.studentId) {
       return { ok: false as const, status: 403, error: "forbidden" };
     }
     return { ok: true as const, lesson };

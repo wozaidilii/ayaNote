@@ -1,8 +1,13 @@
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
+import { joinClassroomAsGuest } from "@/app/actions";
 import { ClassroomWorkspace } from "@/components/classroom-workspace";
+import { LogIn, UiIcon, Video } from "@/components/icons";
 import { courseTypeLabel } from "@/lib/ai";
-import { getAccessibleLesson } from "@/lib/classroom-access";
+import {
+  getAccessibleLesson,
+  getLessonForGuestJoin,
+} from "@/lib/classroom-access";
 import {
   emptyClassroomDoc,
   parseClassroomDoc,
@@ -24,10 +29,55 @@ export default async function ClassroomPage({
   const { id } = await params;
   const sp = await searchParams;
   const access = await getAccessibleLesson(id);
-  if (!access.ok) notFound();
+  const t = await getTranslations("classroom");
+
+  if (!access.ok) {
+    const lesson = await getLessonForGuestJoin(id);
+    if (!lesson || lesson.status === "cancelled") notFound();
+
+    const timeZone = normalizeTimezone(lesson.teacher.timezone);
+    return (
+      <div className="hero">
+        <div className="hero-card">
+          <h1 className="h1 page-title">
+            <UiIcon icon={Video} className="page-title-icon" size={22} />
+            <span>{t("guestJoinTitle")}</span>
+          </h1>
+          <p className="muted">
+            {t("guestJoinSubtitle", {
+              teacher: lesson.teacher.name,
+              when: formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone),
+            })}
+          </p>
+          <form
+            className="panel"
+            action={joinClassroomAsGuest}
+            style={{ marginTop: "1rem" }}
+          >
+            <input type="hidden" name="lessonId" value={lesson.id} />
+            <div className="field">
+              <label htmlFor="guest-name">{t("guestName")}</label>
+              <input
+                id="guest-name"
+                name="name"
+                type="text"
+                defaultValue="Guest"
+                maxLength={48}
+                autoComplete="nickname"
+                required
+              />
+            </div>
+            <button className="btn" type="submit">
+              <UiIcon icon={LogIn} size={15} />
+              {t("guestJoinSubmit")}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const { lesson, role, actorName } = access;
-  const t = await getTranslations("classroom");
   const timeZone = normalizeTimezone(lesson.teacher.timezone);
   const isPast = lesson.status === "completed" || lesson.status === "cancelled";
 
@@ -52,7 +102,11 @@ export default async function ClassroomPage({
   }
 
   const titleLine =
-    role === "teacher" ? lesson.student.name : lesson.teacher.name;
+    role === "teacher"
+      ? lesson.student.name
+      : role === "guest"
+        ? `${lesson.teacher.name} · ${lesson.student.name}`
+        : lesson.teacher.name;
   const metaLine = `${formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone)} – ${formatInTz(lesson.endsAt, "HH:mm", timeZone)} · ${courseTypeLabel(lesson.student.courseType)} · ${lesson.student.level}${isPast ? ` · ${t("pastChip")}` : ""}`;
 
   return (
@@ -72,7 +126,9 @@ export default async function ClassroomPage({
         role={role}
         titleLine={titleLine}
         metaLine={metaLine}
-        backHref={role === "teacher" ? "/today" : "/student"}
+        backHref={
+          role === "teacher" ? "/today" : role === "student" ? "/student" : "/"
+        }
         lessonRoomHref={role === "teacher" ? `/lessons/${lesson.id}` : null}
         labels={{
           connecting: t("connecting"),
@@ -93,6 +149,8 @@ export default async function ClassroomPage({
           statusLive: t("statusLive"),
           statusError: t("statusError"),
           screenShare: t("screenShare"),
+          copyLink: t("copyLink"),
+          linkCopied: t("linkCopied"),
         }}
       />
     </div>

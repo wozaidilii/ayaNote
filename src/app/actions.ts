@@ -8,6 +8,7 @@ import { courseTypeLabel, generatePrepDraft, getAiProvider } from "@/lib/ai";
 import { applyTranscriptToLesson } from "@/lib/drive-transcript";
 import { clearAuthSession, setAuthSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { createGuestId, setGuestSession } from "@/lib/guest-session";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
 import type { PrepRefs } from "@/lib/prep-refs";
 import { LESSON_MINUTES, blackoutDateFromYmd } from "@/lib/scheduling";
@@ -38,6 +39,29 @@ export async function loginTeacher(formData: FormData) {
 export async function logout() {
   await clearAuthSession();
   redirect("/");
+}
+
+/** Guest join for a shareable classroom link (no account). */
+export async function joinClassroomAsGuest(formData: FormData) {
+  const lessonId = String(formData.get("lessonId") ?? "").trim();
+  const rawName = String(formData.get("name") ?? "").trim();
+  const name = (rawName || "Guest").slice(0, 48);
+  if (!lessonId) redirect("/");
+
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: { id: true, status: true },
+  });
+  if (!lesson || lesson.status === "cancelled") {
+    redirect("/");
+  }
+
+  await setGuestSession({
+    lessonId: lesson.id,
+    guestId: createGuestId(),
+    name,
+  });
+  redirect(`/classroom/${lesson.id}`);
 }
 
 /** Bind student session from invite token (reusable until regenerated/expired). */

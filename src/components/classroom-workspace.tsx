@@ -44,6 +44,8 @@ type Labels = {
   statusLive: string;
   statusError: string;
   screenShare: string;
+  copyLink: string;
+  linkCopied: string;
 };
 
 function MixedAudioRecorder({
@@ -281,7 +283,7 @@ export function ClassroomWorkspace({
   sttReady: boolean;
   initialDoc: TiptapDoc;
   userName: string;
-  role: "teacher" | "student";
+  role: "teacher" | "student" | "guest";
   titleLine: string;
   metaLine: string;
   backHref: string;
@@ -289,7 +291,8 @@ export function ClassroomWorkspace({
   labels: Labels;
 }) {
   const router = useRouter();
-  const userColor = role === "teacher" ? "#2563eb" : "#059669";
+  const userColor =
+    role === "teacher" ? "#5b6cff" : role === "guest" ? "#23a559" : "#059669";
   const [saveStatus, setSaveStatus] = useState<ClassroomSaveStatus>("idle");
   const [tokenInfo, setTokenInfo] = useState<{
     token: string;
@@ -300,7 +303,9 @@ export function ClassroomWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [recordActive, setRecordActive] = useState(false);
   const [userLeftCall, setUserLeftCall] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const pendingUploadRef = useRef(false);
+  const canEndAndTranscribe = role === "teacher";
 
   const docKey = useMemo(() => JSON.stringify(initialDoc), [initialDoc]);
 
@@ -325,13 +330,14 @@ export function ClassroomWorkspace({
         return;
       }
       setTokenInfo({ token: data.token, url: data.url });
-      setRecordActive(true);
+      // Only the teacher records for End & transcribe.
+      setRecordActive(role === "teacher");
     } catch {
       setError(labels.errorToken);
     } finally {
       setLoading(false);
     }
-  }, [ending, isPast, labels.errorToken, lessonId, livekitReady]);
+  }, [ending, isPast, labels.errorToken, lessonId, livekitReady, role]);
 
   useEffect(() => {
     if (!isPast && livekitReady && !tokenInfo && !userLeftCall && !ending) {
@@ -340,9 +346,9 @@ export function ClassroomWorkspace({
   }, [ending, isPast, join, livekitReady, tokenInfo, userLeftCall]);
 
   const uploadAndSummarize = (blob: Blob) => {
+    if (role !== "teacher") return;
     const form = new FormData();
     form.append("audio", blob, "classroom.webm");
-    // Kick off STT + summary in the background; leave Classroom immediately.
     void fetch(`/api/lessons/${lessonId}/transcribe`, {
       method: "POST",
       body: form,
@@ -350,11 +356,7 @@ export function ClassroomWorkspace({
     pendingUploadRef.current = false;
     setTokenInfo(null);
     setRecordActive(false);
-    if (role === "teacher") {
-      router.replace(`/lessons/${lessonId}?ok=summarizing`);
-    } else {
-      router.replace(`/student/history`);
-    }
+    router.replace(`/lessons/${lessonId}?ok=summarizing`);
   };
 
   const onChunk = useCallback(
@@ -367,6 +369,7 @@ export function ClassroomWorkspace({
   );
 
   const endAndTranscribe = () => {
+    if (!canEndAndTranscribe) return;
     if (!sttReady) {
       setError(labels.sttMissing);
       return;
@@ -395,6 +398,17 @@ export function ClassroomWorkspace({
     setUserLeftCall(true);
     setRecordActive(false);
     setTokenInfo(null);
+  };
+
+  const copyShareLink = async () => {
+    const url = `${window.location.origin}/classroom/${lessonId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
   };
 
   const board = (
@@ -432,14 +446,16 @@ export function ClassroomWorkspace({
         {inCall && (
           <>
             <ScreenShareButton label={labels.screenShare} />
-            <button
-              className="btn sm"
-              type="button"
-              disabled={ending || !sttReady}
-              onClick={endAndTranscribe}
-            >
-              {ending ? labels.ending : labels.endAndTranscribe}
-            </button>
+            {canEndAndTranscribe && (
+              <button
+                className="btn sm"
+                type="button"
+                disabled={ending || !sttReady}
+                onClick={endAndTranscribe}
+              >
+                {ending ? labels.ending : labels.endAndTranscribe}
+              </button>
+            )}
             <button
               className="btn secondary sm"
               type="button"
@@ -450,6 +466,13 @@ export function ClassroomWorkspace({
             </button>
           </>
         )}
+        <button
+          className="btn secondary sm"
+          type="button"
+          onClick={() => void copyShareLink()}
+        >
+          {linkCopied ? labels.linkCopied : labels.copyLink}
+        </button>
         {!isPast && livekitReady && userLeftCall && !tokenInfo && (
           <button
             className="btn sm"
@@ -465,9 +488,11 @@ export function ClassroomWorkspace({
             Room
           </a>
         )}
-        <a className="btn ghost sm" href={backHref}>
-          ←
-        </a>
+        {role !== "guest" && (
+          <a className="btn ghost sm" href={backHref}>
+            ←
+          </a>
+        )}
       </div>
     </header>
   );

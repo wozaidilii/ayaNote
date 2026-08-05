@@ -57,7 +57,9 @@
     "subtitle": "これから始まるレッスンと一行コンテキスト",
     "prepStatus": "教案",
     "context": "前回フォーカス",
-    "openClassroom": "Classroomを開く"
+    "openClassroom": "Classroomを開く",
+    "startClass": "授業を開始",
+    "startClassEmpty": "この時間帯に開始できる授業がありません。予約を承認するかカレンダーを開いてください。"
   },
   "calendar": {
     "title": "カレンダー",
@@ -260,7 +262,13 @@
     "screenShare": "画面共有",
     "enlargeVideo": "ビデオを拡大",
     "restoreBoard": "教案に戻る",
-    "clickBoardReturn": "教案をクリックして戻る"
+    "clickBoardReturn": "教案をクリックして戻る",
+    "copyLink": "リンクをコピー",
+    "linkCopied": "コピーしました",
+    "guestJoinTitle": "Classroomに参加",
+    "guestJoinSubtitle": "{teacher} · {when}",
+    "guestName": "表示名",
+    "guestJoinSubmit": "参加する"
   },
   "login": {
     "title": "先生ログイン",

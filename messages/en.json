@@ -76,7 +76,9 @@
     "subtitle": "Upcoming lessons with one-line context",
     "prepStatus": "Prep",
     "context": "Last focus",
-    "openClassroom": "Open Classroom"
+    "openClassroom": "Open Classroom",
+    "startClass": "Start class",
+    "startClassEmpty": "No class to start in this window — approve a booking or open Calendar."
   },
   "calendar": {
     "title": "Calendar",
@@ -279,6 +281,12 @@
     "screenShare": "Share screen",
     "enlargeVideo": "Enlarge video",
     "restoreBoard": "Show board",
-    "clickBoardReturn": "Click board to return"
+    "clickBoardReturn": "Click board to return",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied",
+    "guestJoinTitle": "Join classroom",
+    "guestJoinSubtitle": "{teacher} · {when}",
+    "guestName": "Display name",
+    "guestJoinSubmit": "Join"
   }
 }

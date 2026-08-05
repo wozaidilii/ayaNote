@@ -28,6 +28,7 @@ export default async function TodayPage() {
 
   const timeZone = normalizeTimezone(teacher.timezone);
   const { start, end } = rollingDayWindowInTz(timeZone, 2);
+  const now = new Date();
 
   const lessons = await prisma.lesson.findMany({
     where: {
@@ -52,6 +53,15 @@ export default async function TodayPage() {
     orderBy: { startsAt: "asc" },
   });
 
+  const nextClass =
+    lessons.find(
+      (l) =>
+        l.status !== "completed" &&
+        l.endsAt.getTime() >= now.getTime() - 30 * 60_000,
+    ) ??
+    lessons.find((l) => l.status !== "completed") ??
+    null;
+
   return (
     <AppShell active="today" personName={teacher.name}>
       <PageHeading
@@ -64,6 +74,22 @@ export default async function TodayPage() {
         }
         actions={
           <>
+            {nextClass ? (
+              <a
+                className="btn"
+                href={`/classroom/${nextClass.id}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <UiIcon icon={Video} size={15} />
+                {t("startClass")}
+              </a>
+            ) : (
+              <button className="btn" type="button" disabled>
+                <UiIcon icon={Video} size={15} />
+                {t("startClass")}
+              </button>
+            )}
             <Link className="btn secondary" href="/calendar">
               <UiIcon icon={CalendarDays} size={15} />
               {nav("calendar")}
@@ -75,6 +101,12 @@ export default async function TodayPage() {
           </>
         }
       />
+
+      {!nextClass && (
+        <p className="muted" style={{ marginTop: "-0.75rem" }}>
+          {t("startClassEmpty")}
+        </p>
+      )}
 
       <div className="panel">
         <PanelTitle

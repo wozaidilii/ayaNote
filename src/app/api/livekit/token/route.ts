@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveStudentOrNull } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
+import { readGuestSessionForLesson } from "@/lib/guest-session";
 import { createLivekitToken, livekitConfigured } from "@/lib/livekit";
 import { getSession } from "@/lib/session";
 
@@ -71,6 +72,20 @@ export async function POST(req: NextRequest) {
       ...issued,
       role: "student",
       displayName: student.name,
+    });
+  }
+
+  const guest = await readGuestSessionForLesson(lessonId);
+  if (guest) {
+    const issued = await createLivekitToken({
+      lessonId,
+      identity: `guest_${guest.guestId}`,
+      name: guest.name || "Guest",
+    });
+    return NextResponse.json({
+      ...issued,
+      role: "guest",
+      displayName: guest.name,
     });
   }
 
