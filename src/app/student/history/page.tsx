@@ -17,7 +17,10 @@ export default async function StudentHistoryPage() {
       include: {
         teacher: { select: { timezone: true } },
         lessons: {
-          where: { status: "completed" },
+          where: {
+            status: "completed",
+            summary: { is: { approved: true } },
+          },
           include: { summary: true },
           orderBy: { startsAt: "desc" },
         },

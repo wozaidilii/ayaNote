@@ -1,13 +1,19 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
-import { approveSummary, importTranscriptAndSummarize } from "@/app/actions";
+import {
+  approveSummary,
+  importTranscriptAndSummarize,
+  updateLessonStatus,
+} from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
-import { BookOpen, Video, UiIcon } from "@/components/icons";
+import { BookOpen, NotebookPen, Video, UiIcon } from "@/components/icons";
 import { SummaryGeneratingPanel } from "@/components/summary-generating-panel";
 import { PageHeading } from "@/components/ui-heading";
 import { courseTypeLabel, getAiProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
+import { isHeuristicSummaryNotes } from "@/lib/student-memory";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -101,6 +107,7 @@ export default async function LessonRoomPage({
       ? Boolean(process.env.DEEPSEEK_API_KEY)
       : Boolean(process.env.OPENAI_API_KEY ?? process.env.AI_GATEWAY_API_KEY);
   const summarizing = sp.ok === "summarizing" && !lesson.summary;
+  const heuristic = isHeuristicSummaryNotes(lesson.summary?.notes);
 
   return (
     <AppShell active="today" personName={teacher.name}>
@@ -133,9 +140,13 @@ export default async function LessonRoomPage({
         <span className="chip sky">
           {courseTypeLabel(lesson.student.courseType)}
         </span>
+        <span className={`chip ${lesson.status === "completed" ? "done" : "soon"}`}>
+          {t("lessonStatus")}: {lesson.status}
+        </span>
         <span className="chip">
           {hasAiKey ? t("aiReady", { provider }) : t("aiMissing", { provider })}
         </span>
+        {heuristic && <span className="chip">{t("heuristicBadge")}</span>}
         <a
           className="btn"
           href={`/classroom/${lesson.id}`}
@@ -145,9 +156,46 @@ export default async function LessonRoomPage({
           <UiIcon icon={Video} size={15} />
           {t("openClassroomTab")}
         </a>
+        <Link className="btn secondary" href={`/prep?lesson=${lesson.id}`}>
+          <UiIcon icon={NotebookPen} size={15} />
+          {t("openPrep")}
+        </Link>
+      </div>
+
+      <div className="panel" style={{ marginTop: "0.85rem" }}>
+        <h2 style={{ margin: 0 }}>{t("pipelineTitle")}</h2>
+        <p className="muted" style={{ marginTop: "0.4rem" }}>
+          {t("pipelineHint")}
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+          <form action={updateLessonStatus}>
+            <input type="hidden" name="lessonId" value={lesson.id} />
+            <input type="hidden" name="status" value="in_progress" />
+            <button
+              className="btn secondary sm"
+              type="submit"
+              disabled={lesson.status === "in_progress"}
+            >
+              {t("markInProgress")}
+            </button>
+          </form>
+          <form action={updateLessonStatus}>
+            <input type="hidden" name="lessonId" value={lesson.id} />
+            <input type="hidden" name="status" value="completed" />
+            <button
+              className="btn secondary sm"
+              type="submit"
+              disabled={lesson.status === "completed"}
+            >
+              {t("markComplete")}
+            </button>
+          </form>
+        </div>
       </div>
 
       {sp.ok === "summary" && <p className="chip done">{t("okSummary")}</p>}
+      {sp.ok === "approved" && <p className="chip done">{t("okApproved")}</p>}
+      {sp.ok === "status" && <p className="chip done">{t("okStatus")}</p>}
       {summarizing && <p className="chip soon">{t("summarizingChip")}</p>}
       {sp.ok === "livekit" && <p className="chip done">{t("okLivekit")}</p>}
       {sp.warn === "no_ai_key" && <p className="chip">{t("warnNoAiKey")}</p>}
@@ -208,6 +256,7 @@ export default async function LessonRoomPage({
               <input type="hidden" name="lessonId" value={lesson.id} />
 
               <h2 style={{ marginTop: 0 }}>{t("todayContent")}</h2>
+              {heuristic && <p className="chip">{t("heuristicWarn")}</p>}
               <div className="field">
                 <label htmlFor="todaySummary">{t("todaySummary")}</label>
                 <textarea
@@ -320,7 +369,7 @@ export default async function LessonRoomPage({
               </button>
               {lesson.summary.approved && (
                 <p className="muted" style={{ marginTop: "0.75rem" }}>
-                  Approved ✓
+                  {t("approvedNote")}
                 </p>
               )}
             </form>
@@ -343,6 +392,10 @@ export default async function LessonRoomPage({
             <strong>{common("nextFocus")}:</strong> {lastFocus || "—"}
           </p>
           <p>
+            <strong>{common("strengths")}:</strong>{" "}
+            {parseJsonArray(lesson.student.progress?.strengthsJson).join(" · ") || "—"}
+          </p>
+          <p>
             <strong>{common("weaknesses")}:</strong>{" "}
             {parseJsonArray(lesson.student.progress?.weaknessesJson).join(
               " · ",
@@ -356,8 +409,11 @@ export default async function LessonRoomPage({
           </ul>
           {lesson.prepDraft && (
             <div style={{ marginTop: "1rem" }}>
-              <h3>Prep draft</h3>
-              <p className="muted">{lesson.prepDraft.newFocus}</p>
+              <h3>{t("prepSidebar")}</h3>
+              <p className="muted">{lesson.prepDraft.newFocus || "—"}</p>
+              <Link className="btn secondary sm" href={`/prep?lesson=${lesson.id}`}>
+                {t("openPrep")}
+              </Link>
             </div>
           )}
         </aside>

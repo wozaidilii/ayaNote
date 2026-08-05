@@ -76,7 +76,11 @@
     "subtitle": "Upcoming lessons with one-line context",
     "prepStatus": "Prep",
     "context": "Last focus",
-    "openClassroom": "Open Classroom"
+    "openClassroom": "Open Classroom",
+    "openPrep": "Open prep",
+    "pendingBookings": "Pending booking requests",
+    "bookingConflict": "That time conflicts with an existing lesson. Decline or pick another slot.",
+    "bookingUpdated": "Booking decision saved."
   },
   "calendar": {
     "title": "Calendar",
@@ -162,7 +166,16 @@
     "generatingBody": "Transcribing classroom audio and drafting the lesson summary. This page will update when ready.",
     "generatingFailed": "Summary is taking too long. Paste a transcript below as a fallback, or reopen Classroom and try End & transcribe again.",
     "warnNoAiKey": "No AI API key on server — summary used a local heuristic. Set DEEPSEEK_API_KEY for better results.",
-    "errEmpty": "Paste a transcript before generating."
+    "errEmpty": "Paste a transcript before generating.",
+    "lessonStatus": "Lesson",
+    "pipelineTitle": "Lesson pipeline",
+    "pipelineHint": "Mark progress, review transcript/summary, approve memory, then open prep for the next class.",
+    "markInProgress": "Mark in progress",
+    "markComplete": "Mark complete",
+    "openPrep": "Open prep",
+    "okApproved": "Summary approved and merged into student memory (deduped).",
+    "okStatus": "Lesson status updated.",
+    "heuristicBadge": "Heuristic summary"
   },
   "prep": {
     "title": "Prep Queue",
@@ -194,7 +207,10 @@
     "refsNone": "None yet",
     "placeholderLine1": "Pulling course track, goals, and level…",
     "placeholderLine2": "Reading recent lesson summaries & next focus…",
-    "placeholderLine3": "Mixing vocab bank and weak points into sections…"
+    "placeholderLine3": "Mixing vocab bank and weak points into sections…",
+    "sourceAi": "Generated with AI",
+    "sourceHeuristic": "Local heuristic (no AI key / AI failed) — edit before class",
+    "sourceEdited": "Teacher-edited draft"
   },
   "availability": {
     "title": "Availability",
@@ -208,7 +224,9 @@
     "blackouts": "Blackout dates",
     "blackoutReason": "Reason (optional)",
     "addBlackout": "Add blackout",
-    "remove": "Remove"
+    "remove": "Remove",
+    "bookingConflict": "That time conflicts with an existing lesson.",
+    "bookingUpdated": "Booking decision saved."
   },
   "settings": {
     "title": "Settings",
@@ -232,6 +250,8 @@
     "enterClassroom": "Enter AyaNote Classroom",
     "status": "Status",
     "pending": "Pending requests",
+    "notices": "Booking updates",
+    "bookCta": "Book / reschedule",
     "noUpcoming": "No upcoming lesson yet. Book a slot or wait for your teacher to approve."
   },
   "studentBook": {
@@ -249,7 +269,11 @@
     "confirm": "Confirm this slot",
     "duration": "Duration",
     "cancel": "Cancel",
-    "myBookings": "My bookings"
+    "myBookings": "My bookings",
+    "okRequested": "Request sent — wait for teacher confirmation.",
+    "errConflict": "That slot conflicts with an existing lesson.",
+    "errHalfHour": "Lessons must start on the hour or half-hour.",
+    "errInvalidTime": "Invalid start time."
   },
   "studentHistory": {
     "title": "Lesson history",

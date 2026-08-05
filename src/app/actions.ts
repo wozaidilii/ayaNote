@@ -5,13 +5,21 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
 import { courseTypeLabel, generatePrepDraft, getAiProvider } from "@/lib/ai";
+import { checkBookingConflict, isHalfHourAlignedMinute } from "@/lib/booking";
 import { applyTranscriptToLesson } from "@/lib/drive-transcript";
 import { clearAuthSession, setAuthSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
 import type { PrepRefs } from "@/lib/prep-refs";
+import { parsePrepRefs, withEditedGeneration } from "@/lib/prep-refs";
 import { LESSON_MINUTES, blackoutDateFromYmd } from "@/lib/scheduling";
 import { requireStudent, requireTeacher } from "@/lib/session";
+import {
+  deriveStrengths,
+  mergeStringLists,
+  planGrammarMerge,
+  planVocabMerge,
+} from "@/lib/student-memory";
 import { formatInTz, normalizeTimezone, parseIsoOrLocal } from "@/lib/timezone";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
@@ -158,68 +166,123 @@ export async function approveSummary(formData: FormData) {
     }
   })();
 
-  for (const v of vocab.slice(0, 20)) {
-    if (!v.term) continue;
-    await prisma.vocabItem.create({
-      data: {
-        studentId: lesson.studentId,
-        term: v.term,
-        reading: v.reading ?? "",
-        meaning: v.meaning ?? "",
-      },
-    });
+  const existingVocab = await prisma.vocabItem.findMany({
+    where: { studentId: lesson.studentId },
+  });
+  for (const op of planVocabMerge(vocab, existingVocab)) {
+    if (op.action === "create") {
+      await prisma.vocabItem.create({
+        data: {
+          studentId: lesson.studentId,
+          term: op.term,
+          reading: op.reading,
+          meaning: op.meaning,
+        },
+      });
+    } else {
+      await prisma.vocabItem.update({
+        where: { id: op.id },
+        data: { reading: op.reading, meaning: op.meaning },
+      });
+    }
   }
 
-  for (const g of grammar.slice(0, 20)) {
-    if (!g.pattern) continue;
-    await prisma.grammarItem.create({
-      data: {
-        studentId: lesson.studentId,
-        pattern: g.pattern,
-        notes: g.notes ?? "",
-      },
-    });
+  const existingGrammar = await prisma.grammarItem.findMany({
+    where: { studentId: lesson.studentId },
+  });
+  for (const op of planGrammarMerge(grammar, existingGrammar)) {
+    if (op.action === "create") {
+      await prisma.grammarItem.create({
+        data: {
+          studentId: lesson.studentId,
+          pattern: op.pattern,
+          notes: op.notes,
+        },
+      });
+    } else {
+      await prisma.grammarItem.update({
+        where: { id: op.id },
+        data: { notes: op.notes },
+      });
+    }
   }
 
   const topics = parseJsonArray(lesson.summary.topicsJson);
+  const mistakes = parseJsonArray(lesson.summary.mistakesJson);
+  const newStrengths = deriveStrengths(topics, mistakes);
   const existing = await prisma.progressSnapshot.findUnique({
     where: { studentId: lesson.studentId },
   });
-  const covered = Array.from(
-    new Set([
-      ...(existing ? parseJsonArray(existing.topicsCoveredJson) : []),
-      ...topics,
-    ]),
+  const covered = mergeStringLists(
+    existing ? parseJsonArray(existing.topicsCoveredJson) : [],
+    topics,
+    40,
+  );
+  const strengths = mergeStringLists(
+    existing ? parseJsonArray(existing.strengthsJson) : [],
+    newStrengths,
+    12,
+  );
+  const weaknesses = mergeStringLists(
+    existing ? parseJsonArray(existing.weaknessesJson) : [],
+    mistakes,
+    12,
   );
 
+  const alreadyCounted = lesson.status === "completed";
   await prisma.progressSnapshot.upsert({
     where: { studentId: lesson.studentId },
     create: {
       studentId: lesson.studentId,
       topicsCoveredJson: toJson(covered),
-      strengthsJson: toJson([]),
-      weaknessesJson: toJson(parseJsonArray(lesson.summary.mistakesJson)),
+      strengthsJson: toJson(strengths),
+      weaknessesJson: toJson(weaknesses),
       attendanceCount: 1,
       note: nextFocus,
     },
     update: {
       topicsCoveredJson: toJson(covered),
-      weaknessesJson: toJson(
-        Array.from(
-          new Set([
-            ...(existing ? parseJsonArray(existing.weaknessesJson) : []),
-            ...parseJsonArray(lesson.summary.mistakesJson),
-          ]),
-        ).slice(0, 12),
-      ),
-      attendanceCount: (existing?.attendanceCount ?? 0) + 1,
+      strengthsJson: toJson(strengths),
+      weaknessesJson: toJson(weaknesses),
+      attendanceCount: alreadyCounted
+        ? (existing?.attendanceCount ?? 1)
+        : (existing?.attendanceCount ?? 0) + 1,
       note: nextFocus,
     },
   });
 
+  if (lesson.status !== "completed") {
+    await prisma.lesson.update({
+      where: { id: lessonId },
+      data: { status: "completed" },
+    });
+  }
+
   revalidatePath(`/lessons/${lessonId}`);
   revalidatePath(`/students/${lesson.studentId}`);
+  revalidatePath("/student");
   revalidatePath("/student/history");
+  revalidatePath("/today");
+  redirect(`/lessons/${lessonId}?ok=approved`);
+}
+
+export async function updateLessonStatus(formData: FormData) {
+  const teacher = await requireTeacher();
+  const lessonId = String(formData.get("lessonId") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (!["scheduled", "in_progress", "completed", "cancelled"].includes(status)) {
+    redirect(`/lessons/${lessonId}?err=bad_status`);
+  }
+  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+  if (lesson.teacherId !== teacher.id) throw new Error("Not your lesson");
+  await prisma.lesson.update({
+    where: { id: lessonId },
+    data: { status },
+  });
+  revalidatePath(`/lessons/${lessonId}`);
+  revalidatePath("/today");
+  revalidatePath("/calendar");
+  redirect(`/lessons/${lessonId}?ok=status`);
 }
 
 async function writePrepDraftForLesson(lessonId: string) {
@@ -248,16 +311,17 @@ async function writePrepDraftForLesson(lessonId: string) {
     ? parseJsonArray(lesson.student.progress.weaknessesJson)
     : [];
   const vocab = lesson.student.vocabItems.map((v) => v.term);
-  const pastLessons = lesson.student.lessons.map((l) => {
+  const pastLessonLinks = lesson.student.lessons.map((l) => {
     const focus = l.summary?.nextFocus?.trim();
     const topics = l.summary
       ? parseJsonArray(l.summary.topicsJson).slice(0, 2)
       : [];
     const label = focus || topics.join(" / ") || "past lesson";
-    return label;
+    return { id: l.id, label };
   });
+  const pastLessons = pastLessonLinks.map((l) => l.label);
 
-  const draft = await generatePrepDraft({
+  const generated = await generatePrepDraft({
     studentName: lesson.student.name,
     level: lesson.student.level,
     courseType: lesson.student.courseType,
@@ -266,15 +330,18 @@ async function writePrepDraftForLesson(lessonId: string) {
     weaknesses,
     vocab,
   });
+  const { generationSource, ...draft } = generated;
 
   const refs: PrepRefs = {
     course: courseTypeLabel(lesson.student.courseType),
     level: lesson.student.level,
     goals: lesson.student.goals?.trim() || "",
     pastLessons,
+    pastLessonLinks,
     topics: [...new Set(lastTopics)].slice(0, 8),
     weaknesses: weaknesses.slice(0, 6),
     vocab: vocab.slice(0, 10),
+    generationSource,
   };
 
   await prisma.prepDraft.upsert({
@@ -371,10 +438,13 @@ export async function savePrepDraft(formData: FormData) {
     status,
   };
 
+  const existing = await prisma.prepDraft.findUnique({ where: { lessonId } });
+  const refs = withEditedGeneration(parsePrepRefs(existing?.refsJson));
+
   await prisma.prepDraft.upsert({
     where: { lessonId },
-    create: { lessonId, ...data },
-    update: data,
+    create: { lessonId, ...data, refsJson: toJson(refs) },
+    update: { ...data, refsJson: toJson(refs) },
   });
   await prisma.lesson.update({
     where: { id: lessonId },
@@ -470,6 +540,7 @@ export async function decideBooking(formData: FormData) {
   const teacher = await requireTeacher();
   const id = String(formData.get("id") ?? "");
   const decision = String(formData.get("decision") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "/availability");
   const request = await prisma.bookingRequest.findUniqueOrThrow({
     where: { id },
     include: { student: true },
@@ -477,17 +548,21 @@ export async function decideBooking(formData: FormData) {
   if (request.teacherId !== teacher.id) throw new Error("Not your booking");
 
   if (decision === "approve") {
-    const conflict = await prisma.lesson.findFirst({
+    const busy = await prisma.lesson.findMany({
       where: {
         teacherId: request.teacherId,
         status: { not: "cancelled" },
-        startsAt: { lt: request.requestedEnd },
-        endsAt: { gt: request.requestedStart },
-        ...(request.lessonId ? { id: { not: request.lessonId } } : {}),
       },
+      select: { id: true, startsAt: true, endsAt: true },
     });
-    if (conflict) {
-      throw new Error("Time conflict with an existing lesson");
+    const conflict = checkBookingConflict({
+      requestedStart: request.requestedStart,
+      requestedEnd: request.requestedEnd,
+      existing: busy,
+      excludeLessonId: request.lessonId,
+    });
+    if (!conflict.ok) {
+      redirect(`${returnTo}?err=booking_conflict`);
     }
 
     await prisma.bookingRequest.update({
@@ -528,6 +603,7 @@ export async function decideBooking(formData: FormData) {
   revalidatePath("/calendar");
   revalidatePath("/student");
   revalidatePath("/student/book");
+  redirect(`${returnTo}?ok=booking_${decision === "approve" ? "approved" : "declined"}`);
 }
 
 export async function createBookingRequest(formData: FormData) {
@@ -538,14 +614,31 @@ export async function createBookingRequest(formData: FormData) {
   const type = String(formData.get("type") ?? "book");
   const start = parseIsoOrLocal(String(formData.get("requestedStart") ?? ""));
   const note = String(formData.get("note") ?? "");
-  if (Number.isNaN(start.getTime())) throw new Error("Invalid start time");
+  if (Number.isNaN(start.getTime())) {
+    redirect("/student/book?err=invalid_time");
+  }
 
   const tz = normalizeTimezone(teacher.timezone);
   const minute = formatInTz(start, "mm", tz);
-  if (minute !== "00" && minute !== "30") {
-    throw new Error(
-      "Lessons must start on the hour or half-hour (e.g. 15:00 / 15:30)",
-    );
+  if (!isHalfHourAlignedMinute(minute)) {
+    redirect("/student/book?err=half_hour");
+  }
+
+  const end = addMinutes(start, LESSON_MINUTES);
+  const excludeLessonId =
+    type === "reschedule" ? String(formData.get("lessonId") || "") || null : null;
+  const busy = await prisma.lesson.findMany({
+    where: { teacherId: teacher.id, status: { not: "cancelled" } },
+    select: { id: true, startsAt: true, endsAt: true },
+  });
+  const conflict = checkBookingConflict({
+    requestedStart: start,
+    requestedEnd: end,
+    existing: busy,
+    excludeLessonId,
+  });
+  if (!conflict.ok) {
+    redirect("/student/book?err=booking_conflict");
   }
 
   await prisma.bookingRequest.create({
@@ -554,19 +647,18 @@ export async function createBookingRequest(formData: FormData) {
       studentId: student.id,
       type,
       requestedStart: start,
-      requestedEnd: addMinutes(start, LESSON_MINUTES),
+      requestedEnd: end,
       note,
       status: "pending",
-      lessonId:
-        type === "reschedule"
-          ? String(formData.get("lessonId") || "") || null
-          : null,
+      lessonId: excludeLessonId,
     },
   });
 
   revalidatePath("/student/book");
   revalidatePath("/availability");
   revalidatePath("/calendar");
+  revalidatePath("/today");
+  redirect("/student/book?ok=requested");
 }
 
 export async function cancelBookingRequest(formData: FormData) {

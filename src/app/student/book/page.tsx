@@ -7,7 +7,12 @@ import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
 
-export default async function StudentBookPage() {
+export default async function StudentBookPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; err?: string }>;
+}) {
+  const sp = await searchParams;
   const active = await getActiveStudent();
   const [t, common, teacher, student] = await Promise.all([
     getTranslations("studentBook"),

@@ -8,8 +8,10 @@ import { notFound } from "next/navigation";
 
 export default async function InvitePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ err?: string }>;
 }) {
   const { token } = await params;
   const t = await getTranslations("invite");
