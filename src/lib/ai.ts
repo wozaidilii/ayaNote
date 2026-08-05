@@ -72,9 +72,12 @@ function heuristicSummary(
     .filter(Boolean)
     .slice(0, 12);
   const topics = lines.slice(0, 5).map((l) => l.slice(0, 80));
+  const topicLine = topics[0] ?? "Continue conversation practice";
   return {
     topics: topics.length ? topics : ["General conversation practice"],
-    todaySummary: lines.slice(0, 6).join(" / ") || "Conversation practice.",
+    todaySummary:
+      lines.slice(0, 3).join(" ") ||
+      "Conversation practice covering everyday phrases.",
     priorReview: "No prior lesson memory available.",
     vocab: [],
     grammar: [],
@@ -82,7 +85,7 @@ function heuristicSummary(
     mistakes: [],
     homework:
       "Review today's conversation phrases aloud once and write 5 example sentences.",
-    nextFocus: topics[0] ?? "Continue conversation practice",
+    nextFocus: `Next lesson: deepen ${topicLine}. Warm up with today's phrases, then practice a short role-play and correct form accuracy.`,
     notes:
       reason ??
       "Generated locally without an AI API key. Set DEEPSEEK_API_KEY (default) or OPENAI_API_KEY. Edit before approving.",
@@ -180,8 +183,8 @@ export async function summarizeTranscript(
     const { object } = await generateObject({
       model,
       schema: summarySchema,
-      prompt: `You are an experienced Japanese 1v1 teacher writing a RICH lesson record for the next class prep.
-Be specific and useful — not a short bullet dump. Prefer Japanese for linguistic content; English glosses OK.
+      prompt: `You are an experienced Japanese 1v1 teacher writing a lesson record a teacher can scan in seconds, then use for next-class prep.
+Be specific and useful. Prefer Japanese for linguistic content; English glosses OK.
 
 Student: ${context.studentName ?? "unknown"}
 Course track: ${course}
@@ -196,15 +199,15 @@ Classroom board notes (collaborative lesson board written during class — treat
 ${(context.classroomBoard ?? "").trim().slice(0, 6000) || "n/a"}
 
 Return JSON with:
-- topics: 5–10 concrete topic phrases from TODAY (e.g. ビジネスメールの敬語 / 期間の表現)
-- todaySummary: 1–3 paragraphs covering what you practiced today (dialogue situations, themes, flow)
+- topics: 5–10 short highlight phrases from TODAY (scannable chips, e.g. ビジネスメールの敬語 / 期間の表現) — these are the lesson highlights
+- todaySummary: EXACTLY 2–4 sentences summarizing what you practiced today (situations, themes, flow). No long paragraphs or bullet dumps.
 - priorReview: how today's lesson recycled or should recycle previous vocab/grammar; if none, say what to recycle next time
 - vocab: 8–15 items from today (term, reading, meaning)
 - grammar: 4–8 patterns from today with short notes
 - examples: for EACH key grammar pattern (and/or last lesson's focus grammar), give 3–5 natural example sentences the student can reuse (keigo if business course; casual if casual talk; JLPT-style if jlpt_*)
 - mistakes: corrections like 「X」→「Y」with brief why
 - homework: concrete writing/speaking task matching the course track (2–4 sentences of instructions)
-- nextFocus: what to do next lesson
+- nextFocus: next-lesson direction in 2–4 sentences — goal + suggested practice angle a Prep draft can reuse directly
 - notes: teacher memo (injury talk, JLPT timeline, motivation, etc.)
 
 Match tone to course:

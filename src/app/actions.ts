@@ -138,7 +138,7 @@ export async function importTranscriptAndSummarize(formData: FormData) {
   await applyTranscriptToLesson({
     lessonId,
     rawText,
-    source: "meet_import",
+    source: "manual",
     tags,
   });
 
