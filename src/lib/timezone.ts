@@ -34,16 +34,25 @@ export function formatInTz(
   pattern: string,
   timeZone: string = DEFAULT_TIMEZONE,
 ): string {
-  const d = typeof date === "string" || typeof date === "number" ? new Date(date) : date;
+  const d =
+    typeof date === "string" || typeof date === "number"
+      ? new Date(date)
+      : date;
   if (Number.isNaN(d.getTime())) return "—";
   return formatInTimeZone(d, normalizeTimezone(timeZone), pattern);
 }
 
-export function ymdInTz(date: Date, timeZone: string = DEFAULT_TIMEZONE): string {
+export function ymdInTz(
+  date: Date,
+  timeZone: string = DEFAULT_TIMEZONE,
+): string {
   return formatInTz(date, "yyyy-MM-dd", timeZone);
 }
 
-export function weekdayInTz(date: Date, timeZone: string = DEFAULT_TIMEZONE): number {
+export function weekdayInTz(
+  date: Date,
+  timeZone: string = DEFAULT_TIMEZONE,
+): number {
   // ISO: 1=Mon … 7=Sun → JS: 0=Sun … 6=Sat
   const iso = Number(formatInTz(date, "i", timeZone));
   return iso === 7 ? 0 : iso;
@@ -57,7 +66,10 @@ export function wallTimeToUtc(
 ): Date {
   const [y, mo, d] = ymd.split("-").map(Number);
   const [h, mi] = hm.split(":").map(Number);
-  return fromZonedTime(new Date(y, mo - 1, d, h || 0, mi || 0, 0, 0), normalizeTimezone(timeZone));
+  return fromZonedTime(
+    new Date(y, mo - 1, d, h || 0, mi || 0, 0, 0),
+    normalizeTimezone(timeZone),
+  );
 }
 
 /** Start/end of a calendar day in the given timezone, as UTC Dates. */
@@ -66,7 +78,8 @@ export function dayBoundsInTz(
   timeZone: string = DEFAULT_TIMEZONE,
 ): { start: Date; end: Date; ymd: string } {
   const tz = normalizeTimezone(timeZone);
-  const ymd = typeof ymdOrDate === "string" ? ymdOrDate : ymdInTz(ymdOrDate, tz);
+  const ymd =
+    typeof ymdOrDate === "string" ? ymdOrDate : ymdInTz(ymdOrDate, tz);
   const start = wallTimeToUtc(ymd, "00:00", tz);
   const end = addDays(start, 1);
   return { start, end, ymd };
@@ -98,7 +111,10 @@ export function monthGridYm(
   const firstWeekday = weekdayInTz(firstUtc, tz); // 0=Sun
   // Monday-first grid like Google Calendar (many locales)
   const mondayOffset = (firstWeekday + 6) % 7;
-  const gridStart = addDays(wallTimeToUtc(firstYmd, "12:00", tz), -mondayOffset);
+  const gridStart = addDays(
+    wallTimeToUtc(firstYmd, "12:00", tz),
+    -mondayOffset,
+  );
 
   const weeks: { ymd: string; inMonth: boolean }[][] = [];
   let cursor = gridStart;
@@ -148,9 +164,28 @@ export function parseMonthParam(
   };
 }
 
-export function shiftMonth(year: number, monthIndex0: number, delta: number): string {
+export function shiftMonth(
+  year: number,
+  monthIndex0: number,
+  delta: number,
+): string {
   const d = new Date(Date.UTC(year, monthIndex0 + delta, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Monday (yyyy-MM-dd) of the ISO-style week that contains `ymd` in `timeZone`.
+ * Matches the month grid’s Monday-first weeks.
+ */
+export function startOfWeekMondayYmd(
+  ymd: string,
+  timeZone: string = DEFAULT_TIMEZONE,
+): string {
+  const tz = normalizeTimezone(timeZone);
+  const noon = wallTimeToUtc(ymd, "12:00", tz);
+  const weekday = weekdayInTz(noon, tz); // 0=Sun … 6=Sat
+  const mondayOffset = (weekday + 6) % 7; // Sun→6, Mon→0, … Sat→5
+  return ymdInTz(addDays(noon, -mondayOffset), tz);
 }
 
 /** N consecutive calendar days starting at ymd (inclusive), in the given timezone. */
@@ -169,7 +204,11 @@ export function consecutiveYmds(
   return out;
 }
 
-export function shiftYmd(ymd: string, deltaDays: number, timeZone: string = DEFAULT_TIMEZONE): string {
+export function shiftYmd(
+  ymd: string,
+  deltaDays: number,
+  timeZone: string = DEFAULT_TIMEZONE,
+): string {
   const noon = wallTimeToUtc(ymd, "12:00", timeZone);
   return ymdInTz(addDays(noon, deltaDays), timeZone);
 }
@@ -183,7 +222,9 @@ export function parseIsoOrLocal(raw: string): Date {
   if (!raw) return new Date(NaN);
   // Prefer true ISO / Z
   if (/Z$|[+-]\d{2}:\d{2}$/.test(raw) || raw.includes("T")) {
-    const d = parseISO(raw.includes("T") && !raw.includes(":") ? `${raw}:00` : raw);
+    const d = parseISO(
+      raw.includes("T") && !raw.includes(":") ? `${raw}:00` : raw,
+    );
     if (!Number.isNaN(d.getTime())) return d;
   }
   const d = new Date(raw);

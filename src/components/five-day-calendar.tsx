@@ -28,14 +28,17 @@ export function FiveDayCalendar({
   lessons,
   timeZone,
   todayYmd,
+  weekStartYmd,
   prevStart,
   nextStart,
   labels,
 }: {
-  days: string[]; // yyyy-MM-dd × 7 (week)
+  days: string[]; // yyyy-MM-dd × 7 (Mon–Sun)
   lessons: CalendarLessonItem[];
   timeZone: string;
   todayYmd: string;
+  /** Monday of the week that contains today — used by the Today control */
+  weekStartYmd: string;
   prevStart: string;
   nextStart: string;
   labels: {
@@ -113,7 +116,7 @@ export function FiveDayCalendar({
           </Link>
           <Link
             className="btn secondary"
-            href={`/calendar?view=days&start=${todayYmd}`}
+            href={`/calendar?view=days&start=${weekStartYmd}`}
           >
             {labels.today}
           </Link>

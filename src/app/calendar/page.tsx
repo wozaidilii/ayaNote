@@ -20,6 +20,7 @@ import {
   parseMonthParam,
   shiftMonth,
   shiftYmd,
+  startOfWeekMondayYmd,
   wallTimeToUtc,
   ymdInTz,
 } from "@/lib/timezone";
@@ -65,11 +66,14 @@ export default async function CalendarPage({
   const prevMonth = shiftMonth(month.year, month.monthIndex0, -1);
   const nextMonth = shiftMonth(month.year, month.monthIndex0, 1);
 
-  const daysStart =
+  const anchorYmd =
     sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : todayYmd;
+  // Natural Mon–Sun week (not a rolling 7 days from today)
+  const daysStart = startOfWeekMondayYmd(anchorYmd, timeZone);
   const weekDays = consecutiveYmds(daysStart, 7, timeZone);
   const prevStart = shiftYmd(daysStart, -7, timeZone);
   const nextStart = shiftYmd(daysStart, 7, timeZone);
+  const thisWeekStart = startOfWeekMondayYmd(todayYmd, timeZone);
 
   const monthStartYmd = `${month.year}-${String(month.monthIndex0 + 1).padStart(2, "0")}-01`;
   const nextMonthKey = shiftMonth(month.year, month.monthIndex0, 1);
@@ -191,7 +195,7 @@ export default async function CalendarPage({
         >
           <Link
             className={`btn ${view === "days" ? "" : "secondary"}`}
-            href={`/calendar?view=days&start=${todayYmd}`}
+            href={`/calendar?view=days&start=${thisWeekStart}`}
             role="tab"
             aria-selected={view === "days"}
           >
@@ -215,6 +219,7 @@ export default async function CalendarPage({
             lessons={calendarLessons}
             timeZone={timeZone}
             todayYmd={todayYmd}
+            weekStartYmd={thisWeekStart}
             prevStart={prevStart}
             nextStart={nextStart}
             labels={{
