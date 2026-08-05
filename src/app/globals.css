@@ -1252,17 +1252,21 @@ a {
   gap: 0.5rem 0.75rem;
   padding: 0.65rem 0.95rem;
   margin: 0;
+  /* LiveKit [data-lk-theme] sets color: #fff; keep our light panel readable. */
+  color: var(--ink);
 }
 
 .classroom-meet-title {
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.2;
+  color: var(--ink);
 }
 
 .classroom-meet-meta {
   font-size: 12px;
   margin-top: 0.1rem;
+  color: var(--ink-soft);
 }
 
 .classroom-meet-top-actions {
@@ -1275,6 +1279,7 @@ a {
 .classroom-meet-status {
   font-size: 12px;
   margin-right: 0.25rem;
+  color: var(--ink-soft);
 }
 
 .classroom-screenshare-btn.lk-button,
@@ -1307,6 +1312,7 @@ a {
   flex: 1;
   min-height: 0;
   gap: 0.55rem;
+  background: transparent;
 }
 
 .classroom-meet-body {
@@ -1347,6 +1353,7 @@ a {
   overflow: hidden;
   padding: 0.85rem 1.1rem 1.1rem;
   height: 100%;
+  color: var(--ink);
 }
 
 .classroom-float-dock {
@@ -1364,6 +1371,7 @@ a {
   border-radius: 16px;
   background: var(--page);
   border: 1px solid var(--line);
+  color: var(--ink);
   box-shadow: 0 6px 20px rgba(30, 31, 43, 0.08);
 }
 

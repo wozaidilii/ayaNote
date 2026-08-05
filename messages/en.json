@@ -259,6 +259,7 @@
     "viewClassroom": "View classroom & plan"
   },
   "classroom": {
+    "classroomTitle": "AyaNote Classroom",
     "pastBanner": "Past classroom — video ended. This session’s board stays here.",
     "pastChip": "Past",
     "connecting": "Connecting video…",

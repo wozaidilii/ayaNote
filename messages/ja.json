@@ -240,6 +240,7 @@
     "viewClassroom": "Classroomと教案を見る"
   },
   "classroom": {
+    "classroomTitle": "AyaNote Classroom",
     "pastBanner": "過去のClassroom — ビデオは終了。この回のボードはここに残っています。",
     "pastChip": "過去",
     "connecting": "ビデオ接続中…",

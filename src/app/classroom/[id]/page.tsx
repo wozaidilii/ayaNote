@@ -101,13 +101,14 @@ export default async function ClassroomPage({
     });
   }
 
-  const titleLine =
+  const titleLine = t("classroomTitle");
+  const whoLine =
     role === "teacher"
       ? lesson.student.name
       : role === "guest"
         ? `${lesson.teacher.name} · ${lesson.student.name}`
         : lesson.teacher.name;
-  const metaLine = `${formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone)} – ${formatInTz(lesson.endsAt, "HH:mm", timeZone)} · ${courseTypeLabel(lesson.student.courseType)} · ${lesson.student.level}${isPast ? ` · ${t("pastChip")}` : ""}`;
+  const metaLine = `${whoLine} · ${formatInTz(lesson.startsAt, "MMM d · HH:mm", timeZone)} – ${formatInTz(lesson.endsAt, "HH:mm", timeZone)} · ${courseTypeLabel(lesson.student.courseType)} · ${lesson.student.level}${isPast ? ` · ${t("pastChip")}` : ""}`;
 
   return (
     <div className="classroom-page">
