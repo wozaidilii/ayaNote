@@ -253,6 +253,7 @@
     "leftCall": "通話から退出済み — ボードはそのまま",
     "errorToken": "ビデオに入れませんでした",
     "errorTranscribe": "文字起こしに失敗",
+    "errorDuplicate": "別のデバイスで参加中のため、こちらは切断されました。再参加するとこちらが優先されます。",
     "sttMissing": "STTキー未設定 — 通話は可能。文字起こしには OPENAI_API_KEY が必要",
     "docPlaceholder": "一緒に教案ボードを書いてください… Warmup / Review / New focus は見出しで",
     "statusSaving": "保存中…",
@@ -272,12 +273,12 @@
     "guestJoinSubmit": "参加する"
   },
   "login": {
-    "title": "先生ログイン",
+    "title": "サインイン",
     "subtitle": "AyaNoteのアカウントとパスワードでサインインします。",
     "email": "アカウント",
     "password": "パスワード",
     "submit": "サインイン",
-    "studentHint": "生徒は招待リンクを使います。",
+    "studentHint": "トライアル生徒: student1 / student2 / student3（パスワード 123456）。招待制の生徒はこれまで通り招待リンクを使います。",
     "backHome": "ホームへ",
     "errMissing": "アカウントとパスワードを入力してください。",
     "errInvalid": "アカウントまたはパスワードが正しくありません。"

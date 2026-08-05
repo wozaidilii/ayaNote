@@ -10,6 +10,14 @@ export const DEMO_TEACHER_EMAIL = "admin";
 export const DEMO_STUDENT_EMAIL = "alex@example.com";
 /** Default password for seeded trial teacher (change in production). */
 export const DEMO_TEACHER_PASSWORD = "123456";
+/** Mock student login ids for multi-device classroom testing. */
+export const DEMO_STUDENT_LOGINS = [
+  { email: "student1", name: "Student 1" },
+  { email: "student2", name: "Student 2" },
+  { email: "student3", name: "Student 3" },
+] as const;
+/** Same password as demo teacher for mock students. */
+export const DEMO_STUDENT_PASSWORD = DEMO_TEACHER_PASSWORD;
 
 export type SessionInfo = {
   role: AppRole | null;

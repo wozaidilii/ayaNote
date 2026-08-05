@@ -38,6 +38,8 @@ model Student {
   teacherId          String
   name               String
   email              String
+  /** bcrypt hash for password login; empty = invite-only */
+  passwordHash       String    @default("")
   level              String    @default("N4")
   /** Course track: jlpt_n1 | jlpt_n2 | jlpt_n3 | jlpt_n4 | jlpt_n5 | business | casual | travel | custom */
   courseType         String    @default("jlpt_n4")

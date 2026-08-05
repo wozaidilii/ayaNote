@@ -142,6 +142,7 @@ export default async function ClassroomPage({
           leftCall: t("leftCall"),
           errorToken: t("errorToken"),
           errorTranscribe: t("errorTranscribe"),
+          errorDuplicate: t("errorDuplicate"),
           sttMissing: t("sttMissing"),
           pastBanner: t("pastBanner"),
           docPlaceholder: t("docPlaceholder"),

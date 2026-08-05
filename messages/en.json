@@ -53,12 +53,12 @@
     }
   },
   "login": {
-    "title": "Teacher login",
+    "title": "Sign in",
     "subtitle": "Sign in with your AyaNote account and password.",
     "email": "Account",
     "password": "Password",
     "submit": "Sign in",
-    "studentHint": "Students use their invite link.",
+    "studentHint": "Trial students: student1 / student2 / student3 (password 123456). Invite-only students still use their invite link.",
     "backHome": "Back home",
     "errMissing": "Account and password are required.",
     "errInvalid": "Invalid account or password."
@@ -272,6 +272,7 @@
     "leftCall": "Call left — board stays open",
     "errorToken": "Could not join video",
     "errorTranscribe": "Transcription failed",
+    "errorDuplicate": "Joined on another device — this call stopped. Rejoin to take over here.",
     "sttMissing": "STT key missing — call works; set OPENAI_API_KEY to transcribe",
     "docPlaceholder": "Write the lesson board together… Use headings for Warmup, Review, New focus…",
     "statusSaving": "Saving…",

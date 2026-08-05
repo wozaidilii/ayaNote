@@ -17,7 +17,7 @@ import { formatInTz, normalizeTimezone, parseIsoOrLocal } from "@/lib/timezone";
 import { parseClassroomDoc, tiptapDocToPlainText } from "@/lib/classroom-doc";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
-export async function loginTeacher(formData: FormData) {
+export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
@@ -27,14 +27,35 @@ export async function loginTeacher(formData: FormData) {
   }
 
   const teacher = await prisma.teacher.findUnique({ where: { email } });
-  if (!teacher?.passwordHash) {
-    redirect("/?err=invalid");
+  if (teacher?.passwordHash) {
+    const ok = await verifyPassword(password, teacher.passwordHash);
+    if (ok) {
+      await setAuthSession({ role: "teacher", teacherId: teacher.id });
+      redirect("/today");
+    }
   }
-  const ok = await verifyPassword(password, teacher.passwordHash);
-  if (!ok) redirect("/?err=invalid");
 
-  await setAuthSession({ role: "teacher", teacherId: teacher.id });
-  redirect("/today");
+  const student = await prisma.student.findFirst({
+    where: { email, archivedAt: null },
+  });
+  if (student?.passwordHash) {
+    const ok = await verifyPassword(password, student.passwordHash);
+    if (ok) {
+      await setAuthSession({
+        role: "student",
+        studentId: student.id,
+        teacherId: student.teacherId,
+      });
+      redirect("/student");
+    }
+  }
+
+  redirect("/?err=invalid");
+}
+
+/** @deprecated Prefer `login` — kept for any leftover imports. */
+export async function loginTeacher(formData: FormData) {
+  return login(formData);
 }
 
 export async function logout() {

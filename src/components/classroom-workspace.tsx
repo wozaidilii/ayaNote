@@ -9,7 +9,7 @@ import {
   useTracks,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { RoomEvent, Track } from "livekit-client";
+import { DisconnectReason, RoomEvent, Track } from "livekit-client";
 import {
   useCallback,
   useEffect,
@@ -37,6 +37,7 @@ type Labels = {
   leftCall: string;
   errorToken: string;
   errorTranscribe: string;
+  errorDuplicate: string;
   sttMissing: string;
   pastBanner: string;
   docPlaceholder: string;
@@ -543,10 +544,22 @@ export function ClassroomWorkspace({
         video
         data-lk-theme="default"
         className="classroom-livekit-root"
-        onDisconnected={() => {
-          if (!pendingUploadRef.current && !ending) {
-            setTokenInfo(null);
-            setRecordActive(false);
+        onDisconnected={(reason) => {
+          if (pendingUploadRef.current || ending) return;
+          setTokenInfo(null);
+          setRecordActive(false);
+          // Same teacher/student identity on another device kicks this one.
+          // Stop auto-rejoin or both sides fight forever.
+          if (
+            reason === DisconnectReason.DUPLICATE_IDENTITY ||
+            reason === DisconnectReason.PARTICIPANT_REMOVED ||
+            reason === DisconnectReason.ROOM_DELETED ||
+            reason === DisconnectReason.ROOM_CLOSED
+          ) {
+            setUserLeftCall(true);
+            if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+              setError(labels.errorDuplicate);
+            }
           }
         }}
       >

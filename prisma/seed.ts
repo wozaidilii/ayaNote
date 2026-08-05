@@ -2,6 +2,8 @@ import { hashPassword } from "../src/lib/auth";
 import { prisma } from "../src/lib/db";
 import {
   DEMO_STUDENT_EMAIL,
+  DEMO_STUDENT_LOGINS,
+  DEMO_STUDENT_PASSWORD,
   DEMO_TEACHER_EMAIL,
   DEMO_TEACHER_PASSWORD,
 } from "../src/lib/session";
@@ -13,6 +15,7 @@ const LEGACY_TEACHER_EMAIL = "ayano@ayanote.app";
 /** Minimal bootstrap — classes come from in-app booking + Classroom. */
 async function main() {
   const passwordHash = await hashPassword(DEMO_TEACHER_PASSWORD);
+  const studentPasswordHash = await hashPassword(DEMO_STUDENT_PASSWORD);
   const loginId = DEMO_TEACHER_EMAIL as string;
 
   // Migrate previous trial account if still present under the old email.
@@ -79,10 +82,36 @@ async function main() {
     update: {},
   });
 
+  for (const demo of DEMO_STUDENT_LOGINS) {
+    await prisma.student.upsert({
+      where: {
+        teacherId_email: { teacherId: teacher.id, email: demo.email },
+      },
+      create: {
+        teacherId: teacher.id,
+        name: demo.name,
+        email: demo.email,
+        passwordHash: studentPasswordHash,
+        level: "N4",
+        goals: "",
+        privateNotes: "",
+        recordingConsent: false,
+        locale: "en",
+      },
+      update: {
+        name: demo.name,
+        passwordHash: studentPasswordHash,
+        archivedAt: null,
+      },
+    });
+  }
+
   console.log("Bootstrapped trial teacher (password login).");
   console.log({
     teacher: teacher.email,
     password: DEMO_TEACHER_PASSWORD,
+    students: DEMO_STUDENT_LOGINS.map((s) => s.email),
+    studentPassword: DEMO_STUDENT_PASSWORD,
   });
 }
 

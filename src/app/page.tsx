@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { loginTeacher } from "@/app/actions";
+import { login } from "@/app/actions";
 import { LogIn, UiIcon } from "@/components/icons";
 import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
@@ -33,11 +33,7 @@ export default async function HomePage({
         {sp.err === "missing" && <p className="chip">{t("errMissing")}</p>}
         {sp.err === "invalid" && <p className="chip">{t("errInvalid")}</p>}
 
-        <form
-          className="panel"
-          action={loginTeacher}
-          style={{ marginTop: "1rem" }}
-        >
+        <form className="panel" action={login} style={{ marginTop: "1rem" }}>
           <div className="field">
             <label htmlFor="email">{t("email")}</label>
             <input
