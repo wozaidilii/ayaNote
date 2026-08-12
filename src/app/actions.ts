@@ -651,6 +651,70 @@ export async function decideBooking(formData: FormData) {
   revalidatePath("/student/book");
 }
 
+/** Teacher schedules a 60-minute lesson directly from the calendar. */
+export async function createLessonForStudent(formData: FormData) {
+  const teacher = await requireTeacher();
+  const studentId = String(formData.get("studentId") ?? "");
+  const startsAtRaw = String(formData.get("startsAt") ?? "");
+  const returnStart = String(formData.get("returnStart") ?? "");
+  const calendarHref = returnStart
+    ? `/calendar?view=days&start=${encodeURIComponent(returnStart)}`
+    : "/calendar?view=days";
+
+  const start = parseIsoOrLocal(startsAtRaw);
+  if (!studentId || Number.isNaN(start.getTime())) {
+    redirect(`${calendarHref}&err=schedule`);
+  }
+
+  const teacherRow = await prisma.teacher.findUniqueOrThrow({
+    where: { id: teacher.id },
+  });
+  const tz = normalizeTimezone(teacherRow.timezone);
+  const minute = formatInTz(start, "mm", tz);
+  if (minute !== "00" && minute !== "30") {
+    redirect(`${calendarHref}&err=schedule`);
+  }
+
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, teacherId: teacher.id, archivedAt: null },
+  });
+  if (!student) {
+    redirect(`${calendarHref}&err=schedule`);
+  }
+
+  const endsAt = addMinutes(start, LESSON_MINUTES);
+  const conflict = await prisma.lesson.findFirst({
+    where: {
+      teacherId: teacher.id,
+      status: { not: "cancelled" },
+      startsAt: { lt: endsAt },
+      endsAt: { gt: start },
+    },
+  });
+  if (conflict) {
+    redirect(`${calendarHref}&err=conflict`);
+  }
+
+  await prisma.lesson.create({
+    data: {
+      teacherId: teacher.id,
+      studentId: student.id,
+      startsAt: start,
+      endsAt,
+      status: "scheduled",
+      prepStatus: "none",
+      transcriptStatus: "none",
+    },
+  });
+
+  revalidatePath("/availability");
+  revalidatePath("/today");
+  revalidatePath("/calendar");
+  revalidatePath("/student");
+  revalidatePath("/students");
+  redirect(`${calendarHref}&ok=scheduled`);
+}
+
 export async function createBookingRequest(formData: FormData) {
   const student = await requireStudent();
   const teacher = await prisma.teacher.findUniqueOrThrow({

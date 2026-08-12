@@ -33,6 +33,8 @@ export default async function CalendarPage({
     day?: string;
     view?: string;
     start?: string;
+    ok?: string;
+    err?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -97,7 +99,7 @@ export default async function CalendarPage({
   const rangeStart = view === "month" ? monthPaddedStart : daysRangeStart;
   const rangeEnd = view === "month" ? monthPaddedEnd : daysRangeEnd;
 
-  const [lessons, pending] = await Promise.all([
+  const [lessons, pending, students] = await Promise.all([
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
@@ -115,6 +117,11 @@ export default async function CalendarPage({
       where: { teacherId: teacher.id, status: "pending" },
       include: { student: true },
       orderBy: { requestedStart: "asc" },
+    }),
+    prisma.student.findMany({
+      where: { teacherId: teacher.id, archivedAt: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
   ]);
 
@@ -144,6 +151,21 @@ export default async function CalendarPage({
         <p className="muted" style={{ marginTop: 0 }}>
           {t("syncNote")}
         </p>
+        {sp.ok === "scheduled" && (
+          <p className="chip done" style={{ marginTop: "0.75rem" }}>
+            {t("okScheduled")}
+          </p>
+        )}
+        {sp.err === "conflict" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errConflict")}
+          </p>
+        )}
+        {sp.err === "schedule" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errSchedule")}
+          </p>
+        )}
       </div>
 
       {pending.length > 0 && (
@@ -217,6 +239,7 @@ export default async function CalendarPage({
           <FiveDayCalendar
             days={weekDays}
             lessons={calendarLessons}
+            students={students}
             timeZone={timeZone}
             todayYmd={todayYmd}
             weekStartYmd={thisWeekStart}
@@ -227,6 +250,14 @@ export default async function CalendarPage({
               today: t("todayBtn"),
               openRecord: t("openRecord"),
               openLesson: common("openLesson"),
+              scheduleTitle: t("scheduleTitle"),
+              scheduleHint: t("scheduleHint"),
+              selectStudent: t("selectStudent"),
+              selectStudentPlaceholder: t("selectStudentPlaceholder"),
+              noStudents: t("noStudents"),
+              confirmSchedule: t("confirmSchedule"),
+              cancelSchedule: t("cancelSchedule"),
+              close: t("close"),
             }}
           />
         ) : (

@@ -84,7 +84,7 @@
     "title": "Calendar",
     "subtitle": "Schedule in your timezone — week view or month grid",
     "localCalendar": "In-app calendar",
-    "syncNote": "Lessons appear here after you approve student bookings. Video is in Classroom (LiveKit).",
+    "syncNote": "Click an empty time in week view to book a student, or approve pending requests below. Video is in Classroom (LiveKit).",
     "upcoming": "Upcoming",
     "past": "Finished lessons",
     "pending": "Pending requests",
@@ -97,7 +97,18 @@
     "todayBtn": "Today",
     "noLessonsDay": "No lessons on this day.",
     "viewWeek": "Week",
-    "viewMonth": "Month"
+    "viewMonth": "Month",
+    "scheduleTitle": "Schedule lesson",
+    "scheduleHint": "60-minute lesson starting at this time.",
+    "selectStudent": "Student",
+    "selectStudentPlaceholder": "Select a student",
+    "noStudents": "No students yet — add one on the Students page first.",
+    "confirmSchedule": "Book lesson",
+    "cancelSchedule": "Cancel",
+    "close": "Close",
+    "okScheduled": "Lesson booked.",
+    "errConflict": "That time conflicts with another lesson.",
+    "errSchedule": "Could not book that slot. Pick another time or student."
   },
   "students": {
     "title": "Students",

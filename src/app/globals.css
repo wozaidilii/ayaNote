@@ -2084,6 +2084,26 @@ a {
   position: relative;
 }
 
+.day5-col-body-bookable {
+  cursor: crosshair;
+}
+
+.day5-draft {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 1;
+  border-radius: 6px;
+  padding: 3px 5px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.25;
+  background: rgba(91, 108, 255, 0.12);
+  border: 1px dashed rgba(91, 108, 255, 0.55);
+  color: var(--blue);
+  pointer-events: none;
+}
+
 .day5-hour-line {
   position: absolute;
   left: 0;

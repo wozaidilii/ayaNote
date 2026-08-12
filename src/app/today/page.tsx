@@ -30,28 +30,40 @@ export default async function TodayPage() {
   const { start, end } = rollingDayWindowInTz(timeZone, 2);
   const now = new Date();
 
-  const lessons = await prisma.lesson.findMany({
-    where: {
-      teacherId: teacher.id,
-      startsAt: { gte: start, lt: end },
-      status: { not: "cancelled" },
-    },
-    include: {
-      student: {
-        include: {
-          progress: true,
-          lessons: {
-            where: { status: "completed" },
-            include: { summary: true },
-            orderBy: { startsAt: "desc" },
-            take: 1,
+  const [lessons, fallbackClass] = await Promise.all([
+    prisma.lesson.findMany({
+      where: {
+        teacherId: teacher.id,
+        startsAt: { gte: start, lt: end },
+        status: { not: "cancelled" },
+      },
+      include: {
+        student: {
+          include: {
+            progress: true,
+            lessons: {
+              where: { status: "completed" },
+              include: { summary: true },
+              orderBy: { startsAt: "desc" },
+              take: 1,
+            },
           },
         },
+        prepDraft: true,
       },
-      prepDraft: true,
-    },
-    orderBy: { startsAt: "asc" },
-  });
+      orderBy: { startsAt: "asc" },
+    }),
+    // Prefer a startable lesson even outside the Today window.
+    prisma.lesson.findFirst({
+      where: {
+        teacherId: teacher.id,
+        status: { in: ["scheduled", "in_progress"] },
+        endsAt: { gte: new Date(now.getTime() - 30 * 60_000) },
+      },
+      orderBy: { startsAt: "asc" },
+      select: { id: true },
+    }),
+  ]);
 
   const nextClass =
     lessons.find(
@@ -60,7 +72,7 @@ export default async function TodayPage() {
         l.endsAt.getTime() >= now.getTime() - 30 * 60_000,
     ) ??
     lessons.find((l) => l.status !== "completed") ??
-    lessons[0] ??
+    fallbackClass ??
     null;
 
   return (
@@ -76,20 +88,15 @@ export default async function TodayPage() {
         actions={
           <>
             {nextClass ? (
-              <a
-                className="btn"
-                href={`/classroom/${nextClass.id}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <UiIcon icon={Video} size={15} />
-                {t("startClass")}
-              </a>
-            ) : (
-              <Link className="btn" href="/calendar">
+              <Link className="btn" href={`/classroom/${nextClass.id}`}>
                 <UiIcon icon={Video} size={15} />
                 {t("startClass")}
               </Link>
+            ) : (
+              <button className="btn" type="button" disabled>
+                <UiIcon icon={Video} size={15} />
+                {t("startClass")}
+              </button>
             )}
             <Link className="btn secondary" href="/calendar">
               <UiIcon icon={CalendarDays} size={15} />

@@ -2,17 +2,25 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, UiIcon } from "@/components/icons";
+import { createLessonForStudent } from "@/app/actions";
+import { ChevronLeft, ChevronRight, UiIcon, X } from "@/components/icons";
 import type { CalendarLessonItem } from "@/components/month-calendar";
+import { LESSON_MINUTES } from "@/lib/scheduling";
 import { formatInTz, wallTimeToUtc, ymdInTz } from "@/lib/timezone";
 
 const HOUR_START = 0;
 const HOUR_END = 24;
 const PX_PER_HOUR = 40;
+const SLOT_STEP = 30;
 const HOURS = Array.from(
   { length: HOUR_END - HOUR_START },
   (_, i) => HOUR_START + i,
 );
+
+export type CalendarStudentOption = {
+  id: string;
+  name: string;
+};
 
 function minutesFromDayStart(
   iso: string,
@@ -23,9 +31,24 @@ function minutesFromDayStart(
   return (new Date(iso).getTime() - start) / 60_000;
 }
 
+function snapMinutesFromClick(clientY: number, bodyTop: number): number {
+  const y = clientY - bodyTop;
+  const raw = HOUR_START * 60 + (y / PX_PER_HOUR) * 60;
+  const snapped = Math.round(raw / SLOT_STEP) * SLOT_STEP;
+  const lastStart = HOUR_END * 60 - LESSON_MINUTES;
+  return Math.max(HOUR_START * 60, Math.min(lastStart, snapped));
+}
+
+function hmFromMinutes(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export function FiveDayCalendar({
   days,
   lessons,
+  students,
   timeZone,
   todayYmd,
   weekStartYmd,
@@ -35,6 +58,7 @@ export function FiveDayCalendar({
 }: {
   days: string[]; // yyyy-MM-dd × 7 (Mon–Sun)
   lessons: CalendarLessonItem[];
+  students: CalendarStudentOption[];
   timeZone: string;
   todayYmd: string;
   /** Monday of the week that contains today — used by the Today control */
@@ -46,9 +70,20 @@ export function FiveDayCalendar({
     today: string;
     openRecord: string;
     openLesson: string;
+    scheduleTitle: string;
+    scheduleHint: string;
+    selectStudent: string;
+    selectStudentPlaceholder: string;
+    noStudents: string;
+    confirmSchedule: string;
+    cancelSchedule: string;
+    close: string;
   };
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [draft, setDraft] = useState<{ ymd: string; minutes: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
@@ -82,6 +117,14 @@ export function FiveDayCalendar({
     nowMinutes <= HOUR_END * 60;
 
   const gridHeight = (HOUR_END - HOUR_START) * PX_PER_HOUR;
+  const draftTime = draft ? hmFromMinutes(draft.minutes) : "";
+  const draftStartsAt = draft
+    ? wallTimeToUtc(draft.ymd, draftTime, timeZone).toISOString()
+    : "";
+  const draftTop = draft
+    ? ((draft.minutes - HOUR_START * 60) / 60) * PX_PER_HOUR
+    : 0;
+  const draftHeight = (LESSON_MINUTES / 60) * PX_PER_HOUR - 2;
 
   return (
     <div className="day5-cal">
@@ -167,7 +210,20 @@ export function FiveDayCalendar({
                     {dayNum}
                   </div>
                 </div>
-                <div className="day5-col-body" style={{ height: gridHeight }}>
+                <div
+                  className="day5-col-body day5-col-body-bookable"
+                  style={{ height: gridHeight }}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("a.day5-event")) {
+                      return;
+                    }
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setDraft({
+                      ymd,
+                      minutes: snapMinutesFromClick(e.clientY, rect.top),
+                    });
+                  }}
+                >
                   {HOURS.map((h) => (
                     <div
                       key={h}
@@ -183,6 +239,18 @@ export function FiveDayCalendar({
                     >
                       <span className="day5-now-dot" />
                       <span className="day5-now-line" />
+                    </div>
+                  )}
+
+                  {draft?.ymd === ymd && (
+                    <div
+                      className="day5-draft"
+                      style={{ top: draftTop, height: draftHeight }}
+                    >
+                      <div className="day5-event-time">{draftTime}</div>
+                      <div className="day5-event-name">
+                        {labels.scheduleTitle}
+                      </div>
                     </div>
                   )}
 
@@ -232,6 +300,105 @@ export function FiveDayCalendar({
           })}
         </div>
       </div>
+
+      <div
+        className={`students-drawer-backdrop ${draft ? "is-open" : ""}`}
+        onClick={() => setDraft(null)}
+        aria-hidden={!draft}
+      />
+      <aside
+        className={`students-drawer ${draft ? "is-open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={labels.scheduleTitle}
+        aria-hidden={!draft}
+      >
+        <div className="students-drawer-head">
+          <h2>{labels.scheduleTitle}</h2>
+          <button
+            className="btn ghost sm"
+            type="button"
+            onClick={() => setDraft(null)}
+          >
+            <UiIcon icon={X} size={15} />
+            {labels.close}
+          </button>
+        </div>
+        <div className="students-drawer-body">
+          {draft && (
+            <>
+              <p style={{ marginTop: 0, fontSize: "1.15rem", fontWeight: 700 }}>
+                {formatInTz(draftStartsAt, "MMM d · HH:mm", timeZone)}
+                <span className="muted" style={{ fontWeight: 500 }}>
+                  {" "}
+                  –{" "}
+                  {formatInTz(
+                    new Date(
+                      new Date(draftStartsAt).getTime() +
+                        LESSON_MINUTES * 60_000,
+                    ).toISOString(),
+                    "HH:mm",
+                    timeZone,
+                  )}
+                </span>
+              </p>
+              <p className="muted">{labels.scheduleHint}</p>
+
+              {students.length === 0 ? (
+                <p className="muted">{labels.noStudents}</p>
+              ) : (
+                <form action={createLessonForStudent}>
+                  <input type="hidden" name="startsAt" value={draftStartsAt} />
+                  <input
+                    type="hidden"
+                    name="returnStart"
+                    value={days[0] ?? weekStartYmd}
+                  />
+                  <div className="field">
+                    <label htmlFor="schedule-student">
+                      {labels.selectStudent}
+                    </label>
+                    <select
+                      id="schedule-student"
+                      name="studentId"
+                      required
+                      defaultValue=""
+                    >
+                      <option value="" disabled>
+                        {labels.selectStudentPlaceholder}
+                      </option>
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      flexWrap: "wrap",
+                      marginTop: "1rem",
+                    }}
+                  >
+                    <button className="btn" type="submit">
+                      {labels.confirmSchedule}
+                    </button>
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      onClick={() => setDraft(null)}
+                    >
+                      {labels.cancelSchedule}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }

@@ -64,7 +64,7 @@
   "calendar": {
     "title": "カレンダー",
     "subtitle": "タイムゾーンで表示 — 週ビューまたは月グリッド",
-    "syncNote": "予約を承認するとここにレッスンが表示されます。ビデオはClassroom（LiveKit）です。",
+    "syncNote": "週ビューの空き時間をクリックして生徒を選び予約できます。下の保留リクエストを承認することもできます。ビデオはClassroom（LiveKit）です。",
     "upcoming": "予定",
     "past": "終了したレッスン",
     "pending": "保留中のリクエスト",
@@ -78,7 +78,18 @@
     "noLessonsDay": "この日のレッスンはありません。",
     "viewWeek": "週",
     "viewMonth": "月",
-    "localCalendar": "アプリ内カレンダー"
+    "localCalendar": "アプリ内カレンダー",
+    "scheduleTitle": "レッスンを予約",
+    "scheduleHint": "この時刻から60分のレッスンです。",
+    "selectStudent": "生徒",
+    "selectStudentPlaceholder": "生徒を選択",
+    "noStudents": "生徒がいません。先に「生徒」ページで追加してください。",
+    "confirmSchedule": "予約する",
+    "cancelSchedule": "キャンセル",
+    "close": "閉じる",
+    "okScheduled": "レッスンを予約しました。",
+    "errConflict": "その時間は別のレッスンと重なっています。",
+    "errSchedule": "予約できませんでした。別の時間または生徒を選んでください。"
   },
   "students": {
     "title": "生徒",
