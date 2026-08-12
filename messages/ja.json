@@ -199,6 +199,8 @@
     "generatingBody": "Classroom音声を文字起こしし、レッスンまとめを作成しています。完了するとこのページが更新されます。",
     "generatingFailed": "まとめの生成に時間がかかっています。下に書き起こしを貼り付けるか、Classroomでもう一度「終了して文字起こし」を試してください。",
     "warnNoAiKey": "サーバーにAI APIキーがありません — ローカルヒューリスティックを使用。DEEPSEEK_API_KEYを設定してください。",
+    "warnHeuristic": "AIまとめが失敗し、ローカル仮まとめになっています（トピックが文字起こしのまま / 語彙が空）。下のボタンで再生成してください。",
+    "retryAiSummary": "保存済み文字起こしからAIまとめを再生成",
     "errEmpty": "生成前に書き起こしを貼り付けてください。",
     "flowLabel": "レッスンの流れ",
     "stepClassroom": "Classroom",

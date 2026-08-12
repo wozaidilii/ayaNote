@@ -4,12 +4,17 @@ import {
   approveSummary,
   importTranscriptAndSummarize,
   markHomeworkReviewed,
+  regenerateSummaryFromStored,
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
-import { BookOpen, Video, UiIcon } from "@/components/icons";
+import { BookOpen, Sparkles, Video, UiIcon } from "@/components/icons";
 import { SummaryGeneratingPanel } from "@/components/summary-generating-panel";
 import { PageHeading } from "@/components/ui-heading";
-import { courseTypeLabel, getAiProvider } from "@/lib/ai";
+import {
+  courseTypeLabel,
+  getAiProvider,
+  looksLikeHeuristicSummary,
+} from "@/lib/ai";
 import { parseClassroomDoc, tiptapDocToPlainText } from "@/lib/classroom-doc";
 import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
@@ -268,6 +273,27 @@ export default async function LessonRoomPage({
       {sp.ok === "livekit" && <p className="chip done">{t("okLivekit")}</p>}
       {sp.warn === "no_ai_key" && <p className="chip">{t("warnNoAiKey")}</p>}
       {sp.err === "empty_transcript" && <p className="chip">{t("errEmpty")}</p>}
+      {lesson.summary &&
+        looksLikeHeuristicSummary(lesson.summary) &&
+        !summarizing && (
+          <div className="panel" style={{ marginBottom: "1rem" }}>
+            <p className="chip" style={{ marginTop: 0 }}>
+              {t("warnHeuristic")}
+            </p>
+            <p className="muted" style={{ marginBottom: "0.75rem" }}>
+              {lesson.summary.notes}
+            </p>
+            {(lesson.transcript?.editedText || lesson.transcript?.rawText) && (
+              <form action={regenerateSummaryFromStored}>
+                <input type="hidden" name="lessonId" value={lesson.id} />
+                <button className="btn" type="submit">
+                  <UiIcon icon={Sparkles} size={15} />
+                  {t("retryAiSummary")}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
 
       <div className="grid-2 lesson-room-grid">
         <div className="lesson-room-main">

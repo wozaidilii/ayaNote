@@ -165,6 +165,51 @@ export async function importTranscriptAndSummarize(formData: FormData) {
   redirect(`/lessons/${lessonId}?ok=summary${hasKey ? "" : "&warn=no_ai_key"}`);
 }
 
+/** Re-run AI summary on the transcript already stored for this lesson. */
+export async function regenerateSummaryFromStored(formData: FormData) {
+  const teacher = await requireTeacher();
+  const lessonId = String(formData.get("lessonId") ?? "");
+  if (!lessonId) redirect("/today?err=missing_lesson");
+
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { transcript: true },
+  });
+  if (!lesson || lesson.teacherId !== teacher.id) {
+    redirect("/today?err=forbidden");
+  }
+
+  const rawText = (
+    lesson.transcript?.editedText ||
+    lesson.transcript?.rawText ||
+    ""
+  ).trim();
+  if (!rawText) {
+    redirect(`/lessons/${lessonId}?err=empty_transcript`);
+  }
+
+  const source =
+    (lesson.transcript?.source as
+      | "livekit"
+      | "upload"
+      | "manual"
+      | "drive_import"
+      | "meet_import"
+      | undefined) ?? "manual";
+
+  await applyTranscriptToLesson({
+    lessonId,
+    rawText,
+    source,
+  });
+
+  revalidatePath(`/lessons/${lessonId}`);
+  revalidatePath("/students");
+  revalidatePath("/today");
+  revalidatePath("/prep");
+  redirect(`/lessons/${lessonId}?ok=summary`);
+}
+
 export async function approveSummary(formData: FormData) {
   const teacher = await getTeacher();
   const lessonId = String(formData.get("lessonId") ?? "");

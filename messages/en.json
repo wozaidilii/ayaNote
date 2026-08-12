@@ -218,6 +218,8 @@
     "generatingBody": "Transcribing classroom audio and drafting the lesson summary. This page will update when ready.",
     "generatingFailed": "Summary is taking too long. Paste a transcript below as a fallback, or reopen Classroom and try End & transcribe again.",
     "warnNoAiKey": "No AI API key on server — summary used a local heuristic. Set DEEPSEEK_API_KEY for better results.",
+    "warnHeuristic": "AI summary did not complete — this is a local fallback (raw-ish topics / empty vocab). Retry AI summary below.",
+    "retryAiSummary": "Retry AI summary from stored transcript",
     "errEmpty": "Paste a transcript before generating.",
     "flowLabel": "Lesson flow",
     "stepClassroom": "Classroom",

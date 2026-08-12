@@ -3,52 +3,99 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
+/** Soft schema — DeepSeek structured output often omits nested mins and fails hard. */
 const summarySchema = z.object({
-  topics: z.array(z.string()).min(3).max(12),
-  todaySummary: z.string(),
-  priorReview: z.string(),
-  vocab: z.array(
-    z.object({
-      term: z.string(),
-      reading: z.string().optional().default(""),
-      meaning: z.string().optional().default(""),
-    }),
-  ),
-  grammar: z.array(
-    z.object({
-      pattern: z.string(),
-      notes: z.string().optional().default(""),
-    }),
-  ),
-  examples: z.array(
-    z.object({
-      pattern: z.string(),
-      examples: z.array(z.string()).min(2).max(6),
-    }),
-  ),
-  mistakes: z.array(z.string()),
-  homework: z.string(),
-  nextFocus: z.string(),
-  notes: z.string(),
+  topics: z.array(z.string()).max(12).default([]),
+  todaySummary: z.string().default(""),
+  priorReview: z.string().default(""),
+  vocab: z
+    .array(
+      z.object({
+        term: z.string(),
+        reading: z.string().optional().default(""),
+        meaning: z.string().optional().default(""),
+      }),
+    )
+    .max(20)
+    .default([]),
+  grammar: z
+    .array(
+      z.object({
+        pattern: z.string(),
+        notes: z.string().optional().default(""),
+      }),
+    )
+    .max(12)
+    .default([]),
+  examples: z
+    .array(
+      z.object({
+        pattern: z.string(),
+        examples: z.array(z.string()).max(6).default([]),
+      }),
+    )
+    .max(10)
+    .default([]),
+  mistakes: z.array(z.string()).max(20).default([]),
+  homework: z.string().default(""),
+  nextFocus: z.string().default(""),
+  notes: z.string().default(""),
 });
 
 const vocabRecallItemSchema = z.object({
   /** Japanese sentence with the target replaced by ＿＿ (or ___) */
   blanked: z.string(),
   /** Short meaning/summary cue shown as （hint） next to the blank */
-  hint: z.string(),
+  hint: z.string().default(""),
   /** Correct word/phrase that fills ＿＿ */
   answer: z.string(),
 });
 
 const prepSchema = z.object({
-  warmup: z.string(),
-  review: z.string(),
-  newFocus: z.string(),
-  practice: z.string(),
-  homeworkSeed: z.string(),
+  warmup: z.string().default(""),
+  review: z.string().default(""),
+  newFocus: z.string().default(""),
+  practice: z.string().default(""),
+  homeworkSeed: z.string().default(""),
   vocabRecall: z.array(vocabRecallItemSchema).max(8).default([]),
 });
+
+export function isHeuristicSummaryNotes(notes: string | null | undefined) {
+  const n = notes ?? "";
+  return /Fell back|Generated locally|AI summary failed|AI summary unavailable|要再生成|local heuristic|Local fallback/i.test(
+    n,
+  );
+}
+
+/** Detect older local-fallback summaries even if notes were edited away. */
+export function looksLikeHeuristicSummary(summary: {
+  notes?: string | null;
+  homework?: string | null;
+  topicsJson?: string | null;
+}) {
+  if (isHeuristicSummaryNotes(summary.notes)) return true;
+  if (
+    /Review today's conversation phrases aloud/i.test(summary.homework ?? "")
+  ) {
+    return true;
+  }
+  try {
+    const topics = JSON.parse(summary.topicsJson || "[]") as unknown;
+    if (
+      Array.isArray(topics) &&
+      topics.some(
+        (t) =>
+          typeof t === "string" &&
+          (t.length > 60 || /お!来た|OK じゃあ|グループミーティング/.test(t)),
+      )
+    ) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
 
 export type LessonSummaryPayload = z.infer<typeof summarySchema>;
 export type PrepDraftPayload = z.infer<typeof prepSchema>;
@@ -77,29 +124,57 @@ function heuristicSummary(
   transcript: string,
   reason?: string,
 ): LessonSummaryPayload {
-  const lines = transcript
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 12);
-  const topics = lines.slice(0, 5).map((l) => l.slice(0, 80));
-  const topicLine = topics[0] ?? "Continue conversation practice";
+  const charCount = transcript.trim().length;
   return {
-    topics: topics.length ? topics : ["General conversation practice"],
+    topics: ["(AI summary unavailable — regenerate)"],
     todaySummary:
-      lines.slice(0, 3).join(" ") ||
-      "Conversation practice covering everyday phrases.",
-    priorReview: "No prior lesson memory available.",
+      charCount > 0
+        ? `Local fallback only (${charCount} transcript chars). Regenerate summary after fixing AI, or edit manually.`
+        : "No transcript text available.",
+    priorReview: "No AI summary — prior review not extracted.",
     vocab: [],
     grammar: [],
     examples: [],
     mistakes: [],
-    homework:
-      "Review today's conversation phrases aloud once and write 5 example sentences.",
-    nextFocus: `Next lesson: deepen ${topicLine}. Warm up with today's phrases, then practice a short role-play and correct form accuracy.`,
+    homework: "（要再生成）今日の会話から語彙・表現を5文で書いてください。",
+    nextFocus:
+      "（要再生成）次回は本レッスンの弱点語彙・言い淀みを穴埋めで復習し、短いロールプレイで定着させてください。",
     notes:
       reason ??
       "Generated locally without an AI API key. Set DEEPSEEK_API_KEY (default) or OPENAI_API_KEY. Edit before approving.",
+  };
+}
+
+function normalizeSummary(object: LessonSummaryPayload): LessonSummaryPayload {
+  const topics = object.topics.map((t) => t.trim()).filter(Boolean);
+  return {
+    ...object,
+    topics: topics.length ? topics.slice(0, 12) : ["Conversation practice"],
+    todaySummary: object.todaySummary.trim() || "Lesson practice recorded.",
+    priorReview: object.priorReview.trim() || "—",
+    vocab: object.vocab.filter((v) => v.term.trim()).slice(0, 15),
+    grammar: object.grammar.filter((g) => g.pattern.trim()).slice(0, 10),
+    examples: object.examples
+      .map((e) => ({
+        pattern: e.pattern,
+        examples: e.examples
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .slice(0, 6),
+      }))
+      .filter((e) => e.pattern.trim() && e.examples.length > 0)
+      .slice(0, 8),
+    mistakes: object.mistakes
+      .map((m) => m.trim())
+      .filter(Boolean)
+      .slice(0, 15),
+    homework:
+      object.homework.trim() ||
+      "今日の表現を声に出して復習し、5文書いてください。",
+    nextFocus:
+      object.nextFocus.trim() ||
+      "次回は今日の語彙・言い間違いを復習してから新フォーカスへ。",
+    notes: object.notes.trim(),
   };
 }
 
@@ -251,50 +326,69 @@ async function summarizeSingleChunk(
   const partNote = opts?.partLabel
     ? `\nThis is ${opts.partLabel} of a longer lesson — extract what happened in THIS segment only.\n`
     : "";
+  // Cap chunk text so structured JSON has room in the context window.
+  const chunk = transcriptChunk.slice(0, 9000);
 
-  try {
+  const run = async (prompt: string) => {
     const { object } = await generateObject({
       model,
       schema: summarySchema,
-      prompt: `You are an experienced Japanese 1v1 teacher writing a lesson record a teacher can scan in seconds, then use for next-class prep.
+      prompt,
+    });
+    const normalized = normalizeSummary(object);
+    return {
+      ...normalized,
+      notes: normalized.notes
+        ? `${normalized.notes} (via ${getAiProvider()})`
+        : `Summarized via ${getAiProvider()}.`,
+    };
+  };
+
+  const fullPrompt = `You are an experienced Japanese 1v1 teacher writing a lesson record a teacher can scan in seconds, then use for next-class prep.
 Be specific and useful. Prefer Japanese for linguistic content; English glosses OK.
+Do NOT copy raw transcript lines into topics — topics must be short theme labels (e.g. 自己紹介 / 仕事の説明 / ソフトウェア開発の語彙).
 ${partNote}
 ${block}
 
 Return JSON with:
-- topics: 5–10 short highlight phrases from THIS segment (scannable chips, e.g. ビジネスメールの敬語 / 期間の表現)
-- todaySummary: EXACTLY 2–4 sentences summarizing what you practiced in this segment
-- priorReview: how this segment recycled previous vocab/grammar; if none, say what to recycle next time
-- vocab: 8–15 items from this segment (term, reading, meaning)
-- grammar: 4–8 patterns from this segment with short notes
-- examples: for EACH key grammar pattern, give 3–5 natural example sentences
+- topics: 5–10 short highlight phrases (NOT transcript quotes)
+- todaySummary: EXACTLY 2–4 sentences summarizing what you practiced
+- priorReview: how this recycled previous vocab/grammar; if none, say what to recycle next time
+- vocab: 8–15 items (term, reading, meaning) — prioritize words the student struggled to produce/remember
+- grammar: 4–8 patterns with short notes
+- examples: for key grammar patterns, 2–5 natural example sentences each (OK to return [] if unsure)
 - mistakes: corrections like 「X」→「Y」with brief why
 - homework: concrete writing/speaking task matching the course track
 - nextFocus: next-lesson direction in 2–4 sentences
 - notes: teacher memo
 
-Match tone to course:
-- jlpt_*: exam-aware forms and patterns
-- business: polite/keigo email & workplace
-- casual: natural spoken Japanese
-- travel: practical phrases
-(Course: ${course})
+Match tone to course (${course}): jlpt_* exam forms / business keigo / casual spoken / travel phrases.
 
 TRANSCRIPT:
-${transcriptChunk}`,
-    });
-    return {
-      ...object,
-      notes: object.notes?.trim()
-        ? `${object.notes} (via ${getAiProvider()})`
-        : `Summarized via ${getAiProvider()}.`,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    return heuristicSummary(
-      transcriptChunk,
-      `AI summary failed (${getAiProvider()}): ${message}. Fell back to local heuristic. Edit before approving.`,
-    );
+${chunk}`;
+
+  try {
+    return await run(fullPrompt);
+  } catch (err1) {
+    const message1 = err1 instanceof Error ? err1.message : "unknown error";
+    console.error("AI summary attempt 1 failed:", message1);
+    try {
+      return await run(`Japanese 1v1 lesson summary. Return compact JSON fields:
+topics (short labels), todaySummary (2-4 sentences), priorReview, vocab[{term,reading,meaning}], grammar[{pattern,notes}], examples[{pattern,examples[]}], mistakes[], homework, nextFocus, notes.
+Prefer Japanese for linguistic content. Do not paste transcript into topics.
+Student/course context:
+${block}
+
+TRANSCRIPT:
+${chunk.slice(0, 6000)}`);
+    } catch (err2) {
+      const message2 = err2 instanceof Error ? err2.message : "unknown error";
+      console.error("AI summary attempt 2 failed:", message2);
+      return heuristicSummary(
+        transcriptChunk,
+        `AI summary failed (${getAiProvider()}): ${message2}. Fell back to local heuristic. Use「再生成」with the stored transcript. First error: ${message1}`,
+      );
+    }
   }
 }
 
