@@ -1194,6 +1194,62 @@ a {
   font-size: 12px;
 }
 
+.prep-vocab-recall {
+  margin-bottom: var(--space-4);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+
+.prep-vocab-recall-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.prep-cloze-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.prep-cloze-line {
+  line-height: 1.55;
+  font-size: 15px;
+}
+
+.prep-cloze {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.2em;
+  margin: 0 0.05em 0 0.15em;
+  padding: 0 0.2em;
+  border-bottom: 2px solid var(--ink);
+  vertical-align: baseline;
+  cursor: help;
+  outline: none;
+}
+
+.prep-cloze::after {
+  content: "＿＿";
+  color: var(--ink-soft);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.prep-cloze:hover::after,
+.prep-cloze:focus-visible::after {
+  content: attr(data-answer);
+  color: var(--blue);
+}
+
+.prep-cloze-hint {
+  color: var(--ink-soft);
+  font-size: 0.92em;
+}
+
 .prep-editor-top {
   display: flex;
   justify-content: space-between;
@@ -1950,7 +2006,6 @@ a {
   }
 
   .classroom-doc-toolbar .btn,
-  .classroom-insert-image,
   .classroom-av-toggle,
   .classroom-meet-top-actions .btn {
     min-height: 44px;

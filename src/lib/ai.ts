@@ -32,16 +32,27 @@ const summarySchema = z.object({
   notes: z.string(),
 });
 
+const vocabRecallItemSchema = z.object({
+  /** Japanese sentence with the target replaced by ＿＿ (or ___) */
+  blanked: z.string(),
+  /** Short meaning/summary cue shown as （hint） next to the blank */
+  hint: z.string(),
+  /** Correct word/phrase that fills ＿＿ */
+  answer: z.string(),
+});
+
 const prepSchema = z.object({
   warmup: z.string(),
   review: z.string(),
   newFocus: z.string(),
   practice: z.string(),
   homeworkSeed: z.string(),
+  vocabRecall: z.array(vocabRecallItemSchema).max(8).default([]),
 });
 
 export type LessonSummaryPayload = z.infer<typeof summarySchema>;
 export type PrepDraftPayload = z.infer<typeof prepSchema>;
+export type VocabRecallItem = z.infer<typeof vocabRecallItemSchema>;
 export type AiProvider = "deepseek" | "openai";
 
 export const COURSE_TYPES = [
@@ -98,7 +109,15 @@ function heuristicPrep(input: {
   courseType?: string;
   lastTopics: string[];
   weaknesses: string[];
+  vocab?: string[];
 }): PrepDraftPayload {
+  const recallTerms = [
+    ...input.weaknesses
+      .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
+      .filter(Boolean),
+    ...(input.vocab ?? []),
+  ].filter((t, i, arr) => arr.indexOf(t) === i);
+
   return {
     warmup: `5-minute small talk with ${input.studentName} (${courseTypeLabel(input.courseType ?? input.level)}).`,
     review: input.lastTopics.length
@@ -110,6 +129,11 @@ function heuristicPrep(input: {
     practice:
       "Role-play a short real-life dialogue; correct gently and recycle key forms.",
     homeworkSeed: "Write 5 sentences using today's target phrases.",
+    vocabRecall: recallTerms.slice(0, 5).map((term) => ({
+      blanked: `これは＿＿の使い方の例です。`,
+      hint: term.slice(0, 24) || "meaning",
+      answer: term,
+    })),
   };
 }
 
@@ -454,8 +478,8 @@ Course: ${course}
 Level: ${input.level}
 Goals: ${input.goals || "n/a"}
 Recent topics: ${input.lastTopics.join(", ") || "n/a"}
-Weak points: ${input.weaknesses.join(", ") || "n/a"}
-Recent vocab: ${input.vocab.join(", ") || "n/a"}
+Weak points / mistakes to recycle: ${input.weaknesses.join(", ") || "n/a"}
+Priority vocab to recall (prefer these for cloze): ${input.vocab.join(", ") || "n/a"}
 Last lesson todaySummary (what was practiced — build continuity):
 ${todaySummary || "n/a"}
 Last nextFocus / 次回の授業提案 (PRIMARY direction for this prep — honor this unless clearly outdated):
@@ -463,12 +487,24 @@ ${nextFocus || "n/a"}
 Last classroom board (what was written together in the previous session — reuse unfinished threads):
 ${board || "n/a"}
 
-Return warmup, review (include example sentences using last grammar), newFocus, practice, homeworkSeed.
+Return warmup, review (include example sentences using last grammar), newFocus, practice, homeworkSeed,
+and vocabRecall: 4–6 short Japanese cloze sentences for oral warm-up.
+
+vocabRecall format (strict):
+- blanked: natural Japanese sentence with ONE blank written as ＿＿ (fullwidth underscores). Example: 「これは昨日行った＿＿です。」
+- hint: short meaning/summary cue for the missing word (English or simple Japanese), NOT the answer itself. Example: "library" or "静かな場所"
+- answer: the exact Japanese word/phrase that fills ＿＿. Example: "図書館"
+UI will display as: これは昨日行った＿＿(library)です。 — student sees the hint, hovers blank to reveal answer.
+Prioritize words the student struggled with or must re-memorize (from weak points + priority vocab). Level-appropriate.
 Match register to course (business keigo / casual / JLPT patterns / travel).
 Keep each section actionable; Japanese phrases welcome.
-If nextFocus is present, newFocus and practice must clearly advance that proposal.`,
+If nextFocus is present, newFocus and practice must clearly advance that proposal.
+If there is no usable vocab/weak list, return vocabRecall as [].`,
     });
-    return object;
+    return {
+      ...object,
+      vocabRecall: object.vocabRecall ?? [],
+    };
   } catch {
     return heuristicPrep(input);
   }

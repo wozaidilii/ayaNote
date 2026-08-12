@@ -245,6 +245,8 @@
     "refsWeak": "弱点",
     "refsVocab": "語彙バンク",
     "refsNone": "まだなし",
+    "vocabRecallTitle": "語彙リコール（穴埋め）",
+    "vocabRecallHint": "表示は「＿＿(ヒント)」形式です。生徒に空欄を埋めてもらい、空欄にマウスを乗せると正解が出ます。",
     "placeholderLine1": "コース・目標・レベルを読み込み中…",
     "placeholderLine2": "直近のレッスン要約と次回フォーカスを参照中…",
     "placeholderLine3": "語彙バンクと弱点を各セクションに反映中…"

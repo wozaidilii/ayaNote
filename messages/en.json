@@ -264,6 +264,8 @@
     "refsWeak": "Weak points",
     "refsVocab": "Vocab bank",
     "refsNone": "None yet",
+    "vocabRecallTitle": "Vocab recall (cloze)",
+    "vocabRecallHint": "Shown as ＿＿(hint). Ask the student to fill the blank; hover the blank to reveal the answer.",
     "placeholderLine1": "Pulling course track, goals, and level…",
     "placeholderLine2": "Reading recent lesson summaries & next focus…",
     "placeholderLine3": "Mixing vocab bank and weak points into sections…"

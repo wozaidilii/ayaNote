@@ -17,6 +17,29 @@ import * as Y from "yjs";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "live";
 
+const PASTE_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
+
+function clipboardImageFiles(data: DataTransfer | null | undefined): File[] {
+  if (!data) return [];
+  const fromFiles = Array.from(data.files ?? []).filter((f) =>
+    PASTE_IMAGE_TYPES.has(f.type),
+  );
+  if (fromFiles.length > 0) return fromFiles;
+
+  const fromItems: File[] = [];
+  for (const item of Array.from(data.items ?? [])) {
+    if (!PASTE_IMAGE_TYPES.has(item.type)) continue;
+    const file = item.getAsFile();
+    if (file) fromItems.push(file);
+  }
+  return fromItems;
+}
+
 const imageExt = Image.configure({
   inline: false,
   allowBase64: false,
@@ -63,7 +86,7 @@ function DocEditorInner({
   autofocus: boolean;
 }) {
   const saveTimer = useRef<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const insertImageRef = useRef<(file: File) => Promise<void>>(async () => {});
   const persist = useCallback(async () => {
     onStatus("saving");
     try {
@@ -122,6 +145,20 @@ function DocEditorInner({
         attributes: {
           class: "classroom-tiptap",
         },
+        handlePaste: (_view, event) => {
+          const files = clipboardImageFiles(event.clipboardData);
+          if (files.length === 0) return false;
+          event.preventDefault();
+          void Promise.all(files.map((file) => insertImageRef.current(file)));
+          return true;
+        },
+        handleDrop: (_view, event) => {
+          const files = clipboardImageFiles(event.dataTransfer);
+          if (files.length === 0) return false;
+          event.preventDefault();
+          void Promise.all(files.map((file) => insertImageRef.current(file)));
+          return true;
+        },
       },
       onUpdate: () => {
         if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -155,6 +192,10 @@ function DocEditorInner({
   );
 
   useEffect(() => {
+    insertImageRef.current = insertImage;
+  }, [insertImage]);
+
+  useEffect(() => {
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
       void persist();
@@ -168,13 +209,6 @@ function DocEditorInner({
       <div className="classroom-doc-toolbar">
         <button
           type="button"
-          className="btn secondary sm classroom-insert-image"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          Image
-        </button>
-        <button
-          type="button"
           className="btn ghost sm"
           onClick={() => {
             const root = document.querySelector(".classroom-tiptap");
@@ -185,17 +219,6 @@ function DocEditorInner({
         >
           Prep
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) void insertImage(file);
-          }}
-        />
       </div>
       <EditorContent editor={editor} className="classroom-doc-surface" />
     </div>

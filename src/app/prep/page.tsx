@@ -131,6 +131,8 @@ export default async function PrepPage({
           refsWeak: t("refsWeak"),
           refsVocab: t("refsVocab"),
           refsNone: t("refsNone"),
+          vocabRecallTitle: t("vocabRecallTitle"),
+          vocabRecallHint: t("vocabRecallHint"),
           placeholderLine1: t("placeholderLine1"),
           placeholderLine2: t("placeholderLine2"),
           placeholderLine3: t("placeholderLine3"),

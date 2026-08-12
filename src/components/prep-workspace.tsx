@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   generateLessonPrep,
@@ -9,7 +16,12 @@ import {
 } from "@/app/actions";
 import { NotebookPen, Sparkles, UiIcon } from "@/components/icons";
 import { EmptyState, PanelTitle } from "@/components/ui-heading";
-import { emptyPrepRefs, hasPrepRefs, type PrepRefs } from "@/lib/prep-refs";
+import {
+  emptyPrepRefs,
+  hasPrepRefs,
+  type PrepRefs,
+  type VocabRecallItem,
+} from "@/lib/prep-refs";
 
 export type PrepLessonItem = {
   id: string;
@@ -87,6 +99,51 @@ function RefGroup({
   );
 }
 
+/** Split on fullwidth ＿＿ or ascii ___ blanks (optional trailing hint parens stripped). */
+function splitCloze(blanked: string) {
+  return blanked
+    .replace(/[＿_]{2,}\s*[（(][^）)]*[）)]/g, "＿＿")
+    .split(/[＿_]{2,}/);
+}
+
+function ClozeBlank({ answer, hint }: { answer: string; hint: string }) {
+  return (
+    <>
+      <span
+        className="prep-cloze"
+        data-answer={answer}
+        tabIndex={0}
+        title={answer}
+      />
+      <span className="prep-cloze-hint">({hint})</span>
+    </>
+  );
+}
+
+function ClozeLine({ item }: { item: VocabRecallItem }) {
+  const parts = splitCloze(item.blanked);
+  const hint = item.hint || item.answer;
+
+  return (
+    <li className="prep-cloze-line">
+      {parts.length === 1 ? (
+        <>
+          <ClozeBlank answer={item.answer} hint={hint} /> {item.blanked}
+        </>
+      ) : (
+        parts.map((part, i) => (
+          <Fragment key={`${item.answer}-${i}`}>
+            {part}
+            {i < parts.length - 1 ? (
+              <ClozeBlank answer={item.answer} hint={hint} />
+            ) : null}
+          </Fragment>
+        ))
+      )}
+    </li>
+  );
+}
+
 export function PrepWorkspace({
   lessons,
   labels,
@@ -119,6 +176,8 @@ export function PrepWorkspace({
     refsWeak: string;
     refsVocab: string;
     refsNone: string;
+    vocabRecallTitle: string;
+    vocabRecallHint: string;
     placeholderLine1: string;
     placeholderLine2: string;
     placeholderLine3: string;
@@ -481,6 +540,23 @@ export function PrepWorkspace({
                     empty={labels.refsNone}
                   />
                 </div>
+              </div>
+            )}
+
+            {currentRefs.vocabRecall.length > 0 && (
+              <div className="prep-vocab-recall">
+                <div className="prep-refs-title">{labels.vocabRecallTitle}</div>
+                <p className="muted prep-vocab-recall-hint">
+                  {labels.vocabRecallHint}
+                </p>
+                <ol className="prep-cloze-list">
+                  {currentRefs.vocabRecall.map((item, i) => (
+                    <ClozeLine
+                      key={`${item.answer}-${i}-${item.blanked}`}
+                      item={item}
+                    />
+                  ))}
+                </ol>
               </div>
             )}
 

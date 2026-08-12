@@ -339,7 +339,7 @@ async function writePrepDraftForLesson(lessonId: string) {
   const weaknesses = lesson.student.progress
     ? parseJsonArray(lesson.student.progress.weaknessesJson)
     : [];
-  const vocab = lesson.student.vocabItems.map((v) => v.term);
+  const bankVocab = lesson.student.vocabItems.map((v) => v.term);
   const pastLessons = lesson.student.lessons.map((l) => {
     const focus = l.summary?.nextFocus?.trim();
     const topics = l.summary
@@ -352,6 +352,29 @@ async function writePrepDraftForLesson(lessonId: string) {
   const lastSummary = lesson.student.lessons[0]?.summary;
   const priorNextFocus = lastSummary?.nextFocus?.trim() || "";
   const lastTodaySummary = lastSummary?.todaySummary?.trim() || "";
+  let lastLessonVocab: string[] = [];
+  if (lastSummary?.vocabJson) {
+    try {
+      const rows = JSON.parse(lastSummary.vocabJson) as Array<{
+        term?: string;
+      }>;
+      if (Array.isArray(rows)) {
+        lastLessonVocab = rows
+          .map((v) => String(v?.term ?? "").trim())
+          .filter(Boolean);
+      }
+    } catch {
+      lastLessonVocab = [];
+    }
+  }
+  // Prefer last-lesson + weak-point vocab for cloze recall, then bank terms.
+  const vocab = [
+    ...lastLessonVocab,
+    ...weaknesses
+      .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
+      .filter((w) => w && !w.includes("→")),
+    ...bankVocab,
+  ].filter((t, i, arr) => arr.indexOf(t) === i);
 
   const priorBoardLesson = await prisma.lesson.findFirst({
     where: {
@@ -367,7 +390,7 @@ async function writePrepDraftForLesson(lessonId: string) {
     parseClassroomDoc(priorBoardLesson?.classroomDoc),
   );
 
-  const draft = await generatePrepDraft({
+  const generated = await generatePrepDraft({
     studentName: lesson.student.name,
     level: lesson.student.level,
     courseType: lesson.student.courseType,
@@ -379,6 +402,7 @@ async function writePrepDraftForLesson(lessonId: string) {
     priorNextFocus,
     lastTodaySummary,
   });
+  const { vocabRecall, ...draft } = generated;
 
   const refs: PrepRefs = {
     course: courseTypeLabel(lesson.student.courseType),
@@ -388,6 +412,7 @@ async function writePrepDraftForLesson(lessonId: string) {
     topics: [...new Set(lastTopics)].slice(0, 8),
     weaknesses: weaknesses.slice(0, 6),
     vocab: vocab.slice(0, 10),
+    vocabRecall: vocabRecall ?? [],
   };
 
   await prisma.prepDraft.upsert({
