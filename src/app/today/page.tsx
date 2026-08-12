@@ -60,6 +60,7 @@ export default async function TodayPage() {
         l.endsAt.getTime() >= now.getTime() - 30 * 60_000,
     ) ??
     lessons.find((l) => l.status !== "completed") ??
+    lessons[0] ??
     null;
 
   return (
@@ -85,10 +86,10 @@ export default async function TodayPage() {
                 {t("startClass")}
               </a>
             ) : (
-              <button className="btn" type="button" disabled>
+              <Link className="btn" href="/calendar">
                 <UiIcon icon={Video} size={15} />
                 {t("startClass")}
-              </button>
+              </Link>
             )}
             <Link className="btn secondary" href="/calendar">
               <UiIcon icon={CalendarDays} size={15} />
