@@ -354,8 +354,82 @@ a {
   transition: transform 0.22s ease;
 }
 
+.students-drawer-wide {
+  width: min(480px, 100vw);
+}
+
 .students-drawer.is-open {
   transform: translateX(0);
+}
+
+.list-row.students-list-row {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.list-row.students-list-row:hover,
+.list-row.students-list-row.is-selected {
+  background: color-mix(in srgb, var(--accent, #2563eb) 6%, transparent);
+}
+
+.students-status-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.students-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 28px;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  opacity: 0.45;
+  font-size: 0.75rem;
+}
+
+.students-status-chip.is-on {
+  opacity: 1;
+  color: var(--accent, #2563eb);
+  border-color: color-mix(in srgb, var(--accent, #2563eb) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent);
+}
+
+.students-creds-list {
+  margin: 0.6rem 0 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.students-creds-list dt {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.students-creds-list dd {
+  margin: 0.15rem 0 0;
+}
+
+.students-creds-list code {
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.students-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
 }
 
 .students-drawer-head {

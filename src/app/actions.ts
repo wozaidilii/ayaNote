@@ -6,7 +6,12 @@ import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
 import { courseTypeLabel, generatePrepDraft, getAiProvider } from "@/lib/ai";
 import { applyTranscriptToLesson } from "@/lib/drive-transcript";
-import { clearAuthSession, setAuthSession, verifyPassword } from "@/lib/auth";
+import {
+  clearAuthSession,
+  hashPassword,
+  setAuthSession,
+  verifyPassword,
+} from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { createGuestId, setGuestSession } from "@/lib/guest-session";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
@@ -710,30 +715,32 @@ export async function createStudent(formData: FormData) {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
+  const password = String(formData.get("password") ?? "");
   const level = String(formData.get("level") ?? "N4");
   const courseType = String(formData.get("courseType") ?? "jlpt_n4");
   const goals = String(formData.get("goals") ?? "");
   const recordingConsent = formData.get("recordingConsent") === "on";
 
   if (!name || !email) throw new Error("Name and email are required");
+  if (password.length < 4)
+    throw new Error("Password must be at least 4 characters");
 
-  const token = createInviteToken();
+  const passwordHash = await hashPassword(password);
   const student = await prisma.student.create({
     data: {
       teacherId: teacher.id,
       name,
       email,
+      passwordHash,
       level,
       courseType,
       goals,
       recordingConsent,
-      inviteToken: token,
-      inviteTokenExpiresAt: inviteExpiry(90),
     },
   });
 
   revalidatePath("/students");
-  redirect(`/students/${student.id}`);
+  redirect(`/students?student=${student.id}`);
 }
 
 export async function updateStudent(formData: FormData) {
@@ -754,6 +761,7 @@ export async function updateStudent(formData: FormData) {
   const startedAtRaw = String(formData.get("startedAt") ?? "").trim();
   const startedAt = startedAtRaw ? new Date(`${startedAtRaw}T00:00:00`) : null;
   const priceNote = String(formData.get("priceNote") ?? "");
+  const newPassword = String(formData.get("password") ?? "");
 
   let priceHistoryJson = student.priceHistoryJson || "[]";
   if (
@@ -777,6 +785,11 @@ export async function updateStudent(formData: FormData) {
     }
     priceHistoryJson = toJson(history.slice(-20));
   }
+
+  const passwordData =
+    newPassword.length >= 4
+      ? { passwordHash: await hashPassword(newPassword) }
+      : {};
 
   await prisma.student.update({
     where: { id: studentId },
@@ -803,15 +816,12 @@ export async function updateStudent(formData: FormData) {
           : null,
       priceNote,
       priceHistoryJson,
+      ...passwordData,
     },
   });
   revalidatePath(`/students/${studentId}`);
   revalidatePath("/students");
-}
-
-/** @deprecated use updateStudent */
-export async function updateStudentNotes(formData: FormData) {
-  return updateStudent(formData);
+  redirect(`/students?student=${studentId}`);
 }
 
 export async function archiveStudent(formData: FormData) {
