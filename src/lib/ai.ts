@@ -1,64 +1,123 @@
-import { generateObject } from "ai";
+import { generateText, type LanguageModel } from "ai";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
-/** Soft schema — DeepSeek structured output often omits nested mins and fails hard. */
+const asText = z.preprocess(
+  (v) => (v == null ? "" : typeof v === "string" ? v : String(v)),
+  z.string(),
+);
+
+const asTextList = z.preprocess((v) => {
+  if (!Array.isArray(v)) return [];
+  return v.map((item) => {
+    if (typeof item === "string") return item;
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      return String(o.term ?? o.pattern ?? o.text ?? o.label ?? "");
+    }
+    return String(item ?? "");
+  });
+}, z.array(z.string()));
+
+const vocabItemSchema = z.preprocess(
+  (v) => {
+    if (typeof v === "string") return { term: v, reading: "", meaning: "" };
+    return v;
+  },
+  z.object({
+    term: asText,
+    reading: asText.optional().default(""),
+    meaning: asText.optional().default(""),
+  }),
+);
+
+const grammarItemSchema = z.preprocess(
+  (v) => {
+    if (typeof v === "string") return { pattern: v, notes: "" };
+    return v;
+  },
+  z.object({
+    pattern: asText,
+    notes: asText.optional().default(""),
+  }),
+);
+
+const exampleItemSchema = z.preprocess(
+  (v) => {
+    if (typeof v === "string") return { pattern: v, examples: [] };
+    return v;
+  },
+  z.object({
+    pattern: asText,
+    examples: asTextList.default([]),
+  }),
+);
+
+/** Soft schema — DeepSeek often returns loose / partial JSON. */
 const summarySchema = z.object({
-  topics: z.array(z.string()).max(12).default([]),
-  todaySummary: z.string().default(""),
-  priorReview: z.string().default(""),
-  vocab: z
-    .array(
-      z.object({
-        term: z.string(),
-        reading: z.string().optional().default(""),
-        meaning: z.string().optional().default(""),
-      }),
-    )
-    .max(20)
-    .default([]),
-  grammar: z
-    .array(
-      z.object({
-        pattern: z.string(),
-        notes: z.string().optional().default(""),
-      }),
-    )
-    .max(12)
-    .default([]),
-  examples: z
-    .array(
-      z.object({
-        pattern: z.string(),
-        examples: z.array(z.string()).max(6).default([]),
-      }),
-    )
-    .max(10)
-    .default([]),
-  mistakes: z.array(z.string()).max(20).default([]),
-  homework: z.string().default(""),
-  nextFocus: z.string().default(""),
-  notes: z.string().default(""),
+  topics: asTextList.default([]),
+  todaySummary: asText.default(""),
+  priorReview: asText.default(""),
+  vocab: z.array(vocabItemSchema).max(20).default([]),
+  grammar: z.array(grammarItemSchema).max(12).default([]),
+  examples: z.array(exampleItemSchema).max(10).default([]),
+  mistakes: asTextList.default([]),
+  homework: asText.default(""),
+  nextFocus: asText.default(""),
+  notes: asText.default(""),
 });
 
 const vocabRecallItemSchema = z.object({
-  /** Japanese sentence with the target replaced by ＿＿ (or ___) */
-  blanked: z.string(),
-  /** Short meaning/summary cue shown as （hint） next to the blank */
-  hint: z.string().default(""),
-  /** Correct word/phrase that fills ＿＿ */
-  answer: z.string(),
+  blanked: asText,
+  hint: asText.default(""),
+  answer: asText,
 });
 
 const prepSchema = z.object({
-  warmup: z.string().default(""),
-  review: z.string().default(""),
-  newFocus: z.string().default(""),
-  practice: z.string().default(""),
-  homeworkSeed: z.string().default(""),
+  warmup: asText.default(""),
+  review: asText.default(""),
+  newFocus: asText.default(""),
+  practice: asText.default(""),
+  homeworkSeed: asText.default(""),
   vocabRecall: z.array(vocabRecallItemSchema).max(8).default([]),
 });
+
+function extractJsonObject(text: string): unknown {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = (fenced?.[1] ?? trimmed).trim();
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start < 0 || end <= start) {
+    throw new Error("No JSON object in model response");
+  }
+  return JSON.parse(candidate.slice(start, end + 1));
+}
+
+async function generateJson<T>(
+  model: LanguageModel,
+  schema: z.ZodType<T>,
+  prompt: string,
+): Promise<T> {
+  const { text } = await generateText({
+    model,
+    prompt: `${prompt}
+
+Return ONLY one JSON object. No markdown fences, no commentary.`,
+  });
+  const raw = extractJsonObject(text);
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `JSON failed schema: ${parsed.error.issues
+        .slice(0, 3)
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ")}`,
+    );
+  }
+  return parsed.data;
+}
 
 export function isHeuristicSummaryNotes(notes: string | null | undefined) {
   const n = notes ?? "";
@@ -330,11 +389,7 @@ async function summarizeSingleChunk(
   const chunk = transcriptChunk.slice(0, 9000);
 
   const run = async (prompt: string) => {
-    const { object } = await generateObject({
-      model,
-      schema: summarySchema,
-      prompt,
-    });
+    const object = await generateJson(model, summarySchema, prompt);
     const normalized = normalizeSummary(object);
     return {
       ...normalized,
@@ -484,10 +539,10 @@ notes: ${p.notes}`,
     .slice(0, 24000);
 
   try {
-    const { object } = await generateObject({
+    const object = await generateJson(
       model,
-      schema: summarySchema,
-      prompt: `Merge these partial Japanese 1v1 lesson summaries into ONE coherent lesson record for the full class.
+      summarySchema,
+      `Merge these partial Japanese 1v1 lesson summaries into ONE coherent lesson record for the full class.
 Deduplicate topics/vocab/grammar. todaySummary should cover the whole lesson in 2–4 sentences.
 homework and nextFocus should reflect the FULL lesson (prefer later parts if they refined the plan).
 
@@ -495,14 +550,16 @@ ${block}
 
 PARTIAL SUMMARIES:
 ${condensed}`,
-    });
+    );
+    const normalized = normalizeSummary(object);
     return {
-      ...object,
-      notes: object.notes?.trim()
-        ? `${object.notes} (via ${getAiProvider()}, map-reduce)`
+      ...normalized,
+      notes: normalized.notes
+        ? `${normalized.notes} (via ${getAiProvider()}, map-reduce)`
         : `Summarized via ${getAiProvider()} (map-reduce).`,
     };
-  } catch {
+  } catch (err) {
+    console.error("AI merge failed:", err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -563,10 +620,10 @@ export async function generatePrepDraft(input: {
   const todaySummary = (input.lastTodaySummary ?? "").trim().slice(0, 2000);
 
   try {
-    const { object } = await generateObject({
+    const object = await generateJson(
       model,
-      schema: prepSchema,
-      prompt: `Create a 50-minute Japanese 1v1 lesson prep draft tailored to the course track.
+      prepSchema,
+      `Create a 50-minute Japanese 1v1 lesson prep draft tailored to the course track.
 Student: ${input.studentName}
 Course: ${course}
 Level: ${input.level}
@@ -581,25 +638,25 @@ ${nextFocus || "n/a"}
 Last classroom board (what was written together in the previous session — reuse unfinished threads):
 ${board || "n/a"}
 
-Return warmup, review (include example sentences using last grammar), newFocus, practice, homeworkSeed,
+Return JSON with: warmup, review, newFocus, practice, homeworkSeed,
 and vocabRecall: 4–6 short Japanese cloze sentences for oral warm-up.
 
 vocabRecall format (strict):
-- blanked: natural Japanese sentence with ONE blank written as ＿＿ (fullwidth underscores). Example: 「これは昨日行った＿＿です。」
-- hint: short meaning/summary cue for the missing word (English or simple Japanese), NOT the answer itself. Example: "library" or "静かな場所"
-- answer: the exact Japanese word/phrase that fills ＿＿. Example: "図書館"
-UI will display as: これは昨日行った＿＿(library)です。 — student sees the hint, hovers blank to reveal answer.
-Prioritize words the student struggled with or must re-memorize (from weak points + priority vocab). Level-appropriate.
-Match register to course (business keigo / casual / JLPT patterns / travel).
-Keep each section actionable; Japanese phrases welcome.
-If nextFocus is present, newFocus and practice must clearly advance that proposal.
-If there is no usable vocab/weak list, return vocabRecall as [].`,
-    });
+- blanked: natural Japanese sentence with ONE blank written as ＿＿. Example: 「これは昨日行った＿＿です。」
+- hint: short meaning cue (English or simple Japanese), NOT the answer. Example: "library"
+- answer: Japanese word/phrase for ＿＿. Example: "図書館"
+Prioritize weak/priority vocab. Level-appropriate.
+If nextFocus is present, newFocus and practice must advance that proposal.
+If no usable vocab/weak list, return vocabRecall as [].`,
+    );
     return {
       ...object,
-      vocabRecall: object.vocabRecall ?? [],
+      vocabRecall: (object.vocabRecall ?? []).filter(
+        (v) => v.blanked.trim() && v.answer.trim(),
+      ),
     };
-  } catch {
+  } catch (err) {
+    console.error("AI prep failed:", err instanceof Error ? err.message : err);
     return heuristicPrep(input);
   }
 }

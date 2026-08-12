@@ -220,6 +220,7 @@
     "warnNoAiKey": "No AI API key on server — summary used a local heuristic. Set DEEPSEEK_API_KEY for better results.",
     "warnHeuristic": "AI summary did not complete — this is a local fallback (raw-ish topics / empty vocab). Retry AI summary below.",
     "retryAiSummary": "Retry AI summary from stored transcript",
+    "retryAiSummaryPending": "Generating AI summary… (30–90s)",
     "errEmpty": "Paste a transcript before generating.",
     "flowLabel": "Lesson flow",
     "stepClassroom": "Classroom",

@@ -8,6 +8,7 @@ import {
 } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { BookOpen, Sparkles, Video, UiIcon } from "@/components/icons";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { SummaryGeneratingPanel } from "@/components/summary-generating-panel";
 import { PageHeading } from "@/components/ui-heading";
 import {
@@ -20,6 +21,8 @@ import { prisma } from "@/lib/db";
 import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
+
+export const maxDuration = 120;
 
 const TRANSCRIPT_STATUS_KEY: Record<
   string,
@@ -286,10 +289,11 @@ export default async function LessonRoomPage({
             {(lesson.transcript?.editedText || lesson.transcript?.rawText) && (
               <form action={regenerateSummaryFromStored}>
                 <input type="hidden" name="lessonId" value={lesson.id} />
-                <button className="btn" type="submit">
-                  <UiIcon icon={Sparkles} size={15} />
-                  {t("retryAiSummary")}
-                </button>
+                <PendingSubmitButton
+                  icon={Sparkles}
+                  label={t("retryAiSummary")}
+                  pendingLabel={t("retryAiSummaryPending")}
+                />
               </form>
             )}
           </div>
