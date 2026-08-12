@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   if (session.role === "student") {
     const student = await getActiveStudentOrNull();
-    if (!student || student.teacherId !== lesson.teacherId) {
+    if (!student || student.id !== lesson.studentId) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 

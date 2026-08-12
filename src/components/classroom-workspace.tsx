@@ -17,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MutableRefObject,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -56,19 +57,39 @@ type Labels = {
   linkCopied: string;
 };
 
+/** Rotate MediaRecorder every N ms so each WebM segment is independently STT-able. */
+const AUDIO_SEGMENT_MS = 4 * 60 * 1000;
+const AUDIO_SEGMENT_MAX_BYTES = 8 * 1024 * 1024;
+
 function MixedAudioRecorder({
   active,
-  onChunk,
+  finalizeOnStopRef,
+  onSegment,
+  onFinal,
 }: {
   active: boolean;
-  onChunk: (blob: Blob) => void;
+  /** When true, stopping recorder (incl. unmount) delivers onFinal instead of discard. */
+  finalizeOnStopRef: MutableRefObject<boolean>;
+  /** Mid-class segment (keep recording). */
+  onSegment: (blob: Blob) => void;
+  /** Last segment when End & Transcribe stops recording. */
+  onFinal: (blob: Blob) => void;
 }) {
   const room = useRoomContext();
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const chunkBytesRef = useRef(0);
   const ctxRef = useRef<AudioContext | null>(null);
   const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const sourcesRef = useRef<Map<string, MediaStreamAudioSourceNode>>(new Map());
+  const rotatingRef = useRef(false);
+  const mimeTypeRef = useRef("");
+  const onSegmentRef = useRef(onSegment);
+  const onFinalRef = useRef(onFinal);
+  useEffect(() => {
+    onSegmentRef.current = onSegment;
+    onFinalRef.current = onFinal;
+  }, [onFinal, onSegment]);
 
   const attachTrack = useCallback(
     (id: string, mediaStreamTrack: MediaStreamTrack) => {
@@ -95,36 +116,81 @@ function MixedAudioRecorder({
     sourcesRef.current.delete(id);
   }, []);
 
-  useEffect(() => {
-    if (!active) return;
+  const startRecorderRef = useRef<() => void>(() => {});
 
-    const ctx = new AudioContext();
-    const dest = ctx.createMediaStreamDestination();
-    ctxRef.current = ctx;
-    destRef.current = dest;
-    chunksRef.current = [];
-
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "";
-
+  const startRecorder = useCallback(() => {
+    const dest = destRef.current;
+    if (!dest) return;
+    const mimeType = mimeTypeRef.current;
     const recorder = mimeType
       ? new MediaRecorder(dest.stream, { mimeType })
       : new MediaRecorder(dest.stream);
     recorderRef.current = recorder;
+    chunksRef.current = [];
+    chunkBytesRef.current = 0;
     recorder.ondataavailable = (ev) => {
-      if (ev.data.size > 0) chunksRef.current.push(ev.data);
+      if (ev.data.size > 0) {
+        chunksRef.current.push(ev.data);
+        chunkBytesRef.current += ev.data.size;
+        if (
+          chunkBytesRef.current >= AUDIO_SEGMENT_MAX_BYTES &&
+          recorder.state === "recording" &&
+          !rotatingRef.current &&
+          !finalizeOnStopRef.current
+        ) {
+          rotatingRef.current = true;
+          try {
+            recorder.stop();
+          } catch {
+            rotatingRef.current = false;
+          }
+        }
+      }
     };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, {
         type: recorder.mimeType || "audio/webm",
       });
       chunksRef.current = [];
-      if (blob.size > 0) onChunk(blob);
+      chunkBytesRef.current = 0;
+      const wantFinal = finalizeOnStopRef.current;
+      const wasRotate = rotatingRef.current;
+      rotatingRef.current = false;
+      if (wantFinal) {
+        onFinalRef.current(
+          blob.size > 0 ? blob : new Blob([], { type: "audio/webm" }),
+        );
+        return;
+      }
+      if (blob.size > 0) onSegmentRef.current(blob);
+      if (wasRotate && ctxRef.current && !finalizeOnStopRef.current) {
+        startRecorderRef.current();
+      }
     };
     recorder.start(2000);
+  }, [finalizeOnStopRef]);
+
+  useEffect(() => {
+    startRecorderRef.current = startRecorder;
+  }, [startRecorder]);
+
+  useEffect(() => {
+    if (!active) return;
+
+    rotatingRef.current = false;
+    const ctx = new AudioContext();
+    const dest = ctx.createMediaStreamDestination();
+    ctxRef.current = ctx;
+    destRef.current = dest;
+    mimeTypeRef.current = MediaRecorder.isTypeSupported(
+      "audio/webm;codecs=opus",
+    )
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "";
+
+    startRecorder();
 
     for (const pub of room.localParticipant.audioTrackPublications.values()) {
       const track = pub.track?.mediaStreamTrack;
@@ -165,23 +231,57 @@ function MixedAudioRecorder({
       }
     });
 
+    const rotateTimer = window.setInterval(() => {
+      const recorder = recorderRef.current;
+      if (
+        !recorder ||
+        recorder.state !== "recording" ||
+        rotatingRef.current ||
+        finalizeOnStopRef.current
+      ) {
+        return;
+      }
+      rotatingRef.current = true;
+      try {
+        recorder.stop();
+      } catch {
+        rotatingRef.current = false;
+      }
+    }, AUDIO_SEGMENT_MS);
+
+    const sources = sourcesRef.current;
+
     return () => {
+      window.clearInterval(rotateTimer);
       room.off(RoomEvent.TrackSubscribed, onSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, onUnsubscribed);
-      if (recorder.state !== "inactive") {
+      // Intentionally read latest finalize flag at teardown (End & Transcribe).
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- latest ref at cleanup
+      const shouldFinal = finalizeOnStopRef.current;
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
         try {
           recorder.stop();
         } catch {
           /* ignore */
         }
+      } else if (shouldFinal) {
+        onFinalRef.current(new Blob([], { type: "audio/webm" }));
       }
-      for (const id of [...sourcesRef.current.keys()]) detachTrack(id);
+      for (const id of [...sources.keys()]) detachTrack(id);
       void ctx.close();
       ctxRef.current = null;
       destRef.current = null;
       recorderRef.current = null;
     };
-  }, [active, attachTrack, detachTrack, onChunk, room]);
+  }, [
+    active,
+    attachTrack,
+    detachTrack,
+    finalizeOnStopRef,
+    room,
+    startRecorder,
+  ]);
 
   return null;
 }
@@ -467,6 +567,7 @@ export function ClassroomWorkspace({
     useState<TrackReferenceOrPlaceholder | null>(null);
   const [classEndedRemote, setClassEndedRemote] = useState(false);
   const pendingUploadRef = useRef(false);
+  const finalizeOnStopRef = useRef(false);
   const canEndAndTranscribe = role === "teacher";
 
   const leaveToSummary = useCallback(() => {
@@ -527,6 +628,8 @@ export function ClassroomWorkspace({
 
   useEffect(() => {
     if (!isPast && livekitReady && !tokenInfo && !userLeftCall && !ending) {
+      // Auto-join when classroom mounts; join() owns loading/error state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mount join
       void join();
     }
   }, [ending, isPast, join, livekitReady, tokenInfo, userLeftCall]);
@@ -534,18 +637,57 @@ export function ClassroomWorkspace({
   const uploadAndSummarize = (blob: Blob) => {
     if (role !== "teacher") return;
     const form = new FormData();
-    form.append("audio", blob, "classroom.webm");
+    if (blob.size >= 256) {
+      form.append("audio", blob, "classroom-final.webm");
+    }
+    form.append("finalize", "1");
     void fetch(`/api/lessons/${lessonId}/transcribe`, {
       method: "POST",
       body: form,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          detail?: string;
+        };
+        console.error("transcribe failed", data);
+      }
     });
     pendingUploadRef.current = false;
+    finalizeOnStopRef.current = false;
     setTokenInfo(null);
     setRecordActive(false);
     router.replace(`/lessons/${lessonId}?ok=summarizing`);
   };
 
-  const onChunk = useCallback(
+  const uploadSegment = useCallback(
+    (blob: Blob) => {
+      if (role !== "teacher" || blob.size < 256) return;
+      const form = new FormData();
+      form.append("audio", blob, `classroom-part-${Date.now()}.webm`);
+      void fetch(`/api/lessons/${lessonId}/audio-parts`, {
+        method: "POST",
+        body: form,
+      }).then(async (res) => {
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          console.error("audio-part failed", data);
+        }
+      });
+    },
+    [lessonId, role],
+  );
+
+  const onSegment = useCallback(
+    (blob: Blob) => {
+      uploadSegment(blob);
+    },
+    [uploadSegment],
+  );
+
+  const onFinal = useCallback(
     (blob: Blob) => {
       if (!pendingUploadRef.current) return;
       uploadAndSummarize(blob);
@@ -561,6 +703,7 @@ export function ClassroomWorkspace({
       return;
     }
     pendingUploadRef.current = true;
+    finalizeOnStopRef.current = true;
     setUserLeftCall(true);
     setEnding(true);
     setRecordActive(false);
@@ -571,16 +714,18 @@ export function ClassroomWorkspace({
     const timer = window.setTimeout(() => {
       if (!pendingUploadRef.current) return;
       pendingUploadRef.current = false;
+      finalizeOnStopRef.current = false;
       setEnding(false);
       setTokenInfo(null);
       setRecordActive(false);
       setError(labels.errorTranscribe);
-    }, 10000);
+    }, 15000);
     return () => window.clearTimeout(timer);
   }, [ending, labels.errorTranscribe]);
 
   const leaveCall = () => {
     pendingUploadRef.current = false;
+    finalizeOnStopRef.current = false;
     setUserLeftCall(true);
     setRecordActive(false);
     setTokenInfo(null);
@@ -766,7 +911,12 @@ export function ClassroomWorkspace({
           onSelect={setFocusedTrack}
           onClearIfGone={() => setFocusedTrack(null)}
         />
-        <MixedAudioRecorder active={recordActive} onChunk={onChunk} />
+        <MixedAudioRecorder
+          active={recordActive}
+          finalizeOnStopRef={finalizeOnStopRef}
+          onSegment={onSegment}
+          onFinal={onFinal}
+        />
         <RoomAudioRenderer />
         {topBar(true)}
         {classEndedRemote && (

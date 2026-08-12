@@ -128,7 +128,18 @@
     "openPrep": "Open prep",
     "openRoom": "Lesson room",
     "noUpcoming": "No upcoming lesson",
-    "course": "Course"
+    "course": "Course",
+    "startedAt": "Lesson start date",
+    "pricePerLesson": "Fee per lesson",
+    "currency": "Currency",
+    "lessonsPerWeek": "Lessons per week",
+    "priceNote": "Pricing notes",
+    "priceHistory": "Previous fees",
+    "homeworkStatus": "Homework",
+    "hwAssigned": "Assigned",
+    "hwDone": "Done",
+    "hwReviewed": "Reviewed",
+    "markReviewed": "Mark reviewed"
   },
   "lessonRoom": {
     "title": "Lesson Room",
@@ -287,7 +298,11 @@
   "studentHistory": {
     "title": "Lesson history",
     "subtitle": "Summaries only (no full transcripts)",
-    "viewClassroom": "View classroom & plan"
+    "viewClassroom": "View classroom & plan",
+    "hwAssigned": "To do",
+    "hwDone": "Done",
+    "hwReviewed": "Reviewed",
+    "markDone": "Mark as done"
   },
   "studentLesson": {
     "title": "Lesson summary",

@@ -109,7 +109,18 @@
     "openPrep": "教案を開く",
     "openRoom": "レッスンルーム",
     "noUpcoming": "予定なし",
-    "course": "コース"
+    "course": "コース",
+    "startedAt": "レッスン開始日",
+    "pricePerLesson": "レッスン料金",
+    "currency": "通貨",
+    "lessonsPerWeek": "週あたり回数",
+    "priceNote": "料金メモ",
+    "priceHistory": "過去の料金",
+    "homeworkStatus": "宿題",
+    "hwAssigned": "未完了",
+    "hwDone": "完了",
+    "hwReviewed": "確認済み",
+    "markReviewed": "確認済みにする"
   },
   "lessonRoom": {
     "title": "レッスンルーム",
@@ -268,7 +279,11 @@
   "studentHistory": {
     "title": "レッスン履歴",
     "subtitle": "要約のみ（全文書き起こしは非表示）",
-    "viewClassroom": "Classroomと教案を見る"
+    "viewClassroom": "Classroomと教案を見る",
+    "hwAssigned": "未完了",
+    "hwDone": "完了",
+    "hwReviewed": "確認済み",
+    "markDone": "完了にする"
   },
   "studentLesson": {
     "title": "レッスンまとめ",

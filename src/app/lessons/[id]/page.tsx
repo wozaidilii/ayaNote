@@ -1,6 +1,10 @@
 import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
-import { approveSummary, importTranscriptAndSummarize } from "@/app/actions";
+import {
+  approveSummary,
+  importTranscriptAndSummarize,
+  markHomeworkReviewed,
+} from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { BookOpen, Video, UiIcon } from "@/components/icons";
 import { SummaryGeneratingPanel } from "@/components/summary-generating-panel";
@@ -95,6 +99,7 @@ export default async function LessonRoomPage({
       transcript: true,
       summary: true,
       prepDraft: true,
+      homeworks: true,
     },
   });
   if (!lesson) notFound();
@@ -384,6 +389,30 @@ export default async function LessonRoomPage({
                     defaultValue={lesson.summary.homework}
                   />
                 </div>
+                {lesson.homeworks[0] ? (
+                  <div style={{ marginBottom: "0.75rem" }}>
+                    <span
+                      className={`chip${lesson.homeworks[0].status !== "assigned" ? " done" : ""}`}
+                    >
+                      {lesson.homeworks[0].status}
+                    </span>
+                    {lesson.homeworks[0].status === "done" ? (
+                      <form
+                        action={markHomeworkReviewed}
+                        style={{ display: "inline", marginLeft: "0.5rem" }}
+                      >
+                        <input
+                          type="hidden"
+                          name="homeworkId"
+                          value={lesson.homeworks[0].id}
+                        />
+                        <button className="btn secondary sm" type="submit">
+                          Mark reviewed
+                        </button>
+                      </form>
+                    ) : null}
+                  </div>
+                ) : null}
               </section>
 
               <details className="lesson-room-details">

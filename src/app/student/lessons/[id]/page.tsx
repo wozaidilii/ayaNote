@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
+import { markHomeworkDone } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { BookOpen } from "@/components/icons";
 import { SummaryGeneratingPanel } from "@/components/summary-generating-panel";
@@ -45,10 +46,11 @@ export default async function StudentLessonSummaryPage({
       student: { select: { id: true, name: true } },
       summary: true,
       transcript: true,
+      homeworks: true,
     },
   });
   if (!lesson) notFound();
-  if (lesson.teacherId !== active.teacherId) redirect("/student");
+  if (lesson.studentId !== active.id) redirect("/student");
 
   const timeZone = normalizeTimezone(lesson.teacher.timezone);
   const summarizing = sp.ok === "summarizing" && !lesson.summary;
@@ -103,7 +105,35 @@ export default async function StudentLessonSummaryPage({
           <h3>{common("topics")}</h3>
           <p className="muted">{topics.join(" · ") || "—"}</p>
           <h3>{common("homework")}</h3>
-          <p>{lesson.summary.homework || "—"}</p>
+          <p>
+            {lesson.homeworks[0]?.instructions ||
+              lesson.summary.homework ||
+              "—"}
+          </p>
+          {lesson.homeworks[0] ? (
+            <div style={{ marginBottom: "0.75rem" }}>
+              <span
+                className={`chip${lesson.homeworks[0].status !== "assigned" ? " done" : ""}`}
+              >
+                {lesson.homeworks[0].status}
+              </span>
+              {lesson.homeworks[0].status === "assigned" ? (
+                <form
+                  action={markHomeworkDone}
+                  style={{ display: "inline", marginLeft: "0.5rem" }}
+                >
+                  <input
+                    type="hidden"
+                    name="homeworkId"
+                    value={lesson.homeworks[0].id}
+                  />
+                  <button className="btn secondary sm" type="submit">
+                    Done
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          ) : null}
           <h3>{common("nextFocus")}</h3>
           <p>{lesson.summary.nextFocus || "—"}</p>
           {vocab.length > 0 && (

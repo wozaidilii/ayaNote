@@ -47,6 +47,16 @@ model Student {
   privateNotes       String    @default("")
   recordingConsent   Boolean   @default(false)
   locale             String    @default("en")
+  /** Lesson start date for this student */
+  startedAt          DateTime?
+  /** Fee per lesson in minor units avoided — store major units as Decimal-like Float */
+  pricePerLesson     Float?
+  currency           String    @default("JPY")
+  /** Target lessons per week (overrides global max when set) */
+  lessonsPerWeek     Int?
+  priceNote          String    @default("")
+  /** [{ at: ISO, price: number, currency?: string }] for simple price history */
+  priceHistoryJson   String    @default("[]")
   archivedAt         DateTime?
   inviteToken        String?   @unique
   inviteTokenExpiresAt DateTime?
@@ -59,6 +69,7 @@ model Student {
   vocabItems      VocabItem[]
   grammarItems    GrammarItem[]
   progress        ProgressSnapshot?
+  homeworks       Homework[]
 
   @@unique([teacherId, email])
   @@index([teacherId])
@@ -77,6 +88,11 @@ model Lesson {
   meetLink         String?
   transcriptStatus String   @default("none") // none | waiting_drive | imported | manual
   driveFileId      String?
+  /** idle | uploading | transcribing | summarizing | ready | failed */
+  processingStatus String   @default("idle")
+  processingError  String   @default("")
+  /** Next audio part index for segmented classroom recording */
+  nextAudioPartIndex Int    @default(0)
   /** Shared live notes during / after classroom (teacher + student) */
   classroomNotes   String   @default("")
   /** TipTap JSON document for classroom board (single Notion-like page) */
@@ -85,15 +101,75 @@ model Lesson {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  teacher   Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher    Teacher           @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  student    Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
   transcript Transcript?
   summary    Summary?
   prepDraft  PrepDraft?
+  audioParts LessonAudioPart[]
+  homeworks       Homework[]
+  assets          LessonAsset[]
 
   @@index([teacherId, startsAt])
   @@index([studentId, startsAt])
   @@index([transcriptStatus, endsAt])
+  @@index([processingStatus])
+}
+
+/** Metadata for each classroom audio segment (text appended after STT; audio not retained). */
+model LessonAudioPart {
+  id        String   @id @default(cuid())
+  lessonId  String
+  partIndex Int
+  byteSize  Int      @default(0)
+  charCount Int      @default(0)
+  status    String   @default("done") // pending | done | failed
+  error     String   @default("")
+  createdAt DateTime @default(now())
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, partIndex])
+  @@index([lessonId])
+}
+
+/** Per-lesson homework with completion tracking (Summary.homework is display snapshot). */
+model Homework {
+  id           String    @id @default(cuid())
+  lessonId     String
+  studentId    String
+  title        String    @default("")
+  instructions String    @default("")
+  /** assigned | done | reviewed */
+  status       String    @default("assigned")
+  dueAt        DateTime?
+  completedAt  DateTime?
+  /** ai_summary | ai_prep | manual */
+  source       String    @default("ai_summary")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lesson  Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId])
+  @@index([studentId, status])
+}
+
+/** Classroom board image / file attachment stored in DB (served via API). */
+model LessonAsset {
+  id          String   @id @default(cuid())
+  lessonId    String
+  mimeType    String
+  filename    String   @default("")
+  byteSize    Int      @default(0)
+  data        Bytes
+  uploadedBy  String   @default("") // teacherId | studentId | guestId
+  createdAt   DateTime @default(now())
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
 }
 
 model Transcript {

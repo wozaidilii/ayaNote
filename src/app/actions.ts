@@ -121,6 +121,7 @@ async function getTeacher() {
 }
 
 export async function importTranscriptAndSummarize(formData: FormData) {
+  const teacher = await getTeacher();
   const lessonId = String(formData.get("lessonId") ?? "");
   const rawText = String(formData.get("transcript") ?? "");
   const tags = String(formData.get("tags") ?? "")
@@ -133,6 +134,11 @@ export async function importTranscriptAndSummarize(formData: FormData) {
   }
   if (!rawText.trim()) {
     redirect(`/lessons/${lessonId}?err=empty_transcript`);
+  }
+
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacher.id) {
+    redirect("/today?err=forbidden");
   }
 
   await applyTranscriptToLesson({
@@ -155,6 +161,7 @@ export async function importTranscriptAndSummarize(formData: FormData) {
 }
 
 export async function approveSummary(formData: FormData) {
+  const teacher = await getTeacher();
   const lessonId = String(formData.get("lessonId") ?? "");
   const homework = String(formData.get("homework") ?? "");
   const nextFocus = String(formData.get("nextFocus") ?? "");
@@ -166,6 +173,7 @@ export async function approveSummary(formData: FormData) {
     where: { id: lessonId },
     include: { summary: true },
   });
+  if (lesson.teacherId !== teacher.id) throw new Error("Not your lesson");
 
   if (!lesson.summary) throw new Error("No summary");
 
@@ -180,6 +188,35 @@ export async function approveSummary(formData: FormData) {
       approved: true,
     },
   });
+
+  // Materialize homework entity (status source of truth)
+  const instructions = homework.trim();
+  if (instructions) {
+    const existingHw = await prisma.homework.findUnique({
+      where: { lessonId },
+      select: { status: true },
+    });
+    const keepStatus =
+      existingHw?.status === "done" || existingHw?.status === "reviewed"
+        ? existingHw.status
+        : "assigned";
+    await prisma.homework.upsert({
+      where: { lessonId },
+      create: {
+        lessonId,
+        studentId: lesson.studentId,
+        title: "Homework",
+        instructions,
+        status: "assigned",
+        source: "ai_summary",
+      },
+      update: {
+        instructions,
+        source: "ai_summary",
+        status: keepStatus,
+      },
+    });
+  }
 
   const vocab = (() => {
     try {
@@ -266,9 +303,11 @@ export async function approveSummary(formData: FormData) {
   revalidatePath(`/lessons/${lessonId}`);
   revalidatePath(`/students/${lesson.studentId}`);
   revalidatePath("/student/history");
+  revalidatePath(`/student/lessons/${lessonId}`);
 }
 
 async function writePrepDraftForLesson(lessonId: string) {
+  const teacher = await getTeacher();
   const lesson = await prisma.lesson.findUniqueOrThrow({
     where: { id: lessonId },
     include: {
@@ -276,6 +315,7 @@ async function writePrepDraftForLesson(lessonId: string) {
         include: {
           progress: true,
           vocabItems: { orderBy: { createdAt: "desc" }, take: 12 },
+          grammarItems: { orderBy: { createdAt: "desc" }, take: 8 },
           lessons: {
             where: { status: "completed" },
             include: { summary: true },
@@ -286,6 +326,7 @@ async function writePrepDraftForLesson(lessonId: string) {
       },
     },
   });
+  if (lesson.teacherId !== teacher.id) throw new Error("Not your lesson");
 
   const lastTopics = lesson.student.lessons.flatMap((l) =>
     l.summary ? parseJsonArray(l.summary.topicsJson) : [],
@@ -302,6 +343,10 @@ async function writePrepDraftForLesson(lessonId: string) {
     const label = focus || topics.join(" / ") || "past lesson";
     return label;
   });
+
+  const lastSummary = lesson.student.lessons[0]?.summary;
+  const priorNextFocus = lastSummary?.nextFocus?.trim() || "";
+  const lastTodaySummary = lastSummary?.todaySummary?.trim() || "";
 
   const priorBoardLesson = await prisma.lesson.findFirst({
     where: {
@@ -326,6 +371,8 @@ async function writePrepDraftForLesson(lessonId: string) {
     weaknesses,
     vocab,
     lastClassroomBoard,
+    priorNextFocus,
+    lastTodaySummary,
   });
 
   const refs: PrepRefs = {
@@ -421,6 +468,7 @@ export async function generateMissingPrepBatch(lessonIds: string[]) {
 }
 
 export async function savePrepDraft(formData: FormData) {
+  const teacher = await getTeacher();
   const lessonId = String(formData.get("lessonId") ?? "");
   const status = String(formData.get("status") ?? "draft");
   const data = {
@@ -431,6 +479,11 @@ export async function savePrepDraft(formData: FormData) {
     homeworkSeed: String(formData.get("homeworkSeed") ?? ""),
     status,
   };
+
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacher.id) {
+    throw new Error("Not your lesson");
+  }
 
   await prisma.prepDraft.upsert({
     where: { lessonId },
@@ -445,6 +498,8 @@ export async function savePrepDraft(formData: FormData) {
   revalidatePath("/prep");
   revalidatePath("/today");
   revalidatePath("/calendar");
+  revalidatePath(`/lessons/${lessonId}`);
+  revalidatePath(`/students/${lesson.studentId}`);
 }
 
 export async function updateAvailability(formData: FormData) {
@@ -682,7 +737,47 @@ export async function createStudent(formData: FormData) {
 }
 
 export async function updateStudent(formData: FormData) {
+  const teacher = await getTeacher();
   const studentId = String(formData.get("studentId") ?? "");
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!student || student.teacherId !== teacher.id) {
+    throw new Error("Not your student");
+  }
+
+  const priceRaw = String(formData.get("pricePerLesson") ?? "").trim();
+  const pricePerLesson =
+    priceRaw === "" ? null : Number.parseFloat(priceRaw.replace(/,/g, ""));
+  const currency = String(formData.get("currency") ?? "JPY").trim() || "JPY";
+  const lessonsPerWeekRaw = String(formData.get("lessonsPerWeek") ?? "").trim();
+  const lessonsPerWeek =
+    lessonsPerWeekRaw === "" ? null : Number.parseInt(lessonsPerWeekRaw, 10);
+  const startedAtRaw = String(formData.get("startedAt") ?? "").trim();
+  const startedAt = startedAtRaw ? new Date(`${startedAtRaw}T00:00:00`) : null;
+  const priceNote = String(formData.get("priceNote") ?? "");
+
+  let priceHistoryJson = student.priceHistoryJson || "[]";
+  if (
+    pricePerLesson != null &&
+    !Number.isNaN(pricePerLesson) &&
+    pricePerLesson !== student.pricePerLesson
+  ) {
+    let history: Array<{ at: string; price: number; currency?: string }> = [];
+    try {
+      const parsed = JSON.parse(priceHistoryJson) as unknown;
+      if (Array.isArray(parsed)) history = parsed as typeof history;
+    } catch {
+      history = [];
+    }
+    if (student.pricePerLesson != null) {
+      history.push({
+        at: new Date().toISOString(),
+        price: student.pricePerLesson,
+        currency: student.currency || "JPY",
+      });
+    }
+    priceHistoryJson = toJson(history.slice(-20));
+  }
+
   await prisma.student.update({
     where: { id: studentId },
     data: {
@@ -695,6 +790,19 @@ export async function updateStudent(formData: FormData) {
       level: String(formData.get("level") ?? "N4"),
       courseType: String(formData.get("courseType") ?? "jlpt_n4"),
       recordingConsent: formData.get("recordingConsent") === "on",
+      startedAt:
+        startedAt && !Number.isNaN(startedAt.getTime()) ? startedAt : null,
+      pricePerLesson:
+        pricePerLesson != null && !Number.isNaN(pricePerLesson)
+          ? pricePerLesson
+          : null,
+      currency,
+      lessonsPerWeek:
+        lessonsPerWeek != null && !Number.isNaN(lessonsPerWeek)
+          ? lessonsPerWeek
+          : null,
+      priceNote,
+      priceHistoryJson,
     },
   });
   revalidatePath(`/students/${studentId}`);
@@ -707,7 +815,12 @@ export async function updateStudentNotes(formData: FormData) {
 }
 
 export async function archiveStudent(formData: FormData) {
+  const teacher = await getTeacher();
   const studentId = String(formData.get("studentId") ?? "");
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!student || student.teacherId !== teacher.id) {
+    throw new Error("Not your student");
+  }
   await prisma.student.update({
     where: { id: studentId },
     data: {
@@ -722,7 +835,12 @@ export async function archiveStudent(formData: FormData) {
 }
 
 export async function restoreStudent(formData: FormData) {
+  const teacher = await getTeacher();
   const studentId = String(formData.get("studentId") ?? "");
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!student || student.teacherId !== teacher.id) {
+    throw new Error("Not your student");
+  }
   await prisma.student.update({
     where: { id: studentId },
     data: { archivedAt: null },
@@ -732,7 +850,12 @@ export async function restoreStudent(formData: FormData) {
 }
 
 export async function regenerateInviteToken(formData: FormData) {
+  const teacher = await getTeacher();
   const studentId = String(formData.get("studentId") ?? "");
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!student || student.teacherId !== teacher.id) {
+    throw new Error("Not your student");
+  }
   await prisma.student.update({
     where: { id: studentId },
     data: {
@@ -741,4 +864,39 @@ export async function regenerateInviteToken(formData: FormData) {
     },
   });
   revalidatePath(`/students/${studentId}`);
+}
+
+export async function markHomeworkDone(formData: FormData) {
+  const student = await requireStudent();
+  const homeworkId = String(formData.get("homeworkId") ?? "");
+  const hw = await prisma.homework.findUnique({ where: { id: homeworkId } });
+  if (!hw || hw.studentId !== student.id) {
+    throw new Error("Not your homework");
+  }
+  await prisma.homework.update({
+    where: { id: homeworkId },
+    data: { status: "done", completedAt: new Date() },
+  });
+  revalidatePath("/student/history");
+  revalidatePath(`/student/lessons/${hw.lessonId}`);
+  revalidatePath(`/students/${hw.studentId}`);
+  revalidatePath(`/lessons/${hw.lessonId}`);
+}
+
+export async function markHomeworkReviewed(formData: FormData) {
+  const teacher = await getTeacher();
+  const homeworkId = String(formData.get("homeworkId") ?? "");
+  const hw = await prisma.homework.findUnique({
+    where: { id: homeworkId },
+    include: { lesson: { select: { teacherId: true } } },
+  });
+  if (!hw || hw.lesson.teacherId !== teacher.id) {
+    throw new Error("Not your homework");
+  }
+  await prisma.homework.update({
+    where: { id: homeworkId },
+    data: { status: "reviewed" },
+  });
+  revalidatePath(`/lessons/${hw.lessonId}`);
+  revalidatePath(`/students/${hw.studentId}`);
 }

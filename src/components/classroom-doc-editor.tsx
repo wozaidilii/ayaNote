@@ -2,6 +2,7 @@
 
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
+import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { getSchema } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -16,15 +17,23 @@ import * as Y from "yjs";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "live";
 
+const imageExt = Image.configure({
+  inline: false,
+  allowBase64: false,
+  HTMLAttributes: { class: "classroom-doc-image" },
+});
+
 const starter = StarterKit.configure({
   heading: { levels: [1, 2, 3] },
   // History conflicts with Yjs collaboration undo
   undoRedo: false,
 });
 
+const schemaExtensions = [starter, imageExt];
+
 /** Build a Y.Doc seeded from TipTap JSON (call once per lesson mount). */
 export function buildClassroomYDoc(initial: TiptapDoc): Y.Doc {
-  const schema = getSchema([starter]);
+  const schema = getSchema(schemaExtensions);
   return prosemirrorJSONToYDoc(schema, initial, "default");
 }
 
@@ -54,6 +63,7 @@ function DocEditorInner({
   autofocus: boolean;
 }) {
   const saveTimer = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const persist = useCallback(async () => {
     onStatus("saving");
     try {
@@ -77,6 +87,7 @@ function DocEditorInner({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const list: any[] = [
       starter,
+      imageExt,
       Placeholder.configure({ placeholder }),
       Collaboration.configure({ document: ydoc }),
     ];
@@ -122,6 +133,27 @@ function DocEditorInner({
     [extensions],
   );
 
+  const insertImage = useCallback(
+    async (file: File) => {
+      if (!editor) return;
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`/api/lessons/${lessonId}/assets`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) {
+        onStatus("error");
+        return;
+      }
+      const data = (await res.json()) as { url?: string };
+      if (!data.url) return;
+      editor.chain().focus().setImage({ src: data.url }).run();
+      void persist();
+    },
+    [editor, lessonId, onStatus, persist],
+  );
+
   useEffect(() => {
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -131,7 +163,43 @@ function DocEditorInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <EditorContent editor={editor} className="classroom-doc-surface" />;
+  return (
+    <div className="classroom-doc-editor-wrap">
+      <div className="classroom-doc-toolbar">
+        <button
+          type="button"
+          className="btn secondary sm classroom-insert-image"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          Image
+        </button>
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => {
+            const root = document.querySelector(".classroom-tiptap");
+            const heading = root?.querySelector("h1, h2, h3");
+            heading?.scrollIntoView({ behavior: "smooth", block: "start" });
+            editor?.commands.focus();
+          }}
+        >
+          Prep
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void insertImage(file);
+          }}
+        />
+      </div>
+      <EditorContent editor={editor} className="classroom-doc-surface" />
+    </div>
+  );
 }
 
 /**

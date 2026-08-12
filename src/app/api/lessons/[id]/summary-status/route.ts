@@ -18,6 +18,8 @@ export async function GET(
       teacherId: true,
       studentId: true,
       transcriptStatus: true,
+      processingStatus: true,
+      processingError: true,
       summary: { select: { id: true } },
       transcript: { select: { id: true } },
     },
@@ -32,17 +34,26 @@ export async function GET(
     }
   } else if (session.role === "student") {
     const student = await getActiveStudentOrNull();
-    if (!student || student.teacherId !== lesson.teacherId) {
+    if (!student || student.id !== lesson.studentId) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
   } else {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const processingStatus = lesson.processingStatus || "idle";
+  const failed = processingStatus === "failed";
+  const ready =
+    Boolean(lesson.summary) &&
+    (processingStatus === "ready" || processingStatus === "idle");
+
   return NextResponse.json({
-    ready: Boolean(lesson.summary),
+    ready,
+    failed,
     hasSummary: Boolean(lesson.summary),
     hasTranscript: Boolean(lesson.transcript),
     transcriptStatus: lesson.transcriptStatus,
+    processingStatus,
+    processingError: lesson.processingError || "",
   });
 }

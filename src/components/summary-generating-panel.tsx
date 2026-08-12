@@ -19,6 +19,8 @@ export function SummaryGeneratingPanel({
 }) {
   const router = useRouter();
   const [failed, setFailed] = useState(false);
+  const [errorDetail, setErrorDetail] = useState("");
+  const [statusLabel, setStatusLabel] = useState("");
   const doneHref = readyHref ?? `/lessons/${lessonId}?ok=summary`;
   const failHref = readyHref
     ? readyHref.replace(/\?.*$/, "")
@@ -27,7 +29,8 @@ export function SummaryGeneratingPanel({
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
-    const maxAttempts = 90; // ~3 min at 2s
+    // ~20 min at 2s — long lessons need chunked STT + map-reduce summarize
+    const maxAttempts = 600;
 
     const tick = async () => {
       attempts += 1;
@@ -36,8 +39,23 @@ export function SummaryGeneratingPanel({
           cache: "no-store",
         });
         if (!res.ok) return false;
-        const data = (await res.json()) as { ready?: boolean };
+        const data = (await res.json()) as {
+          ready?: boolean;
+          failed?: boolean;
+          processingStatus?: string;
+          processingError?: string;
+        };
         if (cancelled) return true;
+        if (data.processingStatus) {
+          setStatusLabel(data.processingStatus);
+        }
+        if (data.failed) {
+          setFailed(true);
+          setErrorDetail(data.processingError || "");
+          router.replace(failHref);
+          router.refresh();
+          return true;
+        }
         if (data.ready) {
           router.replace(doneHref);
           router.refresh();
@@ -49,6 +67,7 @@ export function SummaryGeneratingPanel({
       if (attempts >= maxAttempts) {
         if (!cancelled) {
           setFailed(true);
+          setErrorDetail("timed_out");
           router.replace(failHref);
           router.refresh();
         }
@@ -76,7 +95,14 @@ export function SummaryGeneratingPanel({
     <div className="panel summary-generating" aria-live="polite">
       <h2 style={{ marginTop: 0 }}>{labels.generatingTitle}</h2>
       {failed ? (
-        <p className="muted">{labels.generatingFailed}</p>
+        <>
+          <p className="muted">{labels.generatingFailed}</p>
+          {errorDetail ? (
+            <p className="muted" style={{ fontSize: "0.85rem" }}>
+              {errorDetail}
+            </p>
+          ) : null}
+        </>
       ) : (
         <>
           <div className="summary-generating-skel" aria-hidden>
@@ -88,6 +114,7 @@ export function SummaryGeneratingPanel({
           </div>
           <p className="muted" style={{ marginBottom: 0 }}>
             {labels.generatingBody}
+            {statusLabel ? ` (${statusLabel})` : ""}
           </p>
         </>
       )}

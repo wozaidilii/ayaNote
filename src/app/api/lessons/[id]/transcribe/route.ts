@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyTranscriptToLesson } from "@/lib/drive-transcript";
 import { prisma } from "@/lib/db";
 import { getAiProvider } from "@/lib/ai";
-import { sttConfigured, transcribeAudioFile } from "@/lib/stt";
+import {
+  finalizeLessonSummary,
+  ingestAudioPart,
+  setLessonProcessing,
+} from "@/lib/lesson-processing";
+import { sttConfigured } from "@/lib/stt";
 import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -27,6 +31,11 @@ async function canAccessLesson(lessonId: string) {
   return { ok: false as const, status: 401, error: "unauthorized" };
 }
 
+/**
+ * Finalize classroom transcription + summary.
+ * - With `audio` form field: legacy / final segment — STT then summarize (or append if parts exist).
+ * - With `finalize=1` only: summarize accumulated transcript from prior audio-parts.
+ */
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -40,39 +49,54 @@ export async function POST(
     );
   }
 
-  if (!sttConfigured()) {
-    return NextResponse.json({ error: "stt_not_configured" }, { status: 503 });
-  }
-
   const form = await req.formData();
+  const finalizeOnly =
+    form.get("finalize") === "1" || form.get("finalize") === "true";
   const audio = form.get("audio");
-  if (!audio || typeof audio === "string") {
+
+  if (!finalizeOnly && (!audio || typeof audio === "string")) {
     return NextResponse.json({ error: "missing_audio" }, { status: 400 });
   }
 
-  const file = audio as File;
-  if (file.size < 256) {
-    return NextResponse.json({ error: "audio_too_small" }, { status: 400 });
-  }
-  // ~25MB soft cap for L1
-  if (file.size > 25 * 1024 * 1024) {
-    return NextResponse.json({ error: "audio_too_large" }, { status: 413 });
+  if (audio && typeof audio !== "string") {
+    if (!sttConfigured()) {
+      return NextResponse.json(
+        { error: "stt_not_configured" },
+        { status: 503 },
+      );
+    }
+    const file = audio as File;
+    if (file.size >= 256) {
+      const part = await ingestAudioPart({
+        lessonId,
+        file,
+        filename: file.name || "classroom.webm",
+      });
+      if (!part.ok) {
+        return NextResponse.json(
+          {
+            error: part.error,
+            detail: "detail" in part ? part.detail : undefined,
+          },
+          { status: part.status },
+        );
+      }
+    }
   }
 
-  const filename = file.name || "classroom.webm";
-  const stt = await transcribeAudioFile(file, filename);
-  if (!stt.ok) {
+  // If client already uploaded parts and only wants summarize — or after final segment
+  await setLessonProcessing(lessonId, "summarizing");
+  const result = await finalizeLessonSummary({
+    lessonId,
+    source: "livekit",
+  });
+
+  if (!result.ok) {
     return NextResponse.json(
-      { error: "stt_failed", detail: stt.error },
+      { error: result.error ?? "summarize_failed" },
       { status: 502 },
     );
   }
-
-  await applyTranscriptToLesson({
-    lessonId,
-    rawText: stt.text,
-    source: "livekit",
-  });
 
   const provider = getAiProvider();
   const hasAiKey =
@@ -82,8 +106,7 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    chars: stt.text.length,
-    sttProvider: stt.provider,
+    chars: result.chars,
     summarized: true,
     aiReady: hasAiKey,
   });

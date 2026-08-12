@@ -37,7 +37,10 @@ export default async function StudentBookPage() {
     endTime: teacher.availabilityRules?.endTime ?? "20:00",
     minNoticeHours: teacher.availabilityRules?.minNoticeHours ?? 24,
     slotMinutes: 60,
-    maxWeeklyLessons: teacher.availabilityRules?.maxWeeklyLessons ?? 6,
+    maxWeeklyLessons:
+      student.lessonsPerWeek ??
+      teacher.availabilityRules?.maxWeeklyLessons ??
+      6,
     timezone:
       teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
   };

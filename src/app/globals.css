@@ -1814,17 +1814,18 @@ a {
   .classroom-meet-body.is-call,
   .classroom-meet-body.is-video-expanded {
     grid-template-columns: 1fr;
+    /* Board first on phones so students can co-write easily */
     grid-template-areas:
-      "dock"
-      "main";
+      "main"
+      "dock";
   }
 
   .classroom-meet-body.is-video-expanded .classroom-float-dock {
-    grid-area: main;
+    grid-area: dock;
   }
 
   .classroom-meet-body.is-video-expanded .classroom-stage {
-    grid-area: dock;
+    grid-area: main;
   }
 
   .classroom-float-dock {
@@ -1832,6 +1833,8 @@ a {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
+    max-height: 28vh;
+    overflow: auto;
   }
 
   .classroom-filmstrip-tiles {
@@ -1841,29 +1844,75 @@ a {
   }
 
   .classroom-filmstrip-tile {
-    width: 140px;
-    min-width: 140px;
-    min-height: 88px;
+    width: 112px;
+    min-width: 112px;
+    min-height: 72px;
   }
 
   .classroom-meet-body.is-video-expanded .classroom-float-dock {
-    flex-direction: column;
+    flex-direction: row;
+    max-height: 32vh;
   }
 
   .classroom-meet-body.is-video-expanded .classroom-filmstrip-tiles {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .classroom-meet-body.is-video-expanded .classroom-filmstrip-tile {
-    width: 100%;
-    min-width: 0;
-    min-height: 160px;
+    width: 112px;
+    min-width: 112px;
+    min-height: 72px;
+  }
+
+  .classroom-stage {
+    min-height: 55vh;
   }
 
   .classroom-tiptap {
-    min-height: 45vh;
+    min-height: 50vh;
+    font-size: 1.05rem;
+    line-height: 1.55;
   }
+
+  .classroom-doc-toolbar .btn,
+  .classroom-insert-image,
+  .classroom-av-toggle,
+  .classroom-meet-top-actions .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .classroom-doc-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+  }
+}
+
+.classroom-doc-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.classroom-doc-toolbar {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel, #fff);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.classroom-doc-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.5rem 0;
 }
 
 .day5-cal {

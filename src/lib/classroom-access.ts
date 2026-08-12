@@ -49,7 +49,7 @@ export async function getAccessibleLesson(lessonId: string) {
 
   if (session.role === "student") {
     const student = await getActiveStudentOrNull();
-    if (!student || student.teacherId !== lesson.teacherId) {
+    if (!student || student.id !== lesson.studentId) {
       return { ok: false as const, status: 403 as const, error: "forbidden" };
     }
     return {

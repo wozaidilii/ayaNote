@@ -33,7 +33,7 @@ export default async function StudentDetailPage({
       vocabItems: { orderBy: { createdAt: "desc" }, take: 8 },
       grammarItems: { orderBy: { createdAt: "desc" }, take: 8 },
       lessons: {
-        include: { summary: true, prepDraft: true },
+        include: { summary: true, prepDraft: true, homeworks: true },
         orderBy: { startsAt: "desc" },
         take: 10,
       },
@@ -140,6 +140,93 @@ export default async function StudentDetailPage({
             <label htmlFor="goals">{common("goals")}</label>
             <textarea id="goals" name="goals" defaultValue={student.goals} />
           </div>
+          <div className="field">
+            <label htmlFor="startedAt">{t("startedAt")}</label>
+            <input
+              id="startedAt"
+              name="startedAt"
+              type="date"
+              defaultValue={
+                student.startedAt ? ymdInTz(student.startedAt, timeZone) : ""
+              }
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="pricePerLesson">{t("pricePerLesson")}</label>
+            <input
+              id="pricePerLesson"
+              name="pricePerLesson"
+              type="number"
+              step="1"
+              min="0"
+              defaultValue={
+                student.pricePerLesson != null ? student.pricePerLesson : ""
+              }
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="currency">{t("currency")}</label>
+            <input
+              id="currency"
+              name="currency"
+              defaultValue={student.currency || "JPY"}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="lessonsPerWeek">{t("lessonsPerWeek")}</label>
+            <input
+              id="lessonsPerWeek"
+              name="lessonsPerWeek"
+              type="number"
+              min="1"
+              max="14"
+              defaultValue={
+                student.lessonsPerWeek != null ? student.lessonsPerWeek : ""
+              }
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="priceNote">{t("priceNote")}</label>
+            <textarea
+              id="priceNote"
+              name="priceNote"
+              defaultValue={student.priceNote}
+            />
+          </div>
+          {(() => {
+            let history: Array<{
+              at: string;
+              price: number;
+              currency?: string;
+            }> = [];
+            try {
+              const parsed = JSON.parse(student.priceHistoryJson || "[]");
+              if (Array.isArray(parsed)) history = parsed;
+            } catch {
+              history = [];
+            }
+            if (history.length === 0) return null;
+            return (
+              <div className="field">
+                <label>{t("priceHistory")}</label>
+                <ul
+                  className="muted"
+                  style={{ margin: 0, paddingLeft: "1.1rem" }}
+                >
+                  {history
+                    .slice()
+                    .reverse()
+                    .slice(0, 5)
+                    .map((h, i) => (
+                      <li key={`${h.at}-${i}`}>
+                        {h.price} {h.currency || "JPY"} ·{" "}
+                        {formatInTz(new Date(h.at), "yyyy-MM-dd", timeZone)}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            );
+          })()}
           <div className="field">
             <label htmlFor="privateNotes">Private notes</label>
             <textarea
@@ -250,6 +337,9 @@ export default async function StudentDetailPage({
               </div>
               <div className="muted">
                 {lesson.summary?.nextFocus || lesson.status}
+                {lesson.homeworks[0]
+                  ? ` · ${t("homeworkStatus")}: ${lesson.homeworks[0].status}`
+                  : ""}
               </div>
             </div>
             <a
