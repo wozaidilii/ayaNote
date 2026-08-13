@@ -298,7 +298,9 @@
     "pendingHomework": "未完了の宿題",
     "doHomework": "宿題をする",
     "noPendingHomework": "未完了の宿題はありません。",
-    "quizQuestions": "{count}問"
+    "quizQuestions": "{count}問",
+    "levelCheck": "レベルチェック",
+    "startLevelCheck": "レベルチェックを始める"
   },
   "studentHomework": {
     "title": "宿題",
@@ -310,7 +312,8 @@
     "reviewTitle": "見直し",
     "submitted": "提出済み",
     "markDone": "完了にする",
-    "alreadyDone": "完了済み"
+    "alreadyDone": "完了済み",
+    "levelCheck": "レベルチェック"
   },
   "studentBook": {
     "title": "予約・振替",

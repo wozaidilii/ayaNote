@@ -40,11 +40,10 @@ export default async function StudentHomeworkPage({
   if (!hw || hw.studentId !== active.id) notFound();
 
   const timeZone = normalizeTimezone(hw.student.teacher.timezone);
-  const lessonLabel = formatInTz(
-    hw.lesson.startsAt,
-    "yyyy-MM-dd HH:mm",
-    timeZone,
-  );
+  const isSample = hw.source === "sample_level" || !hw.lesson;
+  const lessonLabel = isSample
+    ? hw.title || t("levelCheck")
+    : formatInTz(hw.lesson!.startsAt, "yyyy-MM-dd HH:mm", timeZone);
   const questions = parseQuizJson(hw.quizJson);
   const answers = parseAnswersJson(hw.answersJson);
   const isDone = hw.status === "done" || hw.status === "reviewed";

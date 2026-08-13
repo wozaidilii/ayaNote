@@ -1,5 +1,6 @@
 import { hashPassword } from "../src/lib/auth";
 import { prisma } from "../src/lib/db";
+import { ensureSampleLevelHomeworkForAllStudents } from "../src/lib/ensure-sample-homework";
 import {
   DEMO_STUDENT_EMAIL,
   DEMO_STUDENT_LOGINS,
@@ -106,12 +107,14 @@ async function main() {
     });
   }
 
+  const samples = await ensureSampleLevelHomeworkForAllStudents();
   console.log("Bootstrapped trial teacher (password login).");
   console.log({
     teacher: teacher.email,
     password: DEMO_TEACHER_PASSWORD,
     students: DEMO_STUDENT_LOGINS.map((s) => s.email),
     studentPassword: DEMO_STUDENT_PASSWORD,
+    sampleQuizzes: samples.length,
   });
 }
 

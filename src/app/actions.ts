@@ -13,6 +13,7 @@ import {
   serializeAnswers,
   serializeQuiz,
 } from "@/lib/homework-quiz";
+import { ensureSampleLevelHomework } from "@/lib/ensure-sample-homework";
 import { applyTranscriptToLesson } from "@/lib/drive-transcript";
 import {
   clearAuthSession,
@@ -898,6 +899,12 @@ export async function createStudent(formData: FormData) {
     },
   });
 
+  await ensureSampleLevelHomework({
+    studentId: student.id,
+    level,
+    courseType,
+  });
+
   revalidatePath("/students");
   redirect(`/students?student=${student.id}`);
 }
@@ -1048,10 +1055,12 @@ export async function markHomeworkDone(formData: FormData) {
   });
   revalidatePath("/student");
   revalidatePath("/student/history");
-  revalidatePath(`/student/lessons/${hw.lessonId}`);
   revalidatePath(`/student/homework/${hw.id}`);
+  if (hw.lessonId) {
+    revalidatePath(`/student/lessons/${hw.lessonId}`);
+    revalidatePath(`/lessons/${hw.lessonId}`);
+  }
   revalidatePath(`/students/${hw.studentId}`);
-  revalidatePath(`/lessons/${hw.lessonId}`);
 }
 
 export async function submitHomeworkQuiz(formData: FormData) {
@@ -1090,9 +1099,11 @@ export async function submitHomeworkQuiz(formData: FormData) {
   revalidatePath("/student");
   revalidatePath("/student/history");
   revalidatePath(`/student/homework/${hw.id}`);
-  revalidatePath(`/student/lessons/${hw.lessonId}`);
   revalidatePath(`/students/${hw.studentId}`);
-  revalidatePath(`/lessons/${hw.lessonId}`);
+  if (hw.lessonId) {
+    revalidatePath(`/student/lessons/${hw.lessonId}`);
+    revalidatePath(`/lessons/${hw.lessonId}`);
+  }
   redirect(`/student/homework/${hw.id}?ok=done`);
 }
 
@@ -1101,15 +1112,20 @@ export async function markHomeworkReviewed(formData: FormData) {
   const homeworkId = String(formData.get("homeworkId") ?? "");
   const hw = await prisma.homework.findUnique({
     where: { id: homeworkId },
-    include: { lesson: { select: { teacherId: true } } },
+    include: {
+      lesson: { select: { teacherId: true } },
+      student: { select: { teacherId: true } },
+    },
   });
-  if (!hw || hw.lesson.teacherId !== teacher.id) {
+  if (!hw || hw.student.teacherId !== teacher.id) {
     throw new Error("Not your homework");
   }
   await prisma.homework.update({
     where: { id: homeworkId },
     data: { status: "reviewed" },
   });
-  revalidatePath(`/lessons/${hw.lessonId}`);
   revalidatePath(`/students/${hw.studentId}`);
+  if (hw.lessonId) {
+    revalidatePath(`/lessons/${hw.lessonId}`);
+  }
 }

@@ -133,15 +133,20 @@ export default async function StudentHomePage() {
           student.homeworks.map((hw) => {
             const qCount =
               hw.kind === "quiz" ? parseQuizJson(hw.quizJson).length : 0;
+            const isSample = hw.source === "sample_level";
             return (
               <div className="list-row" key={hw.id}>
                 <div>
                   <div style={{ fontWeight: 700 }}>
-                    {formatInTz(
-                      hw.lesson.startsAt,
-                      "yyyy-MM-dd HH:mm",
-                      timeZone,
-                    )}
+                    {isSample
+                      ? t("levelCheck")
+                      : hw.lesson
+                        ? formatInTz(
+                            hw.lesson.startsAt,
+                            "yyyy-MM-dd HH:mm",
+                            timeZone,
+                          )
+                        : hw.title || common("homework")}
                   </div>
                   <div className="muted">
                     {hw.title || common("homework")}
@@ -152,7 +157,7 @@ export default async function StudentHomePage() {
                 </div>
                 <div className="list-row-actions">
                   <a className="btn sm" href={`/student/homework/${hw.id}`}>
-                    {t("doHomework")}
+                    {isSample ? t("startLevelCheck") : t("doHomework")}
                   </a>
                 </div>
               </div>

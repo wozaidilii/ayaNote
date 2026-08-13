@@ -317,7 +317,9 @@
     "pendingHomework": "Homework to do",
     "doHomework": "Do homework",
     "noPendingHomework": "No unfinished homework.",
-    "quizQuestions": "{count} questions"
+    "quizQuestions": "{count} questions",
+    "levelCheck": "Level check",
+    "startLevelCheck": "Start level check"
   },
   "studentHomework": {
     "title": "Homework",
@@ -329,7 +331,8 @@
     "reviewTitle": "Review",
     "submitted": "Submitted",
     "markDone": "Mark as done",
-    "alreadyDone": "Completed"
+    "alreadyDone": "Completed",
+    "levelCheck": "Level check"
   },
   "studentBook": {
     "title": "Book / Reschedule",

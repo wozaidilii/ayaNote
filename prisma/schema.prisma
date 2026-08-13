@@ -136,7 +136,8 @@ model LessonAudioPart {
 /** Per-lesson homework with completion tracking (Summary.homework is display snapshot). */
 model Homework {
   id           String    @id @default(cuid())
-  lessonId     String
+  /** Null for placement / sample quizzes not tied to a lesson */
+  lessonId     String?
   studentId    String
   title        String    @default("")
   instructions String    @default("")
@@ -152,16 +153,17 @@ model Homework {
   status       String    @default("assigned")
   dueAt        DateTime?
   completedAt  DateTime?
-  /** ai_summary | ai_prep | manual */
+  /** ai_summary | ai_prep | manual | sample_level */
   source       String    @default("ai_summary")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  lesson  Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lesson  Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([lessonId])
   @@index([studentId, status])
+  @@index([studentId, source])
 }
 
 /** Classroom board image / file attachment stored in DB (served via API). */
