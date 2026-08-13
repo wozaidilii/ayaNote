@@ -10,6 +10,7 @@
     "availability": "Availability",
     "settings": "Settings",
     "home": "Home",
+    "homework": "Homework",
     "book": "Book / Reschedule",
     "history": "History",
     "switchTeacher": "Teacher view",
@@ -343,7 +344,7 @@
     "summaryWrong": "Incorrect",
     "reviewAnswers": "Review answers",
     "retry": "Try again",
-    "backHome": "Back home",
+    "backHome": "Back to homework",
     "yourAnswer": "Your answer",
     "correctAnswer": "Correct answer"
   },
@@ -372,7 +373,8 @@
     "timezone": "Timezone",
     "todayBtn": "Today",
     "close": "Close",
-    "slotTaken": "This time is already booked."
+    "slotTaken": "This time is already booked.",
+    "slotUnavailable": "This time is not available (outside hours, too soon, or weekly limit)."
   },
   "studentHistory": {
     "title": "Lesson history",

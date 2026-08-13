@@ -134,7 +134,7 @@ export function HomeworkQuiz({
               {labels.retry}
             </button>
           </form>
-          <a className="btn ghost" href="/student">
+          <a className="btn ghost" href="/student/homework">
             {labels.backHome}
           </a>
         </div>

@@ -54,6 +54,7 @@ export const navIcons = {
   availability: Clock3,
   settings: Settings,
   home: Home,
+  homework: BookOpen,
   book: CalendarPlus,
   history: History,
 } as const;

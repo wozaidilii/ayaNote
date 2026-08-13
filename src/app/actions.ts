@@ -1058,6 +1058,7 @@ export async function markHomeworkDone(formData: FormData) {
     data: { status: "done", completedAt: new Date() },
   });
   revalidatePath("/student");
+  revalidatePath("/student/homework");
   revalidatePath("/student/history");
   revalidatePath(`/student/homework/${hw.id}`);
   if (hw.lessonId) {
@@ -1101,6 +1102,7 @@ export async function submitHomeworkQuiz(formData: FormData) {
   });
 
   revalidatePath("/student");
+  revalidatePath("/student/homework");
   revalidatePath("/student/history");
   revalidatePath(`/student/homework/${hw.id}`);
   revalidatePath(`/students/${hw.studentId}`);
@@ -1131,6 +1133,7 @@ export async function retryHomeworkQuiz(formData: FormData) {
     },
   });
   revalidatePath("/student");
+  revalidatePath("/student/homework");
   revalidatePath("/student/history");
   revalidatePath(`/student/homework/${hw.id}`);
   revalidatePath(`/students/${hw.studentId}`);

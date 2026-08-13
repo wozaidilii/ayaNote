@@ -44,10 +44,18 @@ function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
 }
 
 function weekKey(d: Date, timeZone: string) {
-  return formatInTz(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd", timeZone);
+  return formatInTz(
+    startOfWeek(d, { weekStartsOn: 1 }),
+    "yyyy-MM-dd",
+    timeZone,
+  );
 }
 
-function addCalendarDaysYmd(ymd: string, days: number, timeZone: string): string {
+function addCalendarDaysYmd(
+  ymd: string,
+  days: number,
+  timeZone: string,
+): string {
   const noon = wallTimeToUtc(ymd, "12:00", timeZone);
   return ymdInTz(addDays(noon, days), timeZone);
 }
@@ -74,6 +82,12 @@ export function generateAvailableSlots(opts: {
   studentLessonStarts?: Date[];
   from?: Date;
   days?: number;
+  /**
+   * When true (default), stop offering more free slots once the weekly lesson
+   * cap is reached — useful for compact lists. Calendar UIs should pass false
+   * so every free hour remains clickable; enforce the cap on submit instead.
+   */
+  applyWeeklyCap?: boolean;
 }): Date[] {
   const from = opts.from ?? new Date();
   const days = opts.days ?? 14;
@@ -86,6 +100,7 @@ export function generateAvailableSlots(opts: {
   const blackoutYmds = new Set(
     (opts.blackoutDates ?? []).map((b) => ymdInTz(b, tz)),
   );
+  const applyWeeklyCap = opts.applyWeeklyCap !== false;
   const maxWeekly = opts.rules.maxWeeklyLessons ?? 99;
   const existingByWeek = new Map<string, number>();
   for (const start of opts.studentLessonStarts ?? []) {
@@ -115,13 +130,18 @@ export function generateAvailableSlots(opts: {
       if (isBefore(cursor, minStart)) continue;
 
       const end = addMinutes(cursor, LESSON_MINUTES);
-      const conflict = opts.busy.some((b) => overlaps(cursor, end, b.start, b.end));
+      const conflict = opts.busy.some((b) =>
+        overlaps(cursor, end, b.start, b.end),
+      );
       if (conflict) continue;
 
-      const key = weekKey(cursor, tz);
-      const used = (existingByWeek.get(key) ?? 0) + (offeredByWeek.get(key) ?? 0);
-      if (used >= maxWeekly) continue;
-      offeredByWeek.set(key, (offeredByWeek.get(key) ?? 0) + 1);
+      if (applyWeeklyCap) {
+        const key = weekKey(cursor, tz);
+        const used =
+          (existingByWeek.get(key) ?? 0) + (offeredByWeek.get(key) ?? 0);
+        if (used >= maxWeekly) continue;
+        offeredByWeek.set(key, (offeredByWeek.get(key) ?? 0) + 1);
+      }
       slots.push(cursor);
     }
   }
@@ -160,7 +180,10 @@ export function countLessonsInWeek(starts: Date[], around: Date) {
 }
 
 /** Blackout date stored as UTC midnight of that calendar day in teacher TZ. */
-export function blackoutDateFromYmd(ymd: string, timeZone: string = DEFAULT_TIMEZONE) {
+export function blackoutDateFromYmd(
+  ymd: string,
+  timeZone: string = DEFAULT_TIMEZONE,
+) {
   return dayBoundsInTz(ymd, timeZone).start;
 }
 

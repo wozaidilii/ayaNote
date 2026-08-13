@@ -29,6 +29,7 @@ export async function AppShell({
 
   const studentLinks = [
     { href: "/student", key: "home" },
+    { href: "/student/homework", key: "homework" },
     { href: "/student/book", key: "book" },
     { href: "/student/history", key: "history" },
   ] as const;

@@ -51,7 +51,7 @@ export default async function StudentHomeworkPage({
   const showSummary = isDone && (sp.ok === "done" || answers.length > 0);
 
   return (
-    <AppShell active="history" personName={hw.student.name}>
+    <AppShell active="homework" personName={hw.student.name}>
       <PageHeading
         icon={BookOpen}
         title={hw.title || t("title")}

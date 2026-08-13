@@ -10,6 +10,7 @@
     "availability": "空き時間",
     "settings": "設定",
     "home": "ホーム",
+    "homework": "宿題",
     "book": "予約・振替",
     "history": "履歴",
     "switchTeacher": "先生ビュー",
@@ -324,7 +325,7 @@
     "summaryWrong": "不正解",
     "reviewAnswers": "答えを見直す",
     "retry": "もう一度やる",
-    "backHome": "ホームへ",
+    "backHome": "宿題一覧へ",
     "yourAnswer": "あなたの答え",
     "correctAnswer": "正解"
   },
@@ -353,7 +354,8 @@
     "timezone": "タイムゾーン",
     "todayBtn": "今日",
     "close": "閉じる",
-    "slotTaken": "この時間はすでに予約されています。"
+    "slotTaken": "この時間はすでに予約されています。",
+    "slotUnavailable": "この時間は予約できません（営業時間外・通知不足・週上限など）。"
   },
   "studentHistory": {
     "title": "レッスン履歴",

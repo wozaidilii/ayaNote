@@ -95,6 +95,7 @@ export function StudentBookCalendar({
     duration: string;
     myBookings: string;
     slotTaken: string;
+    slotUnavailable: string;
   };
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -253,7 +254,19 @@ export function StudentBookCalendar({
                     ).toISOString();
                     setConfirming(false);
                     if (!openSet.has(iso)) {
-                      setError(labels.slotTaken);
+                      const overlapsBusy = (byDay.get(ymd) ?? []).some((b) => {
+                        const t = new Date(iso).getTime();
+                        return (
+                          t < new Date(b.endsAt).getTime() &&
+                          t + LESSON_MINUTES * 60_000 >
+                            new Date(b.startsAt).getTime()
+                        );
+                      });
+                      setError(
+                        overlapsBusy
+                          ? labels.slotTaken
+                          : labels.slotUnavailable,
+                      );
                       setDraft({ ymd, minutes });
                       return;
                     }

@@ -81,7 +81,9 @@ export default async function StudentBookPage({
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
-        status: { not: "cancelled" },
+        // Only active bookings occupy the calendar — completed past lessons
+        // should not look like "already booked" for students.
+        status: { in: ["scheduled", "in_progress"] },
         startsAt: { gte: rangeStart, lt: rangeEnd },
       },
       select: {
@@ -111,16 +113,20 @@ export default async function StudentBookPage({
     })),
   ];
 
+  // Anchor min-notice to real now (not week start), and show every free hour
+  // on the grid — weekly caps are enforced when the request is submitted.
+  const now = new Date();
   const openSlots = generateAvailableSlots({
     rules,
     busy,
     blackoutDates: teacher.blackoutDates.map((b) => b.date),
     studentLessonStarts: student.lessons
-      .filter((l) => l.status !== "cancelled")
+      .filter((l) => l.status === "scheduled" || l.status === "in_progress")
       .map((l) => l.startsAt),
-    from: rangeStart,
-    days: 8,
-  }).filter((d) => d >= rangeStart && d < rangeEnd);
+    from: now,
+    days: 14,
+    applyWeeklyCap: false,
+  }).filter((d) => d >= rangeStart && d < rangeEnd && d >= now);
 
   const blocks: StudentCalBlock[] = [];
   for (const lesson of busyLessons) {
@@ -201,6 +207,7 @@ export default async function StudentBookPage({
             duration: t("duration"),
             myBookings: t("myBookings"),
             slotTaken: t("slotTaken"),
+            slotUnavailable: t("slotUnavailable"),
           }}
         />
       </div>
