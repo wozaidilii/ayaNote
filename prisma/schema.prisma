@@ -140,6 +140,14 @@ model Homework {
   studentId    String
   title        String    @default("")
   instructions String    @default("")
+  /** text | quiz */
+  kind         String    @default("text")
+  /** Quiz questions JSON: [{ id, type, prompt, stem, target, choices, answerIndex }] */
+  quizJson     String    @default("[]")
+  /** Student answers JSON: [{ questionId, choiceIndex }] */
+  answersJson  String    @default("[]")
+  /** Number of correct answers (quiz) */
+  score        Int?
   /** assigned | done | reviewed */
   status       String    @default("assigned")
   dueAt        DateTime?

@@ -18,6 +18,7 @@ import {
 } from "@/lib/ai";
 import { parseClassroomDoc, tiptapDocToPlainText } from "@/lib/classroom-doc";
 import { prisma } from "@/lib/db";
+import { parseQuizJson } from "@/lib/homework-quiz";
 import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
@@ -112,6 +113,11 @@ export default async function LessonRoomPage({
   });
   if (!lesson) notFound();
   if (lesson.teacherId !== teacher.id) redirect("/today");
+
+  const homework = lesson.homeworks[0] ?? null;
+  const homeworkQuizCount = homework
+    ? parseQuizJson(homework.quizJson).length
+    : 0;
 
   const lastFocus = lesson.student.lessons[0]?.summary?.nextFocus;
   const topics = lesson.summary
@@ -419,14 +425,31 @@ export default async function LessonRoomPage({
                     defaultValue={lesson.summary.homework}
                   />
                 </div>
-                {lesson.homeworks[0] ? (
+                {homework ? (
                   <div style={{ marginBottom: "0.75rem" }}>
                     <span
-                      className={`chip${lesson.homeworks[0].status !== "assigned" ? " done" : ""}`}
+                      className={`chip${homework.status !== "assigned" ? " done" : ""}`}
                     >
-                      {lesson.homeworks[0].status}
+                      {homework.status}
                     </span>
-                    {lesson.homeworks[0].status === "done" ? (
+                    {homework.kind === "quiz" ? (
+                      <span className="muted" style={{ marginLeft: "0.5rem" }}>
+                        {t("quizGenerated", { count: homeworkQuizCount })}
+                      </span>
+                    ) : (
+                      <span className="muted" style={{ marginLeft: "0.5rem" }}>
+                        {t("hwTextOnly")}
+                      </span>
+                    )}
+                    {homework.score != null && homework.kind === "quiz" ? (
+                      <span className="muted" style={{ marginLeft: "0.5rem" }}>
+                        {t("quizScore", {
+                          score: homework.score,
+                          total: homeworkQuizCount,
+                        })}
+                      </span>
+                    ) : null}
+                    {homework.status === "done" ? (
                       <form
                         action={markHomeworkReviewed}
                         style={{ display: "inline", marginLeft: "0.5rem" }}
@@ -434,10 +457,10 @@ export default async function LessonRoomPage({
                         <input
                           type="hidden"
                           name="homeworkId"
-                          value={lesson.homeworks[0].id}
+                          value={homework.id}
                         />
                         <button className="btn secondary sm" type="submit">
-                          Mark reviewed
+                          {t("markReviewed")}
                         </button>
                       </form>
                     ) : null}

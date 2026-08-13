@@ -5,6 +5,7 @@ import { History, Video, UiIcon } from "@/components/icons";
 import { EmptyState, PageHeading } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
+import { parseQuizJson } from "@/lib/homework-quiz";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -45,6 +46,10 @@ export default async function StudentHistoryPage() {
         ) : (
           student.lessons.map((lesson) => {
             const hw = lesson.homeworks[0];
+            const qCount =
+              hw?.kind === "quiz" ? parseQuizJson(hw.quizJson).length : 0;
+            const isAssigned = hw?.status === "assigned";
+            const isDone = hw?.status === "done" || hw?.status === "reviewed";
             return (
               <div className="list-row" key={lesson.id}>
                 <div>
@@ -63,16 +68,40 @@ export default async function StudentHistoryPage() {
                   </div>
                   {hw ? (
                     <div style={{ marginTop: "0.35rem" }}>
-                      <span
-                        className={`chip${hw.status === "done" || hw.status === "reviewed" ? " done" : ""}`}
-                      >
+                      <span className={`chip${isDone ? " done" : ""}`}>
                         {hw.status === "reviewed"
                           ? t("hwReviewed")
                           : hw.status === "done"
                             ? t("hwDone")
                             : t("hwAssigned")}
                       </span>
-                      {hw.status === "assigned" ? (
+                      {isDone && hw.score != null && qCount > 0 ? (
+                        <span
+                          className="muted"
+                          style={{ marginLeft: "0.5rem" }}
+                        >
+                          {t("score", { score: hw.score, total: qCount })}
+                        </span>
+                      ) : null}
+                      {isAssigned ? (
+                        <a
+                          className="btn secondary sm"
+                          href={`/student/homework/${hw.id}`}
+                          style={{ marginLeft: "0.5rem" }}
+                        >
+                          {t("doHomework")}
+                        </a>
+                      ) : null}
+                      {isDone && hw.kind === "quiz" ? (
+                        <a
+                          className="btn ghost sm"
+                          href={`/student/homework/${hw.id}`}
+                          style={{ marginLeft: "0.5rem" }}
+                        >
+                          {t("reviewHomework")}
+                        </a>
+                      ) : null}
+                      {isAssigned && hw.kind === "text" ? (
                         <form
                           action={markHomeworkDone}
                           style={{ display: "inline", marginLeft: "0.5rem" }}

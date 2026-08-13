@@ -10,6 +10,7 @@ import {
 import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
+import { parseQuizJson } from "@/lib/homework-quiz";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -35,6 +36,12 @@ export default async function StudentHomePage() {
         include: { prepDraft: true, summary: true },
         orderBy: { startsAt: "asc" },
         take: 1,
+      },
+      homeworks: {
+        where: { status: "assigned" },
+        include: { lesson: { select: { startsAt: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 10,
       },
     },
   });
@@ -116,6 +123,42 @@ export default async function StudentHomePage() {
               "—"}
           </p>
         </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: "1rem" }}>
+        <PanelTitle icon={BookOpen}>{t("pendingHomework")}</PanelTitle>
+        {student.homeworks.length === 0 ? (
+          <p className="muted">{t("noPendingHomework")}</p>
+        ) : (
+          student.homeworks.map((hw) => {
+            const qCount =
+              hw.kind === "quiz" ? parseQuizJson(hw.quizJson).length : 0;
+            return (
+              <div className="list-row" key={hw.id}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {formatInTz(
+                      hw.lesson.startsAt,
+                      "yyyy-MM-dd HH:mm",
+                      timeZone,
+                    )}
+                  </div>
+                  <div className="muted">
+                    {hw.title || common("homework")}
+                    {qCount > 0
+                      ? ` · ${t("quizQuestions", { count: qCount })}`
+                      : ""}
+                  </div>
+                </div>
+                <div className="list-row-actions">
+                  <a className="btn sm" href={`/student/homework/${hw.id}`}>
+                    {t("doHomework")}
+                  </a>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </AppShell>
   );

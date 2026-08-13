@@ -237,7 +237,11 @@
     "openBoard": "Open board",
     "lastFocusLabel": "Previous next-focus",
     "goStudent": "Student profile",
-    "goPrep": "Prep queue"
+    "goPrep": "Prep queue",
+    "quizGenerated": "Vocabulary quiz · {count} questions",
+    "quizScore": "Score: {score}/{total}",
+    "markReviewed": "Mark reviewed",
+    "hwTextOnly": "Text homework (no quiz — need ≥3 vocab items)"
   },
   "prep": {
     "title": "Prep Queue",
@@ -309,7 +313,23 @@
     "enterClassroom": "Enter AyaNote Classroom",
     "status": "Status",
     "pending": "Pending requests",
-    "noUpcoming": "No upcoming lesson yet. Book a slot or wait for your teacher to approve."
+    "noUpcoming": "No upcoming lesson yet. Book a slot or wait for your teacher to approve.",
+    "pendingHomework": "Homework to do",
+    "doHomework": "Do homework",
+    "noPendingHomework": "No unfinished homework.",
+    "quizQuestions": "{count} questions"
+  },
+  "studentHomework": {
+    "title": "Homework",
+    "next": "Next",
+    "submit": "Submit",
+    "submitting": "Submitting…",
+    "progress": "{current} / {total}",
+    "score": "Score: {score} / {total}",
+    "reviewTitle": "Review",
+    "submitted": "Submitted",
+    "markDone": "Mark as done",
+    "alreadyDone": "Completed"
   },
   "studentBook": {
     "title": "Book / Reschedule",
@@ -335,7 +355,10 @@
     "hwAssigned": "To do",
     "hwDone": "Done",
     "hwReviewed": "Reviewed",
-    "markDone": "Mark as done"
+    "markDone": "Mark as done",
+    "doHomework": "Do homework",
+    "reviewHomework": "Review answers",
+    "score": "Score: {score}/{total}"
   },
   "studentLesson": {
     "title": "Lesson summary",

@@ -5,6 +5,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
 import { courseTypeLabel, generatePrepDraft, getAiProvider } from "@/lib/ai";
+import {
+  buildQuizFromVocab,
+  parseAnswersJson,
+  parseQuizJson,
+  scoreQuiz,
+  serializeAnswers,
+  serializeQuiz,
+} from "@/lib/homework-quiz";
 import { applyTranscriptToLesson } from "@/lib/drive-transcript";
 import {
   clearAuthSession,
@@ -239,35 +247,7 @@ export async function approveSummary(formData: FormData) {
     },
   });
 
-  // Materialize homework entity (status source of truth)
-  const instructions = homework.trim();
-  if (instructions) {
-    const existingHw = await prisma.homework.findUnique({
-      where: { lessonId },
-      select: { status: true },
-    });
-    const keepStatus =
-      existingHw?.status === "done" || existingHw?.status === "reviewed"
-        ? existingHw.status
-        : "assigned";
-    await prisma.homework.upsert({
-      where: { lessonId },
-      create: {
-        lessonId,
-        studentId: lesson.studentId,
-        title: "Homework",
-        instructions,
-        status: "assigned",
-        source: "ai_summary",
-      },
-      update: {
-        instructions,
-        source: "ai_summary",
-        status: keepStatus,
-      },
-    });
-  }
-
+  // Materialize homework entity (status source of truth) + vocab quiz
   const vocab = (() => {
     try {
       return JSON.parse(lesson.summary.vocabJson) as Array<{
@@ -279,6 +259,51 @@ export async function approveSummary(formData: FormData) {
       return [];
     }
   })();
+
+  const quiz = buildQuizFromVocab(vocab);
+  const instructions =
+    homework.trim() ||
+    (quiz.length > 0
+      ? `Vocabulary quiz · ${quiz.length} questions from today's lesson`
+      : "");
+
+  if (instructions || quiz.length > 0) {
+    const existingHw = await prisma.homework.findUnique({
+      where: { lessonId },
+      select: { status: true },
+    });
+    const keepStatus =
+      existingHw?.status === "done" || existingHw?.status === "reviewed"
+        ? existingHw.status
+        : "assigned";
+    const kind = quiz.length > 0 ? "quiz" : "text";
+    await prisma.homework.upsert({
+      where: { lessonId },
+      create: {
+        lessonId,
+        studentId: lesson.studentId,
+        title: quiz.length > 0 ? "Vocabulary quiz" : "Homework",
+        instructions,
+        kind,
+        quizJson: serializeQuiz(quiz),
+        answersJson: "[]",
+        score: null,
+        status: "assigned",
+        source: "ai_summary",
+      },
+      update: {
+        title: quiz.length > 0 ? "Vocabulary quiz" : "Homework",
+        instructions,
+        kind,
+        quizJson: serializeQuiz(quiz),
+        source: "ai_summary",
+        status: keepStatus,
+        ...(keepStatus === "assigned"
+          ? { answersJson: "[]", score: null, completedAt: null }
+          : {}),
+      },
+    });
+  }
 
   const grammar = (() => {
     try {
@@ -1021,10 +1046,54 @@ export async function markHomeworkDone(formData: FormData) {
     where: { id: homeworkId },
     data: { status: "done", completedAt: new Date() },
   });
+  revalidatePath("/student");
   revalidatePath("/student/history");
+  revalidatePath(`/student/lessons/${hw.lessonId}`);
+  revalidatePath(`/student/homework/${hw.id}`);
+  revalidatePath(`/students/${hw.studentId}`);
+  revalidatePath(`/lessons/${hw.lessonId}`);
+}
+
+export async function submitHomeworkQuiz(formData: FormData) {
+  const student = await requireStudent();
+  const homeworkId = String(formData.get("homeworkId") ?? "");
+  const answersRaw = String(formData.get("answersJson") ?? "[]");
+
+  const hw = await prisma.homework.findUnique({
+    where: { id: homeworkId },
+    include: { lesson: { select: { id: true, startsAt: true } } },
+  });
+  if (!hw || hw.studentId !== student.id) {
+    throw new Error("Not your homework");
+  }
+  if (hw.kind !== "quiz") {
+    throw new Error("Not a quiz homework");
+  }
+
+  const questions = parseQuizJson(hw.quizJson);
+  const answers = parseAnswersJson(answersRaw);
+  if (!Array.isArray(answers) || answers.length === 0) {
+    throw new Error("Missing answers");
+  }
+  const score = scoreQuiz(questions, answers);
+
+  await prisma.homework.update({
+    where: { id: homeworkId },
+    data: {
+      answersJson: serializeAnswers(answers),
+      score,
+      status: "done",
+      completedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/student");
+  revalidatePath("/student/history");
+  revalidatePath(`/student/homework/${hw.id}`);
   revalidatePath(`/student/lessons/${hw.lessonId}`);
   revalidatePath(`/students/${hw.studentId}`);
   revalidatePath(`/lessons/${hw.lessonId}`);
+  redirect(`/student/homework/${hw.id}?ok=done`);
 }
 
 export async function markHomeworkReviewed(formData: FormData) {

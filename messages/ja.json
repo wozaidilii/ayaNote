@@ -218,7 +218,11 @@
     "openBoard": "ボードを開く",
     "lastFocusLabel": "前回の次回フォーカス",
     "goStudent": "生徒プロフィール",
-    "goPrep": "教案キュー"
+    "goPrep": "教案キュー",
+    "quizGenerated": "語彙クイズ · {count}問",
+    "quizScore": "得点：{score}/{total}",
+    "markReviewed": "確認済みにする",
+    "hwTextOnly": "文字の宿題（クイズなし — 語彙が3語未満）"
   },
   "prep": {
     "title": "教案キュー",
@@ -290,7 +294,23 @@
     "enterClassroom": "AyaNote Classroomに入る",
     "status": "ステータス",
     "pending": "保留中のリクエスト",
-    "noUpcoming": "次のレッスンはまだありません。枠を予約するか、先生の承認を待ってください。"
+    "noUpcoming": "次のレッスンはまだありません。枠を予約するか、先生の承認を待ってください。",
+    "pendingHomework": "未完了の宿題",
+    "doHomework": "宿題をする",
+    "noPendingHomework": "未完了の宿題はありません。",
+    "quizQuestions": "{count}問"
+  },
+  "studentHomework": {
+    "title": "宿題",
+    "next": "つぎへ",
+    "submit": "提出",
+    "submitting": "提出中…",
+    "progress": "{current} / {total}",
+    "score": "得点：{score} / {total}",
+    "reviewTitle": "見直し",
+    "submitted": "提出済み",
+    "markDone": "完了にする",
+    "alreadyDone": "完了済み"
   },
   "studentBook": {
     "title": "予約・振替",
@@ -316,7 +336,10 @@
     "hwAssigned": "未完了",
     "hwDone": "完了",
     "hwReviewed": "確認済み",
-    "markDone": "完了にする"
+    "markDone": "完了にする",
+    "doHomework": "宿題をする",
+    "reviewHomework": "答えを見る",
+    "score": "得点：{score}/{total}"
   },
   "studentLesson": {
     "title": "レッスンまとめ",
