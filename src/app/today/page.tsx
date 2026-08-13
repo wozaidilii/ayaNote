@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { decideBooking } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import {
   CalendarDays,
+  Check,
+  Clock3,
   LayoutDashboard,
   Users,
   Video,
+  X,
   UiIcon,
 } from "@/components/icons";
 import { EmptyState, PageHeading, PanelTitle } from "@/components/ui-heading";
@@ -20,17 +24,18 @@ import { parseJsonArray } from "@/lib/utils";
 
 export default async function TodayPage() {
   const teacher = await requireTeacher();
-  const [t, common, nav] = await Promise.all([
+  const [t, common, nav, cal] = await Promise.all([
     getTranslations("today"),
     getTranslations("common"),
     getTranslations("nav"),
+    getTranslations("calendar"),
   ]);
 
   const timeZone = normalizeTimezone(teacher.timezone);
   const { start, end } = rollingDayWindowInTz(timeZone, 2);
   const now = new Date();
 
-  const [lessons, fallbackClass] = await Promise.all([
+  const [lessons, fallbackClass, pending] = await Promise.all([
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
@@ -53,7 +58,6 @@ export default async function TodayPage() {
       },
       orderBy: { startsAt: "asc" },
     }),
-    // Prefer a startable lesson even outside the Today window.
     prisma.lesson.findFirst({
       where: {
         teacherId: teacher.id,
@@ -62,6 +66,12 @@ export default async function TodayPage() {
       },
       orderBy: { startsAt: "asc" },
       select: { id: true },
+    }),
+    prisma.bookingRequest.findMany({
+      where: { teacherId: teacher.id, status: "pending" },
+      include: { student: { select: { name: true } } },
+      orderBy: { requestedStart: "asc" },
+      take: 12,
     }),
   ]);
 
@@ -114,6 +124,47 @@ export default async function TodayPage() {
         <p className="muted" style={{ marginTop: "-0.75rem" }}>
           {t("startClassEmpty")}
         </p>
+      )}
+
+      {pending.length > 0 && (
+        <div className="panel">
+          <PanelTitle
+            icon={Clock3}
+            trailing={<span className="chip soon">{pending.length}</span>}
+          >
+            {cal("pending")}
+          </PanelTitle>
+          {pending.map((b) => (
+            <div className="list-row" key={b.id}>
+              <div className="list-row-main">
+                <div className="list-row-title">
+                  {b.student.name} · {b.type}
+                </div>
+                <div className="list-row-meta">
+                  {formatInTz(b.requestedStart, "yyyy-MM-dd HH:mm", timeZone)}
+                </div>
+              </div>
+              <div className="list-row-actions">
+                <form action={decideBooking}>
+                  <input type="hidden" name="id" value={b.id} />
+                  <input type="hidden" name="decision" value="approve" />
+                  <button className="btn sm" type="submit">
+                    <UiIcon icon={Check} size={14} />
+                    {common("approve")}
+                  </button>
+                </form>
+                <form action={decideBooking}>
+                  <input type="hidden" name="id" value={b.id} />
+                  <input type="hidden" name="decision" value="decline" />
+                  <button className="btn danger sm" type="submit">
+                    <UiIcon icon={X} size={14} />
+                    {common("decline")}
+                  </button>
+                </form>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       <div className="panel">

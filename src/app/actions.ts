@@ -846,8 +846,10 @@ export async function createBookingRequest(formData: FormData) {
   });
 
   revalidatePath("/student/book");
+  revalidatePath("/student");
   revalidatePath("/availability");
   revalidatePath("/calendar");
+  revalidatePath("/today");
 }
 
 export async function cancelBookingRequest(formData: FormData) {
@@ -865,8 +867,10 @@ export async function cancelBookingRequest(formData: FormData) {
     data: { status: "cancelled" },
   });
   revalidatePath("/student/book");
+  revalidatePath("/student");
   revalidatePath("/availability");
   revalidatePath("/calendar");
+  revalidatePath("/today");
 }
 
 export async function createStudent(formData: FormData) {
@@ -1105,6 +1109,36 @@ export async function submitHomeworkQuiz(formData: FormData) {
     revalidatePath(`/lessons/${hw.lessonId}`);
   }
   redirect(`/student/homework/${hw.id}?ok=done`);
+}
+
+export async function retryHomeworkQuiz(formData: FormData) {
+  const student = await requireStudent();
+  const homeworkId = String(formData.get("homeworkId") ?? "");
+  const hw = await prisma.homework.findUnique({ where: { id: homeworkId } });
+  if (!hw || hw.studentId !== student.id) {
+    throw new Error("Not your homework");
+  }
+  if (hw.kind !== "quiz") {
+    throw new Error("Not a quiz homework");
+  }
+  await prisma.homework.update({
+    where: { id: homeworkId },
+    data: {
+      answersJson: "[]",
+      score: null,
+      status: "assigned",
+      completedAt: null,
+    },
+  });
+  revalidatePath("/student");
+  revalidatePath("/student/history");
+  revalidatePath(`/student/homework/${hw.id}`);
+  revalidatePath(`/students/${hw.studentId}`);
+  if (hw.lessonId) {
+    revalidatePath(`/student/lessons/${hw.lessonId}`);
+    revalidatePath(`/lessons/${hw.lessonId}`);
+  }
+  redirect(`/student/homework/${hw.id}`);
 }
 
 export async function markHomeworkReviewed(formData: FormData) {

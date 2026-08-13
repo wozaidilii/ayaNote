@@ -48,6 +48,7 @@ export default async function StudentHomeworkPage({
   const answers = parseAnswersJson(hw.answersJson);
   const isDone = hw.status === "done" || hw.status === "reviewed";
   const isQuiz = hw.kind === "quiz" && questions.length > 0;
+  const showSummary = isDone && (sp.ok === "done" || answers.length > 0);
 
   return (
     <AppShell active="history" personName={hw.student.name}>
@@ -62,7 +63,7 @@ export default async function StudentHomeworkPage({
         }
       />
 
-      {hw.instructions ? (
+      {hw.instructions && !showSummary ? (
         <p className="muted" style={{ marginBottom: "1rem" }}>
           {hw.instructions}
         </p>
@@ -77,6 +78,7 @@ export default async function StudentHomeworkPage({
             readOnly={isDone}
             initialAnswers={answers}
             score={hw.score}
+            showSummary={showSummary}
             labels={{
               next: t("next"),
               submit: t("submit"),
@@ -84,6 +86,14 @@ export default async function StudentHomeworkPage({
               progress: t("progress"),
               score: t("score"),
               reviewTitle: t("reviewTitle"),
+              summaryTitle: t("summaryTitle"),
+              summaryCorrect: t("summaryCorrect"),
+              summaryWrong: t("summaryWrong"),
+              reviewAnswers: t("reviewAnswers"),
+              retry: t("retry"),
+              backHome: t("backHome"),
+              yourAnswer: t("yourAnswer"),
+              correctAnswer: t("correctAnswer"),
             }}
           />
         </div>

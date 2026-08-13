@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { markHomeworkDone } from "@/app/actions";
+import { markHomeworkDone, retryHomeworkQuiz } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { History, Video, UiIcon } from "@/components/icons";
 import { EmptyState, PageHeading } from "@/components/ui-heading";
@@ -93,13 +93,28 @@ export default async function StudentHistoryPage() {
                         </a>
                       ) : null}
                       {isDone && hw.kind === "quiz" ? (
-                        <a
-                          className="btn ghost sm"
-                          href={`/student/homework/${hw.id}`}
-                          style={{ marginLeft: "0.5rem" }}
-                        >
-                          {t("reviewHomework")}
-                        </a>
+                        <>
+                          <a
+                            className="btn ghost sm"
+                            href={`/student/homework/${hw.id}`}
+                            style={{ marginLeft: "0.5rem" }}
+                          >
+                            {t("reviewHomework")}
+                          </a>
+                          <form
+                            action={retryHomeworkQuiz}
+                            style={{ display: "inline", marginLeft: "0.35rem" }}
+                          >
+                            <input
+                              type="hidden"
+                              name="homeworkId"
+                              value={hw.id}
+                            />
+                            <button className="btn secondary sm" type="submit">
+                              {t("retry")}
+                            </button>
+                          </form>
+                        </>
                       ) : null}
                       {isAssigned && hw.kind === "text" ? (
                         <form

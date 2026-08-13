@@ -1,17 +1,32 @@
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { CalendarPlus } from "@/components/icons";
-import { SlotPicker } from "@/components/slot-picker";
-import { EmptyState, PageHeading, PanelTitle } from "@/components/ui-heading";
+import {
+  StudentBookCalendar,
+  type StudentCalBlock,
+} from "@/components/student-book-calendar";
+import { PageHeading } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
-import { generateAvailableSlots, groupSlotsByDay } from "@/lib/scheduling";
+import { generateAvailableSlots } from "@/lib/scheduling";
+import {
+  consecutiveYmds,
+  dayBoundsInTz,
+  normalizeTimezone,
+  shiftYmd,
+  startOfWeekMondayYmd,
+  ymdInTz,
+} from "@/lib/timezone";
 
-export default async function StudentBookPage() {
+export default async function StudentBookPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ start?: string }>;
+}) {
+  const sp = await searchParams;
   const active = await getActiveStudent();
-  const [t, common, teacher, student] = await Promise.all([
+  const [t, teacher, student] = await Promise.all([
     getTranslations("studentBook"),
-    getTranslations("common"),
     prisma.teacher.findUniqueOrThrow({
       where: { id: active.teacherId },
       include: {
@@ -31,6 +46,24 @@ export default async function StudentBookPage() {
     }),
   ]);
 
+  const timeZone = normalizeTimezone(
+    teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
+  );
+  const todayYmd = ymdInTz(new Date(), timeZone);
+  const anchorYmd =
+    sp.start && /^\d{4}-\d{2}-\d{2}$/.test(sp.start) ? sp.start : todayYmd;
+  const daysStart = startOfWeekMondayYmd(anchorYmd, timeZone);
+  const weekDays = consecutiveYmds(daysStart, 7, timeZone);
+  const prevStart = shiftYmd(daysStart, -7, timeZone);
+  const nextStart = shiftYmd(daysStart, 7, timeZone);
+  const thisWeekStart = startOfWeekMondayYmd(todayYmd, timeZone);
+
+  const rangeStart = dayBoundsInTz(weekDays[0]!, timeZone).start;
+  const rangeEnd = dayBoundsInTz(
+    shiftYmd(weekDays[weekDays.length - 1]!, 1, timeZone),
+    timeZone,
+  ).start;
+
   const rules = {
     weekdaysJson: teacher.availabilityRules?.weekdaysJson ?? "[1,2,3,4,5,6]",
     startTime: teacher.availabilityRules?.startTime ?? "10:00",
@@ -41,46 +74,79 @@ export default async function StudentBookPage() {
       student.lessonsPerWeek ??
       teacher.availabilityRules?.maxWeeklyLessons ??
       6,
-    timezone:
-      teacher.timezone || teacher.availabilityRules?.timezone || "Asia/Tokyo",
+    timezone: timeZone,
   };
 
-  const [busyLessons, pending] = await Promise.all([
+  const [busyLessons, pendingAll] = await Promise.all([
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
         status: { not: "cancelled" },
-        startsAt: { gte: new Date(Date.now() - 86400000) },
+        startsAt: { gte: rangeStart, lt: rangeEnd },
+      },
+      select: {
+        id: true,
+        studentId: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
       },
     }),
     prisma.bookingRequest.findMany({
       where: { teacherId: teacher.id, status: "pending" },
+      select: {
+        id: true,
+        studentId: true,
+        requestedStart: true,
+        requestedEnd: true,
+      },
     }),
   ]);
 
   const busy = [
     ...busyLessons.map((l) => ({ start: l.startsAt, end: l.endsAt })),
-    ...pending.map((b) => ({ start: b.requestedStart, end: b.requestedEnd })),
+    ...pendingAll.map((b) => ({
+      start: b.requestedStart,
+      end: b.requestedEnd,
+    })),
   ];
 
-  const studentUpcoming = student.lessons.filter(
-    (l) => l.status === "scheduled" && l.startsAt >= new Date(),
-  );
-
-  const slots = generateAvailableSlots({
+  const openSlots = generateAvailableSlots({
     rules,
     busy,
     blackoutDates: teacher.blackoutDates.map((b) => b.date),
     studentLessonStarts: student.lessons
       .filter((l) => l.status !== "cancelled")
       .map((l) => l.startsAt),
-    days: 14,
-  });
-  const days = groupSlotsByDay(slots, rules.timezone).map((d) => ({
-    dayKey: d.dayKey,
-    label: d.label,
-    slots: d.slots.map((s) => s.toISOString()),
-  }));
+    from: rangeStart,
+    days: 8,
+  }).filter((d) => d >= rangeStart && d < rangeEnd);
+
+  const blocks: StudentCalBlock[] = [];
+  for (const lesson of busyLessons) {
+    const mine = lesson.studentId === student.id;
+    blocks.push({
+      id: lesson.id,
+      startsAt: lesson.startsAt.toISOString(),
+      endsAt: lesson.endsAt.toISOString(),
+      kind: mine ? "mine" : "busy",
+      label: mine ? t("yourLesson") : t("busy"),
+    });
+  }
+  for (const req of pendingAll) {
+    const mine = req.studentId === student.id;
+    blocks.push({
+      id: req.id,
+      startsAt: req.requestedStart.toISOString(),
+      endsAt: req.requestedEnd.toISOString(),
+      kind: mine ? "pending" : "busy",
+      label: mine ? t("yourPending") : t("busy"),
+    });
+  }
+
+  const studentUpcoming = student.lessons.filter(
+    (l) => l.status === "scheduled" && l.startsAt >= new Date(),
+  );
 
   return (
     <AppShell active="book" personName={student.name}>
@@ -99,37 +165,45 @@ export default async function StudentBookPage() {
         <p style={{ marginBottom: 0, marginTop: "0.7rem" }}>{t("slotHint")}</p>
       </div>
 
-      <SlotPicker
-        days={days}
-        timeZone={rules.timezone}
-        nextLessonId={studentUpcoming[0]?.id}
-        bookings={student.bookingRequests.map((b) => ({
-          id: b.id,
-          type: b.type,
-          status: b.status,
-          note: b.note,
-          requestedStart: b.requestedStart.toISOString(),
-        }))}
-        labels={{
-          pickSlot: t("pickSlot"),
-          request: t("request"),
-          note: t("note"),
-          typeBook: t("typeBook"),
-          typeReschedule: t("typeReschedule"),
-          noSlots: t("noSlots"),
-          confirm: t("confirm"),
-          duration: t("duration"),
-          cancel: t("cancel"),
-          myBookings: t("myBookings"),
-        }}
-      />
-
-      {student.bookingRequests.length === 0 && (
-        <div className="panel">
-          <PanelTitle icon={CalendarPlus}>{t("myBookings")}</PanelTitle>
-          <EmptyState icon={CalendarPlus}>{common("noItems")}</EmptyState>
-        </div>
-      )}
+      <div className="panel">
+        <StudentBookCalendar
+          days={weekDays}
+          blocks={blocks}
+          openSlotIsos={openSlots.map((s) => s.toISOString())}
+          timeZone={timeZone}
+          todayYmd={todayYmd}
+          weekStartYmd={thisWeekStart}
+          prevStart={prevStart}
+          nextStart={nextStart}
+          nextLessonId={studentUpcoming[0]?.id}
+          bookings={student.bookingRequests.map((b) => ({
+            id: b.id,
+            type: b.type,
+            status: b.status,
+            note: b.note,
+            requestedStart: b.requestedStart.toISOString(),
+          }))}
+          labels={{
+            timezone: t("timezone"),
+            today: t("todayBtn"),
+            busy: t("busy"),
+            yourLesson: t("yourLesson"),
+            yourPending: t("yourPending"),
+            requestTitle: t("requestTitle"),
+            requestHint: t("requestHint"),
+            request: t("request"),
+            note: t("note"),
+            typeBook: t("typeBook"),
+            typeReschedule: t("typeReschedule"),
+            confirm: t("confirm"),
+            cancel: t("cancel"),
+            close: t("close"),
+            duration: t("duration"),
+            myBookings: t("myBookings"),
+            slotTaken: t("slotTaken"),
+          }}
+        />
+      </div>
     </AppShell>
   );
 }

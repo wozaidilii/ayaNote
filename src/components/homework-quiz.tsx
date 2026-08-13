@@ -1,8 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { submitHomeworkQuiz } from "@/app/actions";
+import { useMemo, useState, useTransition } from "react";
+import { retryHomeworkQuiz, submitHomeworkQuiz } from "@/app/actions";
 import type { QuizAnswer, QuizQuestion } from "@/lib/homework-quiz";
+
+type Labels = {
+  next: string;
+  submit: string;
+  submitting: string;
+  progress: string;
+  score: string;
+  reviewTitle: string;
+  summaryTitle: string;
+  summaryCorrect: string;
+  summaryWrong: string;
+  reviewAnswers: string;
+  retry: string;
+  backHome: string;
+  yourAnswer: string;
+  correctAnswer: string;
+};
 
 type Props = {
   homeworkId: string;
@@ -11,14 +28,8 @@ type Props = {
   readOnly?: boolean;
   initialAnswers?: QuizAnswer[];
   score?: number | null;
-  labels: {
-    next: string;
-    submit: string;
-    submitting: string;
-    progress: string;
-    score: string;
-    reviewTitle: string;
-  };
+  showSummary?: boolean;
+  labels: Labels;
 };
 
 export function HomeworkQuiz({
@@ -28,9 +39,17 @@ export function HomeworkQuiz({
   readOnly = false,
   initialAnswers = [],
   score = null,
+  showSummary = false,
   labels,
 }: Props) {
   const [index, setIndex] = useState(0);
+  const [mode, setMode] = useState<"quiz" | "summary" | "review">(
+    showSummary || (readOnly && score != null)
+      ? "summary"
+      : readOnly
+        ? "review"
+        : "quiz",
+  );
   const [selected, setSelected] = useState<(number | null)[]>(() => {
     const arr = questions.map(() => null as number | null);
     for (const a of initialAnswers) {
@@ -41,10 +60,89 @@ export function HomeworkQuiz({
   });
   const [pending, startTransition] = useTransition();
 
+  const results = useMemo(() => {
+    return questions.map((q, i) => {
+      const choice = selected[i];
+      const correct = choice === q.answerIndex;
+      return { q, choice, correct };
+    });
+  }, [questions, selected]);
+
+  const computedScore = useMemo(
+    () => results.filter((r) => r.correct).length,
+    [results],
+  );
+  const displayScore = score ?? computedScore;
+
   if (questions.length === 0) {
     return <p className="muted">—</p>;
   }
 
+  if (mode === "summary") {
+    return (
+      <div className="homework-quiz homework-quiz-summary">
+        <div className="homework-quiz-top">
+          <span className="homework-quiz-lesson">{lessonLabel}</span>
+        </div>
+        <h2 className="homework-quiz-summary-title">{labels.summaryTitle}</h2>
+        <p className="homework-quiz-score homework-quiz-score-lg">
+          {labels.score
+            .replace("{score}", String(displayScore))
+            .replace("{total}", String(questions.length))}
+        </p>
+        <ul className="homework-quiz-summary-list">
+          {results.map((r, i) => (
+            <li
+              key={r.q.id}
+              className={`homework-quiz-summary-item${r.correct ? " is-correct" : " is-wrong"}`}
+            >
+              <span className="homework-quiz-summary-num">{i + 1}</span>
+              <div>
+                <div className="homework-quiz-summary-stem">
+                  <span className="homework-quiz-target">{r.q.target}</span>
+                  <span className="muted"> · {r.q.type}</span>
+                </div>
+                <div className="muted" style={{ fontSize: "0.9rem" }}>
+                  {r.correct ? labels.summaryCorrect : labels.summaryWrong}
+                  {r.choice != null && !r.correct ? (
+                    <>
+                      {" · "}
+                      {labels.yourAnswer}: {r.q.choices[r.choice] ?? "—"}
+                      {" · "}
+                      {labels.correctAnswer}: {r.q.choices[r.q.answerIndex]}
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="homework-quiz-actions homework-quiz-summary-actions">
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => {
+              setMode("review");
+              setIndex(0);
+            }}
+          >
+            {labels.reviewAnswers}
+          </button>
+          <form action={retryHomeworkQuiz}>
+            <input type="hidden" name="homeworkId" value={homeworkId} />
+            <button className="btn" type="submit">
+              {labels.retry}
+            </button>
+          </form>
+          <a className="btn ghost" href="/student">
+            {labels.backHome}
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const inReview = mode === "review" || readOnly;
   const q = questions[index]!;
   const choice = selected[index];
   const isLast = index >= questions.length - 1;
@@ -53,7 +151,10 @@ export function HomeworkQuiz({
   function goNext() {
     if (!canAdvance) return;
     if (isLast) {
-      if (readOnly) return;
+      if (inReview) {
+        setMode("summary");
+        return;
+      }
       const answers: QuizAnswer[] = questions.map((question, i) => ({
         questionId: question.id,
         choiceIndex: selected[i] ?? -1,
@@ -98,12 +199,21 @@ export function HomeworkQuiz({
         ))}
       </ol>
 
-      {readOnly && score != null ? (
+      {inReview && displayScore != null ? (
         <p className="homework-quiz-score">
           {labels.score
-            .replace("{score}", String(score))
+            .replace("{score}", String(displayScore))
             .replace("{total}", String(questions.length))}
-          {readOnly ? ` · ${labels.reviewTitle}` : ""}
+          {" · "}
+          {labels.reviewTitle}
+          {" · "}
+          <button
+            type="button"
+            className="linkish"
+            onClick={() => setMode("summary")}
+          >
+            {labels.summaryTitle}
+          </button>
         </p>
       ) : null}
 
@@ -136,9 +246,9 @@ export function HomeworkQuiz({
       >
         {q.choices.map((text, i) => {
           const selectedHere = choice === i;
-          const correct = readOnly && i === q.answerIndex ? " correct" : "";
+          const correct = inReview && i === q.answerIndex ? " correct" : "";
           const wrong =
-            readOnly && selectedHere && i !== q.answerIndex ? " wrong" : "";
+            inReview && selectedHere && i !== q.answerIndex ? " wrong" : "";
           return (
             <button
               key={i}
@@ -146,9 +256,9 @@ export function HomeworkQuiz({
               role="option"
               aria-selected={selectedHere}
               className={`homework-quiz-choice${selectedHere ? " selected" : ""}${correct}${wrong}`}
-              disabled={readOnly || pending}
+              disabled={inReview || pending}
               onClick={() => {
-                if (readOnly) return;
+                if (inReview) return;
                 setSelected((prev) => {
                   const next = [...prev];
                   next[index] = i;
@@ -163,8 +273,29 @@ export function HomeworkQuiz({
         })}
       </div>
 
-      {!readOnly ? (
-        <div className="homework-quiz-actions">
+      <div className="homework-quiz-actions">
+        {inReview ? (
+          <>
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={index === 0}
+              onClick={() => setIndex((i) => Math.max(0, i - 1))}
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="btn homework-quiz-cta"
+              onClick={() => {
+                if (isLast) setMode("summary");
+                else setIndex((i) => i + 1);
+              }}
+            >
+              {isLast ? labels.summaryTitle : labels.next}
+            </button>
+          </>
+        ) : (
           <button
             type="button"
             className="btn homework-quiz-cta"
@@ -173,8 +304,8 @@ export function HomeworkQuiz({
           >
             {pending ? labels.submitting : isLast ? labels.submit : labels.next}
           </button>
-        </div>
-      ) : null}
+        )}
+      </div>
     </div>
   );
 }

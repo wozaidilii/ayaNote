@@ -319,7 +319,12 @@
     "noPendingHomework": "No unfinished homework.",
     "quizQuestions": "{count} questions",
     "levelCheck": "Level check",
-    "startLevelCheck": "Start level check"
+    "startLevelCheck": "Start level check",
+    "doneHomework": "Completed homework",
+    "noDoneHomework": "No completed homework yet.",
+    "viewResult": "View result",
+    "retry": "Retry",
+    "scoreLine": "Score {score}/{total}"
   },
   "studentHomework": {
     "title": "Homework",
@@ -332,24 +337,42 @@
     "submitted": "Submitted",
     "markDone": "Mark as done",
     "alreadyDone": "Completed",
-    "levelCheck": "Level check"
+    "levelCheck": "Level check",
+    "summaryTitle": "Results",
+    "summaryCorrect": "Correct",
+    "summaryWrong": "Incorrect",
+    "reviewAnswers": "Review answers",
+    "retry": "Try again",
+    "backHome": "Back home",
+    "yourAnswer": "Your answer",
+    "correctAnswer": "Correct answer"
   },
   "studentBook": {
     "title": "Book / Reschedule",
-    "subtitle": "Pick an open 1-hour slot — your teacher confirms",
+    "subtitle": "Pick an open slot on the calendar — your teacher confirms",
     "request": "Send request",
     "note": "Note to teacher",
     "typeBook": "New booking",
     "typeReschedule": "Reschedule",
     "pickSlot": "Teacher availability",
     "slotRule": "1 HOUR · :00 / :30",
-    "slotHint": "Lessons are 60 minutes. Blackouts and weekly limits apply.",
-    "noSlots": "No open slots in the next 2 weeks.",
+    "slotHint": "Gray blocks are already booked. Click an open time to request a lesson.",
+    "noSlots": "No open slots in this week.",
     "recent": "Recent requests",
     "confirm": "Confirm this slot",
     "duration": "Duration",
     "cancel": "Cancel",
-    "myBookings": "My bookings"
+    "myBookings": "My bookings",
+    "busy": "Busy",
+    "yourLesson": "Your lesson",
+    "yourPending": "Pending request",
+    "unavailable": "Unavailable",
+    "requestTitle": "Request this slot",
+    "requestHint": "Your teacher will approve or decline this request.",
+    "timezone": "Timezone",
+    "todayBtn": "Today",
+    "close": "Close",
+    "slotTaken": "This time is already booked."
   },
   "studentHistory": {
     "title": "Lesson history",
@@ -361,6 +384,7 @@
     "markDone": "Mark as done",
     "doHomework": "Do homework",
     "reviewHomework": "Review answers",
+    "retry": "Retry",
     "score": "Score: {score}/{total}"
   },
   "studentLesson": {

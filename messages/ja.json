@@ -300,7 +300,12 @@
     "noPendingHomework": "未完了の宿題はありません。",
     "quizQuestions": "{count}問",
     "levelCheck": "レベルチェック",
-    "startLevelCheck": "レベルチェックを始める"
+    "startLevelCheck": "レベルチェックを始める",
+    "doneHomework": "完了した宿題",
+    "noDoneHomework": "完了した宿題はまだありません。",
+    "viewResult": "結果を見る",
+    "retry": "もう一度",
+    "scoreLine": "得点 {score}/{total}"
   },
   "studentHomework": {
     "title": "宿題",
@@ -313,24 +318,42 @@
     "submitted": "提出済み",
     "markDone": "完了にする",
     "alreadyDone": "完了済み",
-    "levelCheck": "レベルチェック"
+    "levelCheck": "レベルチェック",
+    "summaryTitle": "結果",
+    "summaryCorrect": "正解",
+    "summaryWrong": "不正解",
+    "reviewAnswers": "答えを見直す",
+    "retry": "もう一度やる",
+    "backHome": "ホームへ",
+    "yourAnswer": "あなたの答え",
+    "correctAnswer": "正解"
   },
   "studentBook": {
     "title": "予約・振替",
-    "subtitle": "空いている1時間枠を選ぶ — 先生が確認します",
+    "subtitle": "カレンダーで空き枠を選ぶ — 先生が確認します",
     "request": "リクエスト送信",
     "note": "先生へのメモ",
     "typeBook": "新規予約",
     "typeReschedule": "振替",
     "pickSlot": "先生の空き時間",
     "slotRule": "1時間 · :00 / :30",
-    "slotHint": "レッスンは60分。休講日と週上限が適用されます。",
-    "noSlots": "今後2週間に空き枠がありません。",
+    "slotHint": "灰色は予約済み。空いている時間をクリックしてリクエストできます。",
+    "noSlots": "この週に空き枠がありません。",
     "recent": "最近のリクエスト",
     "confirm": "この枠で確定",
     "duration": "時間",
     "cancel": "キャンセル",
-    "myBookings": "自分の予約"
+    "myBookings": "自分の予約",
+    "busy": "予約済み",
+    "yourLesson": "あなたのレッスン",
+    "yourPending": "承認待ち",
+    "unavailable": "予約不可",
+    "requestTitle": "この枠をリクエスト",
+    "requestHint": "先生が承認または辞退します。",
+    "timezone": "タイムゾーン",
+    "todayBtn": "今日",
+    "close": "閉じる",
+    "slotTaken": "この時間はすでに予約されています。"
   },
   "studentHistory": {
     "title": "レッスン履歴",
@@ -342,6 +365,7 @@
     "markDone": "完了にする",
     "doHomework": "宿題をする",
     "reviewHomework": "答えを見る",
+    "retry": "もう一度",
     "score": "得点：{score}/{total}"
   },
   "studentLesson": {

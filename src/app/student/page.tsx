@@ -8,6 +8,7 @@ import {
   UiIcon,
 } from "@/components/icons";
 import { PageHeading, PanelTitle } from "@/components/ui-heading";
+import { retryHomeworkQuiz } from "@/app/actions";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { parseQuizJson } from "@/lib/homework-quiz";
@@ -45,6 +46,17 @@ export default async function StudentHomePage() {
       },
     },
   });
+
+  const doneHomeworks = await prisma.homework.findMany({
+    where: {
+      studentId: student.id,
+      status: { in: ["done", "reviewed"] },
+    },
+    include: { lesson: { select: { startsAt: true } } },
+    orderBy: { completedAt: "desc" },
+    take: 8,
+  });
+
   const next = student.lessons[0];
   const timeZone = normalizeTimezone(student.teacher.timezone);
 
@@ -159,6 +171,58 @@ export default async function StudentHomePage() {
                   <a className="btn sm" href={`/student/homework/${hw.id}`}>
                     {isSample ? t("startLevelCheck") : t("doHomework")}
                   </a>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="panel" style={{ marginTop: "1rem" }}>
+        <PanelTitle icon={BookOpen}>{t("doneHomework")}</PanelTitle>
+        {doneHomeworks.length === 0 ? (
+          <p className="muted">{t("noDoneHomework")}</p>
+        ) : (
+          doneHomeworks.map((hw) => {
+            const qCount =
+              hw.kind === "quiz" ? parseQuizJson(hw.quizJson).length : 0;
+            const isSample = hw.source === "sample_level";
+            return (
+              <div className="list-row" key={hw.id}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {isSample
+                      ? t("levelCheck")
+                      : hw.lesson
+                        ? formatInTz(
+                            hw.lesson.startsAt,
+                            "yyyy-MM-dd HH:mm",
+                            timeZone,
+                          )
+                        : hw.title || common("homework")}
+                  </div>
+                  <div className="muted">
+                    {hw.title || common("homework")}
+                    {hw.score != null && qCount > 0
+                      ? ` · ${t("scoreLine", { score: hw.score, total: qCount })}`
+                      : ""}
+                  </div>
+                </div>
+                <div className="list-row-actions">
+                  <a
+                    className="btn secondary sm"
+                    href={`/student/homework/${hw.id}`}
+                  >
+                    {t("viewResult")}
+                  </a>
+                  {hw.kind === "quiz" ? (
+                    <form action={retryHomeworkQuiz}>
+                      <input type="hidden" name="homeworkId" value={hw.id} />
+                      <button className="btn sm" type="submit">
+                        {t("retry")}
+                      </button>
+                    </form>
+                  ) : null}
                 </div>
               </div>
             );
