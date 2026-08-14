@@ -424,16 +424,6 @@ async function writePrepDraftForLesson(lessonId: string) {
         include: {
           progress: true,
           vocabItems: { orderBy: { createdAt: "desc" }, take: 12 },
-          grammarItems: { orderBy: { createdAt: "desc" }, take: 8 },
-          lessons: {
-            where: {
-              status: "completed",
-              summary: { is: { approved: true } },
-            },
-            include: { summary: true },
-            orderBy: { startsAt: "desc" },
-            take: 3,
-          },
         },
       },
     },
@@ -446,86 +436,11 @@ async function writePrepDraftForLesson(lessonId: string) {
     throw new Error("Assign a student before generating prep");
   }
 
-  const lastTopics = lesson.student.lessons.flatMap((l) =>
-    l.summary ? parseJsonArray(l.summary.topicsJson) : [],
-  );
   const weaknesses = lesson.student.progress
     ? parseJsonArray(lesson.student.progress.weaknessesJson)
     : [];
-  const lastSummary = lesson.student.lessons[0]?.summary ?? null;
-  const lastMistakes = lastSummary
-    ? parseJsonArray(lastSummary.mistakesJson)
-    : [];
   const bankVocab = lesson.student.vocabItems.map((v) => v.term);
-  const pastLessons = lesson.student.lessons.map((l) => {
-    const focus = l.summary?.nextFocus?.trim();
-    const topics = l.summary
-      ? parseJsonArray(l.summary.topicsJson).slice(0, 2)
-      : [];
-    const label = focus || topics.join(" / ") || "past lesson";
-    return label;
-  });
 
-  const priorNextFocus = lastSummary?.nextFocus?.trim() || "";
-  const lastTodaySummary = lastSummary?.todaySummary?.trim() || "";
-  let lastLessonVocab: string[] = [];
-  if (lastSummary?.vocabJson) {
-    try {
-      const rows = JSON.parse(lastSummary.vocabJson) as Array<{
-        term?: string;
-      }>;
-      if (Array.isArray(rows)) {
-        lastLessonVocab = rows
-          .map((v) => String(v?.term ?? "").trim())
-          .filter(Boolean);
-      }
-    } catch {
-      lastLessonVocab = [];
-    }
-  }
-  // Prefer last-lesson + weak-point vocab for cloze recall, then bank terms.
-  const vocab = [
-    ...lastLessonVocab,
-    ...lastMistakes
-      .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
-      .filter((w) => w && !w.includes("→")),
-    ...weaknesses
-      .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
-      .filter((w) => w && !w.includes("→")),
-    ...bankVocab,
-  ].filter((t, i, arr) => arr.indexOf(t) === i);
-
-  const priorBoardLesson = await prisma.lesson.findFirst({
-    where: {
-      studentId: lesson.studentId,
-      id: { not: lessonId },
-      status: { in: ["completed", "scheduled", "in_progress"] },
-      classroomDoc: { not: "" },
-    },
-    orderBy: { startsAt: "desc" },
-    select: { classroomDoc: true },
-  });
-  const lastClassroomBoard = tiptapDocToPlainText(
-    parseClassroomDoc(priorBoardLesson?.classroomDoc),
-  );
-
-  const generated = await generatePrepDraft({
-    studentName: lesson.student.name,
-    level: lesson.student.level,
-    courseType: lesson.student.courseType,
-    goals: lesson.student.goals,
-    lastTopics,
-    weaknesses,
-    mistakes: lastMistakes,
-    vocab,
-    lastClassroomBoard,
-    priorNextFocus,
-    lastTodaySummary,
-    isFirstLesson: !lastSummary,
-  });
-  const { vocabRecall: generatedCloze, ...draft } = generated;
-
-  const existingRefs = parsePrepRefs(lesson.prepDraft?.refsJson);
   const priorLesson = await prisma.lesson.findFirst({
     where: {
       studentId: lesson.studentId,
@@ -535,20 +450,33 @@ async function writePrepDraftForLesson(lessonId: string) {
     orderBy: { startsAt: "desc" },
     include: { prepDraft: true },
   });
+  const existingRefs = parsePrepRefs(lesson.prepDraft?.refsJson);
   const priorRefs = parsePrepRefs(priorLesson?.prepDraft?.refsJson);
   const thisCloze =
     existingRefs.vocabRecall.length > 0
       ? existingRefs.vocabRecall
       : priorRefs.nextVocabRecall;
 
+  const generated = await generatePrepDraft({
+    studentName: lesson.student.name,
+    level: lesson.student.level,
+    courseType: lesson.student.courseType,
+    goals: lesson.student.goals,
+    lastTopics: [],
+    weaknesses,
+    vocab: bankVocab,
+    isFirstLesson: !priorLesson,
+  });
+  const { vocabRecall: generatedCloze, ...draft } = generated;
+
   const refs: PrepRefs = {
     course: courseTypeLabel(lesson.student.courseType),
     level: lesson.student.level,
     goals: lesson.student.goals?.trim() || "",
-    pastLessons,
-    topics: [...new Set(lastTopics)].slice(0, 8),
-    weaknesses: [...lastMistakes, ...weaknesses].slice(0, 8),
-    vocab: vocab.slice(0, 10),
+    pastLessons: [],
+    topics: [],
+    weaknesses: weaknesses.slice(0, 6),
+    vocab: bankVocab.slice(0, 10),
     vocabRecall: thisCloze,
     nextVocabRecall: generatedCloze ?? [],
   };

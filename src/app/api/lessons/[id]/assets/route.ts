@@ -68,7 +68,7 @@ export async function POST(
       mimeType,
       filename,
       byteSize: buf.length,
-      data: buf,
+      data: Uint8Array.from(buf),
       uploadedBy,
     },
     select: { id: true },

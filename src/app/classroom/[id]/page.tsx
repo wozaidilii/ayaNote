@@ -15,7 +15,6 @@ import {
 } from "@/lib/classroom-doc";
 import { parsePrepRefs } from "@/lib/prep-refs";
 import { prisma } from "@/lib/db";
-import { parseJsonArray } from "@/lib/utils";
 import { livekitConfigured } from "@/lib/livekit";
 import { sttConfigured } from "@/lib/stt";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
@@ -84,18 +83,6 @@ export default async function ClassroomPage({
 
   const refs = parsePrepRefs(lesson.prepDraft?.refsJson);
   const cloze = refs.vocabRecall;
-  const lastApproved =
-    role === "teacher"
-      ? await prisma.lesson.findFirst({
-          where: {
-            studentId: lesson.studentId,
-            id: { not: lesson.id },
-            summary: { is: { approved: true } },
-          },
-          orderBy: { startsAt: "desc" },
-          include: { summary: true },
-        })
-      : null;
   const bound = bindClassroomDocToPrep(
     parseClassroomDoc(lesson.classroomDoc),
     cloze,
@@ -151,11 +138,6 @@ export default async function ClassroomPage({
                 course: courseTypeLabel(lesson.student.courseType),
                 level: lesson.student.level,
                 goals: lesson.student.goals ?? "",
-                lastTodaySummary: lastApproved?.summary?.todaySummary ?? "",
-                lastNextFocus: lastApproved?.summary?.nextFocus ?? "",
-                lastMistakes: parseJsonArray(
-                  lastApproved?.summary?.mistakesJson,
-                ),
                 vocab: refs.vocab,
               }
             : null
@@ -200,9 +182,6 @@ export default async function ClassroomPage({
           tabMaterials: t("tabMaterials"),
           materialsCourse: t("materialsCourse"),
           materialsGoals: t("materialsGoals"),
-          materialsLastSummary: t("materialsLastSummary"),
-          materialsLastFocus: t("materialsLastFocus"),
-          materialsMistakes: t("materialsMistakes"),
           materialsVocab: t("materialsVocab"),
           materialsEmpty: t("materialsEmpty"),
           teacherPrepEmpty: t("teacherPrepEmpty"),

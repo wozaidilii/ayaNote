@@ -262,14 +262,10 @@ function heuristicPrep(input: {
   courseType?: string;
   lastTopics: string[];
   weaknesses: string[];
-  mistakes?: string[];
   vocab?: string[];
   isFirstLesson?: boolean;
 }): PrepDraftPayload {
   const recallTerms = [
-    ...(input.mistakes ?? [])
-      .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
-      .filter(Boolean),
     ...input.weaknesses
       .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
       .filter(Boolean),
@@ -665,14 +661,7 @@ export async function generatePrepDraft(input: {
   goals: string;
   lastTopics: string[];
   weaknesses: string[];
-  mistakes?: string[];
   vocab: string[];
-  /** Recent classroom board plain text (last completed lesson) */
-  lastClassroomBoard?: string;
-  /** Approved next-lesson proposal from last summary */
-  priorNextFocus?: string;
-  /** Last approved lesson todaySummary narrative */
-  lastTodaySummary?: string;
   isFirstLesson?: boolean;
   materialsExcerpt?: string;
 }): Promise<PrepDraftPayload> {
@@ -681,10 +670,6 @@ export async function generatePrepDraft(input: {
 
   const course = courseTypeLabel(input.courseType || input.level);
   const track = prepTrack(input.level, input.courseType);
-  const board = (input.lastClassroomBoard ?? "").trim().slice(0, 5000);
-  const nextFocus = (input.priorNextFocus ?? "").trim().slice(0, 2000);
-  const todaySummary = (input.lastTodaySummary ?? "").trim().slice(0, 2000);
-  const mistakes = (input.mistakes ?? []).join(" · ") || "n/a";
   const materials = (input.materialsExcerpt ?? "").trim().slice(0, 4000);
   const firstNote = input.isFirstLesson
     ? track === "beginner"
@@ -698,8 +683,10 @@ export async function generatePrepDraft(input: {
     const object = await generateJson(
       model,
       prepSchema,
-      `Create a 50-minute Japanese 1v1 lesson prep draft tailored to the course track.
-Stay inside the sources below. Do not invent textbook chapters that were not provided.
+      `Create a 50-minute Japanese 1v1 lesson prep draft for the teacher.
+Do NOT copy last-lesson todaySummary, nextFocus, or mistakes into this prep.
+Those belong on the teacher lesson-record screen, not in 教案.
+The only carry-over from the previous lesson is cloze (handled outside this prompt).
 
 Student: ${input.studentName}
 Course: ${course}
@@ -708,36 +695,22 @@ Track: ${track}
 Goals: ${input.goals || "n/a"}
 ${firstNote}
 
-SOURCE ORDER (honor this):
-1) Imported materials excerpt (if any):
-${materials || "n/a — no imported textbook text; do not fake a textbook"}
-2) Last APPROVED todaySummary:
-${todaySummary || "n/a"}
-3) Last APPROVED nextFocus (PRIMARY direction unless clearly outdated):
-${nextFocus || "n/a"}
-4) Last APPROVED mistakes (recycle explicitly — do not only treat as vague weaknesses):
-${mistakes}
-5) Weak points / vocab bank:
-${input.weaknesses.join(", ") || "n/a"}
-Priority vocab: ${input.vocab.join(", ") || "n/a"}
-Recent topics: ${input.lastTopics.join(", ") || "n/a"}
-Last classroom board TEXT (not images):
-${board || "n/a"}
+Materials excerpt (if any):
+${materials || "n/a"}
 
 Return JSON with: warmup, review, newFocus, practice, homeworkSeed,
-and vocabRecall: 4–6 short Japanese cloze sentences.
+and vocabRecall: 4–6 short Japanese cloze sentences for the FOLLOWING lesson.
 
 IMPORTANT:
-- warmup / review / newFocus / practice / homeworkSeed are TEACHER-ONLY notes for THIS lesson. Do not write them as student-facing board content. Do not assume they will appear in the next lesson.
-- vocabRecall is for the NEXT lesson's oral warmup (student-facing cloze). It must not repeat this lesson's newFocus/practice as board text.
+- warmup / review / newFocus / practice / homeworkSeed are TEACHER-ONLY notes for THIS lesson.
+- Do not include a recap of last class summary/focus/mistakes.
+- vocabRecall is for the NEXT lesson's oral warmup (student-facing cloze).
 
 vocabRecall format (strict):
 - blanked: natural Japanese sentence with ONE blank written as ＿＿. Example: 「これは昨日行った＿＿です。」
 - hint: short meaning cue (English or simple Japanese), NOT the answer. Example: "library"
 - answer: Japanese word/phrase for ＿＿. Example: "図書館"
-Prioritize last-lesson mistakes then weak/priority vocab. Level-appropriate.
-If nextFocus is present, newFocus and practice must advance that proposal.
-If no usable vocab/weak list, return vocabRecall as [].`,
+Level-appropriate. If no usable vocab, return vocabRecall as [].`,
     );
     return {
       ...object,

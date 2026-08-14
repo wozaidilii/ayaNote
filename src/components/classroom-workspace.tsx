@@ -71,9 +71,6 @@ type Labels = {
   tabMaterials: string;
   materialsCourse: string;
   materialsGoals: string;
-  materialsLastSummary: string;
-  materialsLastFocus: string;
-  materialsMistakes: string;
   materialsVocab: string;
   materialsEmpty: string;
   teacherPrepEmpty: string;
@@ -90,9 +87,6 @@ export type TeacherPrepPayload = {
   course: string;
   level: string;
   goals: string;
-  lastTodaySummary: string;
-  lastNextFocus: string;
-  lastMistakes: string[];
   vocab: string[];
 };
 
@@ -611,39 +605,13 @@ function TeacherPrepPanel({
               <p>{prep.goals}</p>
             </section>
           ) : null}
-          {prep.lastTodaySummary.trim() ? (
-            <section className="classroom-teacher-prep-block">
-              <h3>{labels.materialsLastSummary}</h3>
-              <p>{prep.lastTodaySummary}</p>
-            </section>
-          ) : null}
-          {prep.lastNextFocus.trim() ? (
-            <section className="classroom-teacher-prep-block">
-              <h3>{labels.materialsLastFocus}</h3>
-              <p>{prep.lastNextFocus}</p>
-            </section>
-          ) : null}
-          {prep.lastMistakes.length > 0 ? (
-            <section className="classroom-teacher-prep-block">
-              <h3>{labels.materialsMistakes}</h3>
-              <ul className="classroom-teacher-prep-list">
-                {prep.lastMistakes.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
           {prep.vocab.length > 0 ? (
             <section className="classroom-teacher-prep-block">
               <h3>{labels.materialsVocab}</h3>
               <p>{prep.vocab.join(" · ")}</p>
             </section>
           ) : null}
-          {!prep.goals.trim() &&
-          !prep.lastTodaySummary.trim() &&
-          !prep.lastNextFocus.trim() &&
-          prep.lastMistakes.length === 0 &&
-          prep.vocab.length === 0 ? (
+          {!prep.goals.trim() && prep.vocab.length === 0 ? (
             <p className="muted classroom-teacher-prep-hint">
               {labels.materialsEmpty}
             </p>

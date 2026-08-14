@@ -8,7 +8,6 @@ import { PageHeading } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
-import { parseJsonArray } from "@/lib/utils";
 
 type VocabRow = { term: string; reading?: string; meaning?: string };
 type GrammarRow = { pattern: string; notes?: string };
@@ -54,9 +53,6 @@ export default async function StudentLessonSummaryPage({
 
   const timeZone = normalizeTimezone(lesson.teacher.timezone);
   const summarizing = sp.ok === "summarizing" && !lesson.summary;
-  const topics = lesson.summary
-    ? parseJsonArray(lesson.summary.topicsJson)
-    : [];
   const vocab = lesson.summary
     ? parseObjectArray<VocabRow>(lesson.summary.vocabJson)
     : [];
@@ -101,9 +97,6 @@ export default async function StudentLessonSummaryPage({
       ) : lesson.summary ? (
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>{t("todayContent")}</h2>
-          <p>{lesson.summary.todaySummary}</p>
-          <h3>{common("topics")}</h3>
-          <p className="muted">{topics.join(" · ") || "—"}</p>
           <h3>{common("homework")}</h3>
           <p>
             {lesson.homeworks[0]?.instructions ||
@@ -133,12 +126,6 @@ export default async function StudentLessonSummaryPage({
                 </form>
               ) : null}
             </div>
-          ) : null}
-          {lesson.summary.approved ? (
-            <>
-              <h3>{common("nextFocus")}</h3>
-              <p>{lesson.summary.nextFocus || "—"}</p>
-            </>
           ) : null}
           {vocab.length > 0 && (
             <>

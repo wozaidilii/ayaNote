@@ -32,7 +32,6 @@ export default async function StudentHomePage() {
       },
       lessons: {
         where: { status: "scheduled", startsAt: { gte: new Date() } },
-        include: { summary: true },
         orderBy: { startsAt: "asc" },
         take: 1,
       },
@@ -46,19 +45,6 @@ export default async function StudentHomePage() {
 
   const next = student.lessons[0];
   const timeZone = normalizeTimezone(student.teacher.timezone);
-  const lastApproved = await prisma.lesson.findFirst({
-    where: {
-      studentId: student.id,
-      status: "completed",
-      summary: { is: { approved: true } },
-    },
-    orderBy: { startsAt: "desc" },
-    include: { summary: true },
-  });
-  const nextFocus =
-    lastApproved?.summary?.nextFocus?.trim() ||
-    (next?.summary?.approved ? next.summary.nextFocus.trim() : "") ||
-    "";
   const homeworkLine =
     student.homeworks[0]?.title || student.homeworks[0]?.instructions || "";
 
@@ -90,8 +76,7 @@ export default async function StudentHomePage() {
                 <strong>{t("status")}:</strong> {next.status}
               </p>
               <p>
-                <strong>{t("whatNext")}:</strong>{" "}
-                {nextFocus || homeworkLine || "—"}
+                <strong>{t("whatNext")}:</strong> {homeworkLine || "—"}
               </p>
               {homeworkLine ? (
                 <p>

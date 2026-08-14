@@ -133,11 +133,6 @@ export default async function StudentHistoryPage() {
                       ) : null}
                     </div>
                   ) : null}
-                  {lesson.summary?.approved ? (
-                    <div>
-                      {common("nextFocus")}: {lesson.summary.nextFocus || "—"}
-                    </div>
-                  ) : null}
                 </div>
                 <div className="list-row-actions">
                   <a
