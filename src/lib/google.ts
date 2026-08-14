@@ -9,6 +9,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
   "openid",
   "email",
 ].join(" ");
@@ -138,6 +139,47 @@ export async function getValidAccessToken(teacher: {
   if (!teacher.googleRefreshToken) return null;
   const refreshed = await refreshAccessToken(teacher.googleRefreshToken);
   return refreshed.access_token;
+}
+
+export function looksLikeMailbox(email: string | null | undefined) {
+  const value = (email ?? "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return false;
+  if (value.endsWith("@calendar.ayanote.local")) return false;
+  return true;
+}
+
+export async function sendGmailMessage(opts: {
+  accessToken: string;
+  to: string;
+  subject: string;
+  text: string;
+}) {
+  const raw = [
+    `To: ${opts.to}`,
+    `Subject: =?UTF-8?B?${Buffer.from(opts.subject).toString("base64")}?=`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    opts.text,
+  ].join("\r\n");
+  const res = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        raw: Buffer.from(raw).toString("base64url"),
+      }),
+    },
+  );
+  if (!res.ok) {
+    console.error("Gmail send failed", await res.text());
+    return false;
+  }
+  return true;
 }
 
 export type MeetCreateResult = {

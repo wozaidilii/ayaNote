@@ -19,6 +19,7 @@ export async function getAccessibleLesson(lessonId: string) {
           email: true,
           level: true,
           courseType: true,
+          goals: true,
         },
       },
       prepDraft: true,

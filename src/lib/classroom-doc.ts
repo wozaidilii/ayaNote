@@ -3,6 +3,8 @@
  * Server-safe (no TipTap imports).
  */
 
+import type { VocabRecallItem } from "@/lib/prep-refs";
+
 export type TiptapNode = {
   type: string;
   attrs?: Record<string, unknown>;
@@ -37,38 +39,41 @@ function paragraph(text: string): TiptapNode {
   };
 }
 
-function section(title: string, body: string): TiptapNode[] {
-  const lines = body.replace(/\r\n/g, "\n").split("\n");
-  const paras =
-    lines.length === 0 || (lines.length === 1 && !lines[0].trim())
-      ? [paragraph("")]
-      : lines.map((line) => paragraph(line));
-  return [heading(title), ...paras];
-}
+const PREP_SECTION_TITLES = new Set([
+  "Warmup",
+  "Review",
+  "New focus",
+  "Practice",
+  "Homework",
+  "Notes",
+  "Recall",
+]);
 
-export function seedClassroomDoc(opts: {
-  warmup?: string;
-  review?: string;
-  newFocus?: string;
-  practice?: string;
-  homeworkSeed?: string;
-  classroomNotes?: string;
-}): TiptapDoc {
+/** Shared board: last lesson's cloze only (no teacher-only prep sections). */
+export function seedClassroomDocFromCloze(
+  items: VocabRecallItem[] | null | undefined,
+): TiptapDoc {
+  const cloze = items ?? [];
+  if (cloze.length === 0) {
+    return { type: "doc", content: [paragraph("")] };
+  }
   return {
     type: "doc",
     content: [
-      ...section("Warmup", opts.warmup ?? ""),
-      ...section("Review", opts.review ?? ""),
-      ...section("New focus", opts.newFocus ?? ""),
-      ...section("Practice", opts.practice ?? ""),
-      ...section("Homework", opts.homeworkSeed ?? ""),
-      ...section("Notes", opts.classroomNotes ?? ""),
+      heading("Recall"),
+      ...cloze.map((item) => {
+        const hint = item.hint.trim();
+        const showHint = hint && hint !== item.answer.trim();
+        return paragraph(
+          showHint ? `${item.blanked}（${hint}）` : item.blanked,
+        );
+      }),
     ],
   };
 }
 
 export function emptyClassroomDoc(): TiptapDoc {
-  return seedClassroomDoc({});
+  return seedClassroomDocFromCloze([]);
 }
 
 export function parseClassroomDoc(
@@ -141,4 +146,106 @@ export function tiptapDocToPlainText(
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+export function extractImageNodes(
+  doc: TiptapDoc | null | undefined,
+): TiptapNode[] {
+  if (!doc?.content?.length) return [];
+  const images: TiptapNode[] = [];
+  const walk = (node: TiptapNode) => {
+    if (node.type === "image") {
+      images.push(node);
+      return;
+    }
+    for (const child of node.content ?? []) walk(child);
+  };
+  for (const node of doc.content) walk(node);
+  return images;
+}
+
+export function appendImageNodes(
+  doc: TiptapDoc,
+  images: TiptapNode[],
+): TiptapDoc {
+  if (images.length === 0) return doc;
+  const seen = new Set(
+    extractImageNodes(doc)
+      .map((n) => String(n.attrs?.src ?? ""))
+      .filter(Boolean),
+  );
+  const extra = images.filter((n) => {
+    const src = String(n.attrs?.src ?? "");
+    if (!src || seen.has(src)) return false;
+    seen.add(src);
+    return true;
+  });
+  if (extra.length === 0) return doc;
+  return { type: "doc", content: [...doc.content, ...extra] };
+}
+
+/** True when the board has real lesson text, not just section headings / images. */
+export function hasClassroomBodyText(
+  doc: TiptapDoc | null | undefined,
+): boolean {
+  const plain = tiptapDocToPlainText(doc);
+  if (!plain) return false;
+  return plain
+    .split("\n")
+    .map((line) => line.replace(/^#+\s*/, "").trim())
+    .some((line) => line.length > 0 && !PREP_SECTION_TITLES.has(line));
+}
+
+function headingTexts(doc: TiptapDoc): string[] {
+  const titles: string[] = [];
+  for (const node of doc.content ?? []) {
+    if (node.type !== "heading") continue;
+    const text = (node.content ?? [])
+      .map((child) => child.text ?? "")
+      .join("")
+      .trim();
+    if (text) titles.push(text);
+  }
+  return titles;
+}
+
+function isLegacyPrepBoard(doc: TiptapDoc | null | undefined): boolean {
+  if (!doc) return false;
+  const titles = new Set(headingTexts(doc));
+  return titles.has("Warmup") && titles.has("New focus");
+}
+
+/**
+ * Shared board is this lesson's cloze only.
+ * Teacher-only prep sections are never written onto the student-visible board.
+ */
+export function bindClassroomDocToPrep(
+  existing: TiptapDoc | null | undefined,
+  cloze: VocabRecallItem[] | null | undefined,
+): { doc: TiptapDoc; changed: boolean } {
+  const seeded = seedClassroomDocFromCloze(cloze);
+  if (!existing) {
+    return { doc: seeded, changed: true };
+  }
+  if (hasClassroomBodyText(existing) && !isLegacyPrepBoard(existing)) {
+    return { doc: existing, changed: false };
+  }
+  const doc = appendImageNodes(seeded, extractImageNodes(existing));
+  return {
+    doc,
+    changed: serializeClassroomDoc(existing) !== serializeClassroomDoc(doc),
+  };
+}
+
+/** Keep live image pastes, but never let an empty/legacy board wipe cloze. */
+export function mergeClassroomBoardSave(
+  incoming: TiptapDoc,
+  stored: TiptapDoc | null | undefined,
+  cloze: VocabRecallItem[] | null | undefined,
+): TiptapDoc {
+  if (hasClassroomBodyText(incoming) && !isLegacyPrepBoard(incoming)) {
+    return incoming;
+  }
+  const bound = bindClassroomDocToPrep(stored, cloze);
+  return appendImageNodes(bound.doc, extractImageNodes(incoming));
 }

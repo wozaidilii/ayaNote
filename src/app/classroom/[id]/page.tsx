@@ -9,12 +9,13 @@ import {
   getLessonForGuestJoin,
 } from "@/lib/classroom-access";
 import {
-  emptyClassroomDoc,
+  bindClassroomDocToPrep,
   parseClassroomDoc,
-  seedClassroomDoc,
   serializeClassroomDoc,
 } from "@/lib/classroom-doc";
+import { parsePrepRefs } from "@/lib/prep-refs";
 import { prisma } from "@/lib/db";
+import { parseJsonArray } from "@/lib/utils";
 import { livekitConfigured } from "@/lib/livekit";
 import { sttConfigured } from "@/lib/stt";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
@@ -81,20 +82,26 @@ export default async function ClassroomPage({
   const timeZone = normalizeTimezone(lesson.teacher.timezone);
   const isPast = lesson.status === "completed" || lesson.status === "cancelled";
 
-  let doc = parseClassroomDoc(lesson.classroomDoc);
-  if (!doc) {
-    const seeded = seedClassroomDoc({
-      warmup: lesson.prepDraft?.warmup,
-      review: lesson.prepDraft?.review,
-      newFocus: lesson.prepDraft?.newFocus,
-      practice: lesson.prepDraft?.practice,
-      homeworkSeed: lesson.prepDraft?.homeworkSeed,
-      classroomNotes: lesson.classroomNotes,
-    });
-    const hasContent = Boolean(
-      lesson.prepDraft || lesson.classroomNotes || lesson.classroomDoc,
-    );
-    doc = hasContent ? seeded : emptyClassroomDoc();
+  const refs = parsePrepRefs(lesson.prepDraft?.refsJson);
+  const cloze = refs.vocabRecall;
+  const lastApproved =
+    role === "teacher"
+      ? await prisma.lesson.findFirst({
+          where: {
+            studentId: lesson.studentId,
+            id: { not: lesson.id },
+            summary: { is: { approved: true } },
+          },
+          orderBy: { startsAt: "desc" },
+          include: { summary: true },
+        })
+      : null;
+  const bound = bindClassroomDocToPrep(
+    parseClassroomDoc(lesson.classroomDoc),
+    cloze,
+  );
+  const doc = bound.doc;
+  if (bound.changed) {
     await prisma.lesson.update({
       where: { id: lesson.id },
       data: { classroomDoc: serializeClassroomDoc(doc) },
@@ -131,6 +138,28 @@ export default async function ClassroomPage({
           role === "teacher" ? "/today" : role === "student" ? "/student" : "/"
         }
         lessonRoomHref={role === "teacher" ? `/lessons/${lesson.id}` : null}
+        teacherPrep={
+          role === "teacher"
+            ? {
+                warmup: lesson.prepDraft?.warmup ?? "",
+                review: lesson.prepDraft?.review ?? "",
+                newFocus: lesson.prepDraft?.newFocus ?? "",
+                practice: lesson.prepDraft?.practice ?? "",
+                homeworkSeed: lesson.prepDraft?.homeworkSeed ?? "",
+                vocabRecall: cloze,
+                nextVocabRecall: refs.nextVocabRecall,
+                course: courseTypeLabel(lesson.student.courseType),
+                level: lesson.student.level,
+                goals: lesson.student.goals ?? "",
+                lastTodaySummary: lastApproved?.summary?.todaySummary ?? "",
+                lastNextFocus: lastApproved?.summary?.nextFocus ?? "",
+                lastMistakes: parseJsonArray(
+                  lastApproved?.summary?.mistakesJson,
+                ),
+                vocab: refs.vocab,
+              }
+            : null
+        }
         labels={{
           connecting: t("connecting"),
           notConfigured: t("notConfigured"),
@@ -156,6 +185,27 @@ export default async function ClassroomPage({
           classEnded: t("classEnded"),
           copyLink: t("copyLink"),
           linkCopied: t("linkCopied"),
+          teacherPrepTitle: t("teacherPrepTitle"),
+          teacherPrepOnly: t("teacherPrepOnly"),
+          sectionWarmup: t("sectionWarmup"),
+          sectionReview: t("sectionReview"),
+          sectionNewFocus: t("sectionNewFocus"),
+          sectionPractice: t("sectionPractice"),
+          sectionHomework: t("sectionHomework"),
+          teacherCloze: t("teacherCloze"),
+          teacherClozeHint: t("teacherClozeHint"),
+          teacherClozeNext: t("teacherClozeNext"),
+          tabPlan: t("tabPlan"),
+          tabCloze: t("tabCloze"),
+          tabMaterials: t("tabMaterials"),
+          materialsCourse: t("materialsCourse"),
+          materialsGoals: t("materialsGoals"),
+          materialsLastSummary: t("materialsLastSummary"),
+          materialsLastFocus: t("materialsLastFocus"),
+          materialsMistakes: t("materialsMistakes"),
+          materialsVocab: t("materialsVocab"),
+          materialsEmpty: t("materialsEmpty"),
+          teacherPrepEmpty: t("teacherPrepEmpty"),
         }}
       />
     </div>

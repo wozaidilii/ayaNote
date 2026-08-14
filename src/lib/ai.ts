@@ -179,6 +179,25 @@ export function courseTypeLabel(value: string) {
   return COURSE_TYPES.find((c) => c.value === value)?.label ?? value;
 }
 
+function prepTrack(
+  level: string,
+  courseType?: string,
+): "beginner" | "jlpt" | "conversation" {
+  const blob = `${level} ${courseType ?? ""}`.toLowerCase();
+  if (/n5|beginner|初級|入門/.test(blob) || courseType === "jlpt_n5") {
+    return "beginner";
+  }
+  if (
+    courseType === "casual" ||
+    courseType === "travel" ||
+    courseType === "business"
+  ) {
+    return "conversation";
+  }
+  if ((courseType ?? "").startsWith("jlpt_")) return "jlpt";
+  return "jlpt";
+}
+
 function heuristicSummary(
   transcript: string,
   reason?: string,
@@ -243,14 +262,55 @@ function heuristicPrep(input: {
   courseType?: string;
   lastTopics: string[];
   weaknesses: string[];
+  mistakes?: string[];
   vocab?: string[];
+  isFirstLesson?: boolean;
 }): PrepDraftPayload {
   const recallTerms = [
+    ...(input.mistakes ?? [])
+      .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
+      .filter(Boolean),
     ...input.weaknesses
       .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
       .filter(Boolean),
     ...(input.vocab ?? []),
   ].filter((t, i, arr) => arr.indexOf(t) === i);
+
+  if (input.isFirstLesson) {
+    const track = prepTrack(input.level, input.courseType);
+    if (track === "beginner") {
+      return {
+        warmup: `First-day greetings with ${input.studentName}: こんにちは / はじめまして / よろしくお願いします.`,
+        review: "Hiragana/katakana comfort check — no new textbook unit yet.",
+        newFocus:
+          "Self-introduction skeleton: name, country/city, one hobby. Stay inside first-contact phrases.",
+        practice:
+          "Teacher models, student repeats, then 3-turn self-intro. Recycle only those phrases.",
+        homeworkSeed: "Write a 4-line self-intro using today's phrases.",
+        vocabRecall: [],
+      };
+    }
+    if (track === "conversation") {
+      return {
+        warmup: `Free talk: why ${input.studentName} is studying Japanese, recent week.`,
+        review: "No prior lesson — capture 3–5 words they already use.",
+        newFocus:
+          "One real-life scene (work / travel / daily chat) and collect vocab/grammar only. No fixed textbook unit.",
+        practice: "Short role-play of that scene; note useful phrases.",
+        homeworkSeed: "Write 5 sentences from today's captured phrases.",
+        vocabRecall: [],
+      };
+    }
+    return {
+      warmup: `Placement chat at ${courseTypeLabel(input.courseType ?? input.level)}.`,
+      review:
+        "Sample-level quiz already assigned — glance at weak items if done.",
+      newFocus: `One short ${courseTypeLabel(input.courseType ?? input.level)} unit matching current level. Do not skip ahead.`,
+      practice: "2 exam-style items + 1 production turn.",
+      homeworkSeed: "Complete the assigned level-check quiz if not done.",
+      vocabRecall: [],
+    };
+  }
 
   return {
     warmup: `5-minute small talk with ${input.studentName} (${courseTypeLabel(input.courseType ?? input.level)}).`,
@@ -342,7 +402,7 @@ Prior vocab bank: ${priorVocab || "n/a"}
 Prior grammar bank: ${priorGrammar || "n/a"}
 Last nextFocus: ${context.priorNextFocus || "n/a"}
 
-Classroom board notes (collaborative lesson board written during class — treat as ground truth for what was planned/practiced on the board):
+Classroom board notes (TEXT ONLY from the collaborative board — ignore images; never invent content from pictures):
 ${(context.classroomBoard ?? "").trim().slice(0, 6000) || "n/a"}`,
   };
 }
@@ -402,6 +462,8 @@ async function summarizeSingleChunk(
   const fullPrompt = `You are an experienced Japanese 1v1 teacher writing a lesson record a teacher can scan in seconds, then use for next-class prep.
 Be specific and useful. Prefer Japanese for linguistic content; English glosses OK.
 Do NOT copy raw transcript lines into topics — topics must be short theme labels (e.g. 自己紹介 / 仕事の説明 / ソフトウェア開発の語彙).
+Do not rewrite numbers, times, or proper nouns unless they appear in the transcript or board text (e.g. do not turn "5 days" into 5日間 unless that exact wording is in the source).
+Do not use classroom images. Only transcript + board TEXT.
 ${partNote}
 ${block}
 
@@ -603,49 +665,77 @@ export async function generatePrepDraft(input: {
   goals: string;
   lastTopics: string[];
   weaknesses: string[];
+  mistakes?: string[];
   vocab: string[];
   /** Recent classroom board plain text (last completed lesson) */
   lastClassroomBoard?: string;
   /** Approved next-lesson proposal from last summary */
   priorNextFocus?: string;
-  /** Last lesson todaySummary narrative */
+  /** Last approved lesson todaySummary narrative */
   lastTodaySummary?: string;
+  isFirstLesson?: boolean;
+  materialsExcerpt?: string;
 }): Promise<PrepDraftPayload> {
   const model = getModel();
   if (!model) return heuristicPrep(input);
 
   const course = courseTypeLabel(input.courseType || input.level);
+  const track = prepTrack(input.level, input.courseType);
   const board = (input.lastClassroomBoard ?? "").trim().slice(0, 5000);
   const nextFocus = (input.priorNextFocus ?? "").trim().slice(0, 2000);
   const todaySummary = (input.lastTodaySummary ?? "").trim().slice(0, 2000);
+  const mistakes = (input.mistakes ?? []).join(" · ") || "n/a";
+  const materials = (input.materialsExcerpt ?? "").trim().slice(0, 4000);
+  const firstNote = input.isFirstLesson
+    ? track === "beginner"
+      ? "FIRST LESSON / beginner: greetings, self-intro, classroom phrases, kana check. Do not invent a multi-unit curriculum. Stay inside first-contact Japanese."
+      : track === "conversation"
+        ? "FIRST LESSON / conversation: free-talk structure. Capture vocab/grammar only. Do not force a textbook unit."
+        : "FIRST LESSON / JLPT: placement-level check + one short unit matching the current level. Do not skip ahead."
+    : "";
 
   try {
     const object = await generateJson(
       model,
       prepSchema,
       `Create a 50-minute Japanese 1v1 lesson prep draft tailored to the course track.
+Stay inside the sources below. Do not invent textbook chapters that were not provided.
+
 Student: ${input.studentName}
 Course: ${course}
 Level: ${input.level}
+Track: ${track}
 Goals: ${input.goals || "n/a"}
-Recent topics: ${input.lastTopics.join(", ") || "n/a"}
-Weak points / mistakes to recycle: ${input.weaknesses.join(", ") || "n/a"}
-Priority vocab to recall (prefer these for cloze): ${input.vocab.join(", ") || "n/a"}
-Last lesson todaySummary (what was practiced — build continuity):
+${firstNote}
+
+SOURCE ORDER (honor this):
+1) Imported materials excerpt (if any):
+${materials || "n/a — no imported textbook text; do not fake a textbook"}
+2) Last APPROVED todaySummary:
 ${todaySummary || "n/a"}
-Last nextFocus / 次回の授業提案 (PRIMARY direction for this prep — honor this unless clearly outdated):
+3) Last APPROVED nextFocus (PRIMARY direction unless clearly outdated):
 ${nextFocus || "n/a"}
-Last classroom board (what was written together in the previous session — reuse unfinished threads):
+4) Last APPROVED mistakes (recycle explicitly — do not only treat as vague weaknesses):
+${mistakes}
+5) Weak points / vocab bank:
+${input.weaknesses.join(", ") || "n/a"}
+Priority vocab: ${input.vocab.join(", ") || "n/a"}
+Recent topics: ${input.lastTopics.join(", ") || "n/a"}
+Last classroom board TEXT (not images):
 ${board || "n/a"}
 
 Return JSON with: warmup, review, newFocus, practice, homeworkSeed,
-and vocabRecall: 4–6 short Japanese cloze sentences for oral warm-up.
+and vocabRecall: 4–6 short Japanese cloze sentences.
+
+IMPORTANT:
+- warmup / review / newFocus / practice / homeworkSeed are TEACHER-ONLY notes for THIS lesson. Do not write them as student-facing board content. Do not assume they will appear in the next lesson.
+- vocabRecall is for the NEXT lesson's oral warmup (student-facing cloze). It must not repeat this lesson's newFocus/practice as board text.
 
 vocabRecall format (strict):
 - blanked: natural Japanese sentence with ONE blank written as ＿＿. Example: 「これは昨日行った＿＿です。」
 - hint: short meaning cue (English or simple Japanese), NOT the answer. Example: "library"
 - answer: Japanese word/phrase for ＿＿. Example: "図書館"
-Prioritize weak/priority vocab. Level-appropriate.
+Prioritize last-lesson mistakes then weak/priority vocab. Level-appropriate.
 If nextFocus is present, newFocus and practice must advance that proposal.
 If no usable vocab/weak list, return vocabRecall as [].`,
     );

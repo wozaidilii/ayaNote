@@ -32,15 +32,35 @@ export default async function StudentHomePage() {
       },
       lessons: {
         where: { status: "scheduled", startsAt: { gte: new Date() } },
-        include: { prepDraft: true, summary: true },
+        include: { summary: true },
         orderBy: { startsAt: "asc" },
         take: 1,
+      },
+      homeworks: {
+        where: { status: "assigned" },
+        orderBy: { createdAt: "desc" },
+        take: 3,
       },
     },
   });
 
   const next = student.lessons[0];
   const timeZone = normalizeTimezone(student.teacher.timezone);
+  const lastApproved = await prisma.lesson.findFirst({
+    where: {
+      studentId: student.id,
+      status: "completed",
+      summary: { is: { approved: true } },
+    },
+    orderBy: { startsAt: "desc" },
+    include: { summary: true },
+  });
+  const nextFocus =
+    lastApproved?.summary?.nextFocus?.trim() ||
+    (next?.summary?.approved ? next.summary.nextFocus.trim() : "") ||
+    "";
+  const homeworkLine =
+    student.homeworks[0]?.title || student.homeworks[0]?.instructions || "";
 
   return (
     <AppShell active="home" personName={student.name}>
@@ -71,8 +91,19 @@ export default async function StudentHomePage() {
               </p>
               <p>
                 <strong>{t("whatNext")}:</strong>{" "}
-                {next.prepDraft?.newFocus || next.summary?.nextFocus || "—"}
+                {nextFocus || homeworkLine || "—"}
               </p>
+              {homeworkLine ? (
+                <p>
+                  <strong>{t("pendingHomework")}:</strong> {homeworkLine}{" "}
+                  <a
+                    className="btn secondary sm"
+                    href={`/student/homework/${student.homeworks[0]!.id}`}
+                  >
+                    {t("doHomework")}
+                  </a>
+                </p>
+              ) : null}
               <p>
                 <a
                   className="btn"
@@ -109,11 +140,6 @@ export default async function StudentHomePage() {
           <p>
             <strong>{common("topics")}:</strong>{" "}
             {parseJsonArray(student.progress?.topicsCoveredJson).join(" · ") ||
-              "—"}
-          </p>
-          <p>
-            <strong>{common("weaknesses")}:</strong>{" "}
-            {parseJsonArray(student.progress?.weaknessesJson).join(" · ") ||
               "—"}
           </p>
         </div>

@@ -69,11 +69,16 @@ export default async function SettingsPage({
         {!googleConfigured() ? (
           <p className="chip">{t("googleNotConfigured")}</p>
         ) : teacher.googleRefreshToken ? (
-          <p className="chip done">
-            {t("googleConnectedAs", {
-              email: teacher.googleConnectedEmail || "Google",
-            })}
-          </p>
+          <>
+            <p className="chip done">
+              {t("googleConnectedAs", {
+                email: teacher.googleConnectedEmail || "Google",
+              })}
+            </p>
+            <a className="btn secondary" href="/api/google/connect">
+              {t("connectGoogle")}
+            </a>
+          </>
         ) : (
           <>
             <p className="chip">{t("googleNotConnected")}</p>

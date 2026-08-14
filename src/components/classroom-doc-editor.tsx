@@ -12,33 +12,15 @@ import { useRoomContext } from "@livekit/components-react";
 import { ConnectionState, RoomEvent } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TiptapDoc } from "@/lib/classroom-doc";
+import {
+  collectImagesFromDataTransfer,
+  dataTransferLooksLikeImage,
+  type ClipboardImage,
+} from "@/lib/clipboard-images";
 import { LiveKitYjsProvider } from "@/lib/livekit-yjs-provider";
 import * as Y from "yjs";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "live";
-
-const PASTE_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-]);
-
-function clipboardImageFiles(data: DataTransfer | null | undefined): File[] {
-  if (!data) return [];
-  const fromFiles = Array.from(data.files ?? []).filter((f) =>
-    PASTE_IMAGE_TYPES.has(f.type),
-  );
-  if (fromFiles.length > 0) return fromFiles;
-
-  const fromItems: File[] = [];
-  for (const item of Array.from(data.items ?? [])) {
-    if (!PASTE_IMAGE_TYPES.has(item.type)) continue;
-    const file = item.getAsFile();
-    if (file) fromItems.push(file);
-  }
-  return fromItems;
-}
 
 const imageExt = Image.configure({
   inline: false,
@@ -60,14 +42,6 @@ export function buildClassroomYDoc(initial: TiptapDoc): Y.Doc {
   return prosemirrorJSONToYDoc(schema, initial, "default");
 }
 
-/** Drop local fragment so peer state becomes authoritative (avoids duplicate seed). */
-function clearYDocFragment(ydoc: Y.Doc) {
-  const fragment = ydoc.getXmlFragment("default");
-  if (fragment.length > 0) {
-    fragment.delete(0, fragment.length);
-  }
-}
-
 function DocEditorInner({
   lessonId,
   ydoc,
@@ -86,7 +60,9 @@ function DocEditorInner({
   autofocus: boolean;
 }) {
   const saveTimer = useRef<number | null>(null);
-  const insertImageRef = useRef<(file: File) => Promise<void>>(async () => {});
+  const insertImageRef = useRef<
+    (image: ClipboardImage, pos?: number) => Promise<void>
+  >(async () => {});
   const persist = useCallback(async () => {
     onStatus("saving");
     try {
@@ -145,18 +121,47 @@ function DocEditorInner({
         attributes: {
           class: "classroom-tiptap",
         },
+        handleDOMEvents: {
+          dragenter: (_view, event) => {
+            if (!dataTransferLooksLikeImage(event.dataTransfer)) return false;
+            event.preventDefault();
+            return true;
+          },
+          dragover: (_view, event) => {
+            if (!dataTransferLooksLikeImage(event.dataTransfer)) return false;
+            event.preventDefault();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+            return true;
+          },
+        },
         handlePaste: (_view, event) => {
-          const files = clipboardImageFiles(event.clipboardData);
-          if (files.length === 0) return false;
+          if (!dataTransferLooksLikeImage(event.clipboardData)) return false;
           event.preventDefault();
-          void Promise.all(files.map((file) => insertImageRef.current(file)));
+          void collectImagesFromDataTransfer(event.clipboardData).then(
+            async (images) => {
+              for (const image of images) {
+                await insertImageRef.current(image);
+              }
+            },
+          );
           return true;
         },
-        handleDrop: (_view, event) => {
-          const files = clipboardImageFiles(event.dataTransfer);
-          if (files.length === 0) return false;
+        handleDrop: (view, event) => {
+          if (!dataTransferLooksLikeImage(event.dataTransfer)) return false;
           event.preventDefault();
-          void Promise.all(files.map((file) => insertImageRef.current(file)));
+          const coords = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
+          });
+          let pos = coords?.pos;
+          void collectImagesFromDataTransfer(event.dataTransfer).then(
+            async (images) => {
+              for (const image of images) {
+                await insertImageRef.current(image, pos);
+                pos = undefined;
+              }
+            },
+          );
           return true;
         },
       },
@@ -171,21 +176,65 @@ function DocEditorInner({
   );
 
   const insertImage = useCallback(
-    async (file: File) => {
+    async (image: ClipboardImage, pos?: number) => {
       if (!editor) return;
+      const mark = `⏳ Uploading image…`;
+      const chain = editor.chain().focus();
+      if (typeof pos === "number") chain.setTextSelection(pos);
+      chain.insertContent(mark).run();
+
+      const removeMark = () => {
+        editor.commands.command(({ tr, dispatch }) => {
+          let found = false;
+          tr.doc.descendants((node, nodePos) => {
+            if (found || !node.isText || !node.text) return;
+            const idx = node.text.indexOf(mark);
+            if (idx < 0) return;
+            tr.delete(nodePos + idx, nodePos + idx + mark.length);
+            found = true;
+          });
+          if (found && dispatch) dispatch(tr);
+          return found;
+        });
+      };
+
       const form = new FormData();
-      form.append("file", file);
+      if (image.kind === "file") {
+        form.append("file", image.file);
+      } else {
+        form.append("sourceUrl", image.url);
+      }
       const res = await fetch(`/api/lessons/${lessonId}/assets`, {
         method: "POST",
         body: form,
       });
       if (!res.ok) {
+        removeMark();
         onStatus("error");
         return;
       }
       const data = (await res.json()) as { url?: string };
-      if (!data.url) return;
+      if (!data.url) {
+        removeMark();
+        onStatus("error");
+        return;
+      }
+      const surface = document.querySelector(".classroom-doc-surface");
+      const scrollTop =
+        surface instanceof HTMLElement ? surface.scrollTop : null;
+      removeMark();
       editor.chain().focus().setImage({ src: data.url }).run();
+      if (surface instanceof HTMLElement && scrollTop !== null) {
+        const restore = () => {
+          surface.scrollTop = scrollTop;
+        };
+        restore();
+        surface.addEventListener("load", restore, true);
+        window.setTimeout(() => {
+          surface.removeEventListener("load", restore, true);
+          restore();
+        }, 800);
+      }
       void persist();
     },
     [editor, lessonId, onStatus, persist],
@@ -302,6 +351,12 @@ function LiveSyncedDoc({
 }) {
   const room = useRoomContext();
   const [provider, setProvider] = useState<LiveKitYjsProvider | null>(null);
+  // Students/guests must not seed-then-delete the shared Y.Doc: that CRDT
+  // delete wipes the teacher's board (and then persists over this lesson's prep).
+  const syncDoc = useMemo(
+    () => (syncAuthority ? ydoc : new Y.Doc()),
+    [syncAuthority, ydoc],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -309,11 +364,7 @@ function LiveSyncedDoc({
 
     const attach = () => {
       if (cancelled) return;
-      // Non-authority clients drop local TipTap seed so Yjs merge won't duplicate.
-      if (!syncAuthority) {
-        clearYDocFragment(ydoc);
-      }
-      p = new LiveKitYjsProvider(ydoc, room, user);
+      p = new LiveKitYjsProvider(syncDoc, room, user);
       setProvider(p);
       onStatus("live");
     };
@@ -336,7 +387,7 @@ function LiveSyncedDoc({
       p?.destroy();
       setProvider(null);
     };
-  }, [onStatus, room, syncAuthority, user, ydoc]);
+  }, [onStatus, room, syncDoc, user]);
 
   if (!provider) {
     return (
@@ -351,7 +402,7 @@ function LiveSyncedDoc({
   return (
     <DocEditorInner
       lessonId={lessonId}
-      ydoc={ydoc}
+      ydoc={syncDoc}
       provider={provider}
       user={user}
       placeholder={placeholder}

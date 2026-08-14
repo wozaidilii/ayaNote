@@ -27,6 +27,7 @@ import {
   type ClassroomSaveStatus,
 } from "@/components/classroom-doc-editor";
 import type { TiptapDoc } from "@/lib/classroom-doc";
+import type { VocabRecallItem } from "@/lib/prep-refs";
 
 const CLASS_CONTROL_TOPIC = "ayanote-classroom-control";
 
@@ -55,6 +56,44 @@ type Labels = {
   classEnded: string;
   copyLink: string;
   linkCopied: string;
+  teacherPrepTitle: string;
+  teacherPrepOnly: string;
+  sectionWarmup: string;
+  sectionReview: string;
+  sectionNewFocus: string;
+  sectionPractice: string;
+  sectionHomework: string;
+  teacherCloze: string;
+  teacherClozeHint: string;
+  teacherClozeNext: string;
+  tabPlan: string;
+  tabCloze: string;
+  tabMaterials: string;
+  materialsCourse: string;
+  materialsGoals: string;
+  materialsLastSummary: string;
+  materialsLastFocus: string;
+  materialsMistakes: string;
+  materialsVocab: string;
+  materialsEmpty: string;
+  teacherPrepEmpty: string;
+};
+
+export type TeacherPrepPayload = {
+  warmup: string;
+  review: string;
+  newFocus: string;
+  practice: string;
+  homeworkSeed: string;
+  vocabRecall: VocabRecallItem[];
+  nextVocabRecall: VocabRecallItem[];
+  course: string;
+  level: string;
+  goals: string;
+  lastTodaySummary: string;
+  lastNextFocus: string;
+  lastMistakes: string[];
+  vocab: string[];
 };
 
 /** Rotate MediaRecorder every N ms so each WebM segment is independently STT-able. */
@@ -454,6 +493,167 @@ function ClassEndController({
   return null;
 }
 
+type TeacherPrepTab = "plan" | "cloze" | "materials";
+
+function ClozeList({ items }: { items: VocabRecallItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <ol className="classroom-teacher-cloze">
+      {items.map((item, i) => (
+        <li key={`${item.answer}-${i}`}>
+          <span>
+            {item.blanked}（{item.hint}）
+          </span>
+          <span className="classroom-teacher-cloze-answer">{item.answer}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function TeacherPrepPanel({
+  prep,
+  labels,
+}: {
+  prep: TeacherPrepPayload;
+  labels: Labels;
+}) {
+  const [tab, setTab] = useState<TeacherPrepTab>("plan");
+  const blocks: Array<{ title: string; body: string }> = [
+    { title: labels.sectionWarmup, body: prep.warmup },
+    { title: labels.sectionReview, body: prep.review },
+    { title: labels.sectionNewFocus, body: prep.newFocus },
+    { title: labels.sectionPractice, body: prep.practice },
+    { title: labels.sectionHomework, body: prep.homeworkSeed },
+  ];
+  const planBlocks = blocks.filter((block) => block.body.trim());
+  const tabs: Array<{ id: TeacherPrepTab; label: string }> = [
+    { id: "plan", label: labels.tabPlan },
+    { id: "cloze", label: labels.tabCloze },
+    { id: "materials", label: labels.tabMaterials },
+  ];
+
+  return (
+    <aside
+      className="classroom-teacher-prep"
+      aria-label={labels.teacherPrepTitle}
+    >
+      <div className="classroom-teacher-prep-title">
+        {labels.teacherPrepTitle}
+      </div>
+      <p className="muted classroom-teacher-prep-hint">
+        {labels.teacherPrepOnly}
+      </p>
+      <div className="classroom-teacher-prep-tabs" role="tablist">
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            className={`classroom-teacher-prep-tab${tab === item.id ? " is-active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "plan" ? (
+        planBlocks.length === 0 ? (
+          <p className="muted classroom-teacher-prep-hint">
+            {labels.teacherPrepEmpty}
+          </p>
+        ) : (
+          planBlocks.map((block) => (
+            <section key={block.title} className="classroom-teacher-prep-block">
+              <h3>{block.title}</h3>
+              <p>{block.body}</p>
+            </section>
+          ))
+        )
+      ) : null}
+
+      {tab === "cloze" ? (
+        <>
+          <section className="classroom-teacher-prep-block">
+            <h3>{labels.teacherCloze}</h3>
+            <p className="muted classroom-teacher-prep-hint">
+              {labels.teacherClozeHint}
+            </p>
+            {prep.vocabRecall.length > 0 ? (
+              <ClozeList items={prep.vocabRecall} />
+            ) : (
+              <p className="muted">{labels.teacherPrepEmpty}</p>
+            )}
+          </section>
+          {prep.nextVocabRecall.length > 0 ? (
+            <section className="classroom-teacher-prep-block">
+              <h3>{labels.teacherClozeNext}</h3>
+              <ClozeList items={prep.nextVocabRecall} />
+            </section>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === "materials" ? (
+        <>
+          <section className="classroom-teacher-prep-block">
+            <h3>{labels.materialsCourse}</h3>
+            <p>
+              {prep.course}
+              {prep.level ? ` · ${prep.level}` : ""}
+            </p>
+          </section>
+          {prep.goals.trim() ? (
+            <section className="classroom-teacher-prep-block">
+              <h3>{labels.materialsGoals}</h3>
+              <p>{prep.goals}</p>
+            </section>
+          ) : null}
+          {prep.lastTodaySummary.trim() ? (
+            <section className="classroom-teacher-prep-block">
+              <h3>{labels.materialsLastSummary}</h3>
+              <p>{prep.lastTodaySummary}</p>
+            </section>
+          ) : null}
+          {prep.lastNextFocus.trim() ? (
+            <section className="classroom-teacher-prep-block">
+              <h3>{labels.materialsLastFocus}</h3>
+              <p>{prep.lastNextFocus}</p>
+            </section>
+          ) : null}
+          {prep.lastMistakes.length > 0 ? (
+            <section className="classroom-teacher-prep-block">
+              <h3>{labels.materialsMistakes}</h3>
+              <ul className="classroom-teacher-prep-list">
+                {prep.lastMistakes.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {prep.vocab.length > 0 ? (
+            <section className="classroom-teacher-prep-block">
+              <h3>{labels.materialsVocab}</h3>
+              <p>{prep.vocab.join(" · ")}</p>
+            </section>
+          ) : null}
+          {!prep.goals.trim() &&
+          !prep.lastTodaySummary.trim() &&
+          !prep.lastNextFocus.trim() &&
+          prep.lastMistakes.length === 0 &&
+          prep.vocab.length === 0 ? (
+            <p className="muted classroom-teacher-prep-hint">
+              {labels.materialsEmpty}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+    </aside>
+  );
+}
+
 function statusLabel(status: ClassroomSaveStatus, labels: Labels) {
   if (status === "saving") return labels.statusSaving;
   if (status === "saved") return labels.statusSaved;
@@ -500,6 +700,9 @@ function CallLayout({
       </aside>
 
       <section className="classroom-stage panel">
+        <div className={`classroom-stage-board${hasFocus ? " is-parked" : ""}`}>
+          {board}
+        </div>
         {hasFocus && focusedTrack ? (
           <div className="classroom-focus-stage">
             <ParticipantTile
@@ -514,9 +717,7 @@ function CallLayout({
               {restoreBoardLabel}
             </button>
           </div>
-        ) : (
-          <div className="classroom-board-wrap">{board}</div>
-        )}
+        ) : null}
       </section>
     </div>
   );
@@ -535,6 +736,7 @@ export function ClassroomWorkspace({
   backHref,
   lessonRoomHref,
   labels,
+  teacherPrep = null,
 }: {
   lessonId: string;
   isPast: boolean;
@@ -548,6 +750,7 @@ export function ClassroomWorkspace({
   backHref: string;
   lessonRoomHref: string | null;
   labels: Labels;
+  teacherPrep?: TeacherPrepPayload | null;
 }) {
   const router = useRouter();
   const userColor =
@@ -743,22 +946,31 @@ export function ClassroomWorkspace({
   };
 
   const board = (
-    <>
-      {isPast && (
-        <p className="classroom-past-banner muted">{labels.pastBanner}</p>
-      )}
-      <ClassroomDocEditor
-        lessonId={lessonId}
-        ydoc={ydoc}
-        userName={userName}
-        userColor={userColor}
-        placeholder={labels.docPlaceholder}
-        onStatus={setSaveStatus}
-        autofocus
-        enableLivekitSync={Boolean(tokenInfo)}
-        syncAuthority={role === "teacher"}
-      />
-    </>
+    <div
+      className={
+        teacherPrep ? "classroom-stage-split" : "classroom-board-stack"
+      }
+    >
+      <div className="classroom-board-wrap">
+        {isPast && (
+          <p className="classroom-past-banner muted">{labels.pastBanner}</p>
+        )}
+        <ClassroomDocEditor
+          lessonId={lessonId}
+          ydoc={ydoc}
+          userName={userName}
+          userColor={userColor}
+          placeholder={labels.docPlaceholder}
+          onStatus={setSaveStatus}
+          autofocus
+          enableLivekitSync={Boolean(tokenInfo)}
+          syncAuthority={role === "teacher"}
+        />
+      </div>
+      {teacherPrep ? (
+        <TeacherPrepPanel prep={teacherPrep} labels={labels} />
+      ) : null}
+    </div>
   );
 
   const topBar = (inCall: boolean) => (

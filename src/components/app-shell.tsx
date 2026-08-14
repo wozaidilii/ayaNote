@@ -22,6 +22,7 @@ export async function AppShell({
     { href: "/today", key: "today" },
     { href: "/calendar", key: "calendar" },
     { href: "/students", key: "students" },
+    { href: "/history", key: "history" },
     { href: "/prep", key: "prep" },
     { href: "/availability", key: "availability" },
     { href: "/settings", key: "settings" },

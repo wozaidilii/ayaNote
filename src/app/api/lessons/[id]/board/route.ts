@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessibleLesson } from "@/lib/classroom-access";
 import {
-  emptyClassroomDoc,
+  bindClassroomDocToPrep,
+  mergeClassroomBoardSave,
   parseClassroomDoc,
-  seedClassroomDoc,
   serializeClassroomDoc,
   type TiptapDoc,
 } from "@/lib/classroom-doc";
+import { parsePrepRefs } from "@/lib/prep-refs";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -16,47 +17,6 @@ export type ClassroomDocPayload = {
   updatedAt: string;
   seeded: boolean;
 };
-
-function resolveDoc(lesson: {
-  classroomDoc: string;
-  classroomNotes: string;
-  updatedAt: Date;
-  prepDraft: {
-    warmup: string;
-    review: string;
-    newFocus: string;
-    practice: string;
-    homeworkSeed: string;
-  } | null;
-}): { doc: TiptapDoc; seeded: boolean; needsPersist: boolean } {
-  const existing = parseClassroomDoc(lesson.classroomDoc);
-  if (existing) {
-    return { doc: existing, seeded: false, needsPersist: false };
-  }
-
-  const hasPrep = Boolean(
-    lesson.prepDraft &&
-    (lesson.prepDraft.warmup ||
-      lesson.prepDraft.review ||
-      lesson.prepDraft.newFocus ||
-      lesson.prepDraft.practice ||
-      lesson.prepDraft.homeworkSeed ||
-      lesson.classroomNotes),
-  );
-
-  const doc = hasPrep
-    ? seedClassroomDoc({
-        warmup: lesson.prepDraft?.warmup,
-        review: lesson.prepDraft?.review,
-        newFocus: lesson.prepDraft?.newFocus,
-        practice: lesson.prepDraft?.practice,
-        homeworkSeed: lesson.prepDraft?.homeworkSeed,
-        classroomNotes: lesson.classroomNotes,
-      })
-    : emptyClassroomDoc();
-
-  return { doc, seeded: true, needsPersist: true };
-}
 
 export async function GET(
   _req: NextRequest,
@@ -71,22 +31,26 @@ export async function GET(
     );
   }
 
-  const resolved = resolveDoc(access.lesson);
+  const cloze = parsePrepRefs(access.lesson.prepDraft?.refsJson).vocabRecall;
+  const bound = bindClassroomDocToPrep(
+    parseClassroomDoc(access.lesson.classroomDoc),
+    cloze,
+  );
   let updatedAt = access.lesson.updatedAt;
 
-  if (resolved.needsPersist) {
+  if (bound.changed) {
     const saved = await prisma.lesson.update({
       where: { id },
-      data: { classroomDoc: serializeClassroomDoc(resolved.doc) },
+      data: { classroomDoc: serializeClassroomDoc(bound.doc) },
       select: { updatedAt: true },
     });
     updatedAt = saved.updatedAt;
   }
 
   const payload: ClassroomDocPayload = {
-    doc: resolved.doc,
+    doc: bound.doc,
     updatedAt: updatedAt.toISOString(),
-    seeded: resolved.seeded,
+    seeded: bound.changed,
   };
   return NextResponse.json(payload);
 }
@@ -119,14 +83,20 @@ export async function PUT(
     return NextResponse.json({ error: "invalid_doc" }, { status: 400 });
   }
 
+  const merged = mergeClassroomBoardSave(
+    body.doc,
+    parseClassroomDoc(access.lesson.classroomDoc),
+    parsePrepRefs(access.lesson.prepDraft?.refsJson).vocabRecall,
+  );
+
   const saved = await prisma.lesson.update({
     where: { id },
-    data: { classroomDoc: serializeClassroomDoc(body.doc) },
+    data: { classroomDoc: serializeClassroomDoc(merged) },
     select: { updatedAt: true, classroomDoc: true },
   });
 
   const payload: ClassroomDocPayload = {
-    doc: parseClassroomDoc(saved.classroomDoc) ?? body.doc,
+    doc: parseClassroomDoc(saved.classroomDoc) ?? merged,
     updatedAt: saved.updatedAt.toISOString(),
     seeded: false,
   };

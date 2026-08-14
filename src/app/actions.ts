@@ -17,6 +17,10 @@ import {
   syncTeacherCalendar,
 } from "@/lib/calendar-sync";
 import {
+  notifyBookingDecision,
+  notifyBookingSubmitted,
+} from "@/lib/booking-email";
+import {
   buildQuizFromVocab,
   parseAnswersJson,
   parseQuizJson,
@@ -35,7 +39,11 @@ import {
 import { prisma } from "@/lib/db";
 import { createGuestId, setGuestSession } from "@/lib/guest-session";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
-import type { PrepRefs } from "@/lib/prep-refs";
+import {
+  parsePrepRefs,
+  type PrepRefs,
+  type VocabRecallItem,
+} from "@/lib/prep-refs";
 import {
   LESSON_MINUTES,
   blackoutDateFromYmd,
@@ -43,7 +51,12 @@ import {
 } from "@/lib/scheduling";
 import { requireStudent, requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, parseIsoOrLocal } from "@/lib/timezone";
-import { parseClassroomDoc, tiptapDocToPlainText } from "@/lib/classroom-doc";
+import {
+  bindClassroomDocToPrep,
+  parseClassroomDoc,
+  serializeClassroomDoc,
+  tiptapDocToPlainText,
+} from "@/lib/classroom-doc";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
 export async function login(formData: FormData) {
@@ -406,13 +419,17 @@ async function writePrepDraftForLesson(lessonId: string) {
   const lesson = await prisma.lesson.findUniqueOrThrow({
     where: { id: lessonId },
     include: {
+      prepDraft: true,
       student: {
         include: {
           progress: true,
           vocabItems: { orderBy: { createdAt: "desc" }, take: 12 },
           grammarItems: { orderBy: { createdAt: "desc" }, take: 8 },
           lessons: {
-            where: { status: "completed" },
+            where: {
+              status: "completed",
+              summary: { is: { approved: true } },
+            },
             include: { summary: true },
             orderBy: { startsAt: "desc" },
             take: 3,
@@ -422,12 +439,22 @@ async function writePrepDraftForLesson(lessonId: string) {
     },
   });
   if (lesson.teacherId !== teacher.id) throw new Error("Not your lesson");
+  if (
+    isCalendarInboxEmail(lesson.student.email) ||
+    isCalendarPlaceholderEmail(lesson.student.email)
+  ) {
+    throw new Error("Assign a student before generating prep");
+  }
 
   const lastTopics = lesson.student.lessons.flatMap((l) =>
     l.summary ? parseJsonArray(l.summary.topicsJson) : [],
   );
   const weaknesses = lesson.student.progress
     ? parseJsonArray(lesson.student.progress.weaknessesJson)
+    : [];
+  const lastSummary = lesson.student.lessons[0]?.summary ?? null;
+  const lastMistakes = lastSummary
+    ? parseJsonArray(lastSummary.mistakesJson)
     : [];
   const bankVocab = lesson.student.vocabItems.map((v) => v.term);
   const pastLessons = lesson.student.lessons.map((l) => {
@@ -439,7 +466,6 @@ async function writePrepDraftForLesson(lessonId: string) {
     return label;
   });
 
-  const lastSummary = lesson.student.lessons[0]?.summary;
   const priorNextFocus = lastSummary?.nextFocus?.trim() || "";
   const lastTodaySummary = lastSummary?.todaySummary?.trim() || "";
   let lastLessonVocab: string[] = [];
@@ -460,6 +486,9 @@ async function writePrepDraftForLesson(lessonId: string) {
   // Prefer last-lesson + weak-point vocab for cloze recall, then bank terms.
   const vocab = [
     ...lastLessonVocab,
+    ...lastMistakes
+      .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
+      .filter((w) => w && !w.includes("→")),
     ...weaknesses
       .map((w) => w.replace(/^「(.+?)」.*/, "$1").trim())
       .filter((w) => w && !w.includes("→")),
@@ -487,12 +516,30 @@ async function writePrepDraftForLesson(lessonId: string) {
     goals: lesson.student.goals,
     lastTopics,
     weaknesses,
+    mistakes: lastMistakes,
     vocab,
     lastClassroomBoard,
     priorNextFocus,
     lastTodaySummary,
+    isFirstLesson: !lastSummary,
   });
-  const { vocabRecall, ...draft } = generated;
+  const { vocabRecall: generatedCloze, ...draft } = generated;
+
+  const existingRefs = parsePrepRefs(lesson.prepDraft?.refsJson);
+  const priorLesson = await prisma.lesson.findFirst({
+    where: {
+      studentId: lesson.studentId,
+      id: { not: lessonId },
+      startsAt: { lt: lesson.startsAt },
+    },
+    orderBy: { startsAt: "desc" },
+    include: { prepDraft: true },
+  });
+  const priorRefs = parsePrepRefs(priorLesson?.prepDraft?.refsJson);
+  const thisCloze =
+    existingRefs.vocabRecall.length > 0
+      ? existingRefs.vocabRecall
+      : priorRefs.nextVocabRecall;
 
   const refs: PrepRefs = {
     course: courseTypeLabel(lesson.student.courseType),
@@ -500,9 +547,10 @@ async function writePrepDraftForLesson(lessonId: string) {
     goals: lesson.student.goals?.trim() || "",
     pastLessons,
     topics: [...new Set(lastTopics)].slice(0, 8),
-    weaknesses: weaknesses.slice(0, 6),
+    weaknesses: [...lastMistakes, ...weaknesses].slice(0, 8),
     vocab: vocab.slice(0, 10),
-    vocabRecall: vocabRecall ?? [],
+    vocabRecall: thisCloze,
+    nextVocabRecall: generatedCloze ?? [],
   };
 
   await prisma.prepDraft.upsert({
@@ -511,12 +559,71 @@ async function writePrepDraftForLesson(lessonId: string) {
     update: { ...draft, refsJson: toJson(refs), status: "draft" },
   });
 
+  await pushClozeToNextLesson({
+    studentId: lesson.studentId,
+    afterStartsAt: lesson.startsAt,
+    exceptLessonId: lessonId,
+    cloze: generatedCloze ?? [],
+  });
+
+  const bound = bindClassroomDocToPrep(
+    parseClassroomDoc(lesson.classroomDoc),
+    thisCloze,
+  );
   await prisma.lesson.update({
     where: { id: lessonId },
-    data: { prepStatus: "draft" },
+    data: {
+      prepStatus: "draft",
+      ...(bound.changed
+        ? { classroomDoc: serializeClassroomDoc(bound.doc) }
+        : {}),
+    },
   });
 
   return { lessonId, draft, refs };
+}
+
+async function pushClozeToNextLesson(opts: {
+  studentId: string;
+  afterStartsAt: Date;
+  exceptLessonId: string;
+  cloze: VocabRecallItem[];
+}) {
+  const next = await prisma.lesson.findFirst({
+    where: {
+      studentId: opts.studentId,
+      id: { not: opts.exceptLessonId },
+      status: { in: ["scheduled", "in_progress"] },
+      startsAt: { gt: opts.afterStartsAt },
+    },
+    orderBy: { startsAt: "asc" },
+    include: { prepDraft: true },
+  });
+  if (!next) return;
+
+  const nextRefs = parsePrepRefs(next.prepDraft?.refsJson);
+  nextRefs.vocabRecall = opts.cloze;
+  await prisma.prepDraft.upsert({
+    where: { lessonId: next.id },
+    create: {
+      lessonId: next.id,
+      refsJson: toJson(nextRefs),
+      status: "draft",
+    },
+    update: { refsJson: toJson(nextRefs) },
+  });
+  const bound = bindClassroomDocToPrep(
+    parseClassroomDoc(next.classroomDoc),
+    opts.cloze,
+  );
+  if (bound.changed) {
+    await prisma.lesson.update({
+      where: { id: next.id },
+      data: { classroomDoc: serializeClassroomDoc(bound.doc) },
+    });
+  }
+  revalidatePath(`/classroom/${next.id}`);
+  revalidatePath(`/lessons/${next.id}`);
 }
 
 function revalidatePrepSurfaces(lessonIds: string[] = []) {
@@ -525,6 +632,36 @@ function revalidatePrepSurfaces(lessonIds: string[] = []) {
   revalidatePath("/calendar");
   for (const id of lessonIds) {
     revalidatePath(`/lessons/${id}`);
+    revalidatePath(`/classroom/${id}`);
+  }
+}
+
+async function maybeWritePrepIfEmpty(lessonId: string) {
+  try {
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { prepDraft: true, student: true },
+    });
+    if (!lesson) return;
+    if (
+      isCalendarInboxEmail(lesson.student.email) ||
+      isCalendarPlaceholderEmail(lesson.student.email)
+    ) {
+      return;
+    }
+    const existing = lesson.prepDraft;
+    const hasContent = Boolean(
+      existing &&
+      (existing.warmup.trim() ||
+        existing.review.trim() ||
+        existing.newFocus.trim() ||
+        existing.practice.trim() ||
+        existing.homeworkSeed.trim()),
+    );
+    if (hasContent) return;
+    await writePrepDraftForLesson(lessonId);
+  } catch (err) {
+    console.error("First prep failed", err);
   }
 }
 
@@ -600,7 +737,10 @@ export async function savePrepDraft(formData: FormData) {
     status,
   };
 
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { prepDraft: true },
+  });
   if (!lesson || lesson.teacherId !== teacher.id) {
     throw new Error("Not your lesson");
   }
@@ -610,15 +750,26 @@ export async function savePrepDraft(formData: FormData) {
     create: { lessonId, ...data },
     update: data,
   });
+  const cloze = parsePrepRefs(lesson.prepDraft?.refsJson).vocabRecall;
+  const bound = bindClassroomDocToPrep(
+    parseClassroomDoc(lesson.classroomDoc),
+    cloze,
+  );
   await prisma.lesson.update({
     where: { id: lessonId },
-    data: { prepStatus: status === "ready" ? "ready" : "draft" },
+    data: {
+      prepStatus: status === "ready" ? "ready" : "draft",
+      ...(bound.changed
+        ? { classroomDoc: serializeClassroomDoc(bound.doc) }
+        : {}),
+    },
   });
 
   revalidatePath("/prep");
   revalidatePath("/today");
   revalidatePath("/calendar");
   revalidatePath(`/lessons/${lessonId}`);
+  revalidatePath(`/classroom/${lessonId}`);
   revalidatePath(`/students/${lesson.studentId}`);
 }
 
@@ -740,7 +891,7 @@ export async function decideBooking(formData: FormData) {
         },
       });
     } else if (request.type === "book") {
-      await prisma.lesson.create({
+      const created = await prisma.lesson.create({
         data: {
           teacherId: request.teacherId,
           studentId: request.studentId,
@@ -751,12 +902,25 @@ export async function decideBooking(formData: FormData) {
           transcriptStatus: "none",
         },
       });
+      await maybeWritePrepIfEmpty(created.id);
     }
   } else {
     await prisma.bookingRequest.update({
       where: { id },
       data: { status: "declined" },
     });
+  }
+
+  try {
+    await notifyBookingDecision({
+      teacher,
+      studentEmail: request.student.email,
+      studentName: request.student.name,
+      requestedStart: request.requestedStart,
+      approved: decision === "approve",
+    });
+  } catch (err) {
+    console.error("Booking decision email failed", err);
   }
 
   revalidatePath("/availability");
@@ -819,7 +983,7 @@ export async function createLessonForStudent(formData: FormData) {
     redirect(`${calendarHref}&err=conflict`);
   }
 
-  await prisma.lesson.create({
+  const created = await prisma.lesson.create({
     data: {
       teacherId: teacher.id,
       studentId: student.id,
@@ -830,6 +994,7 @@ export async function createLessonForStudent(formData: FormData) {
       transcriptStatus: "none",
     },
   });
+  await maybeWritePrepIfEmpty(created.id);
 
   revalidatePath("/availability");
   revalidatePath("/today");
@@ -886,6 +1051,16 @@ export async function createBookingRequest(formData: FormData) {
           : null,
     },
   });
+
+  try {
+    await notifyBookingSubmitted({
+      teacher,
+      studentName: student.name,
+      requestedStart: start,
+    });
+  } catch (err) {
+    console.error("Booking request email failed", err);
+  }
 
   revalidatePath("/student/book");
   revalidatePath("/student");
@@ -950,6 +1125,18 @@ export async function createStudent(formData: FormData) {
     level,
     courseType,
   });
+
+  const firstLesson = await prisma.lesson.findFirst({
+    where: {
+      studentId: student.id,
+      status: { in: ["scheduled", "in_progress"] },
+    },
+    orderBy: { startsAt: "asc" },
+    select: { id: true },
+  });
+  if (firstLesson) {
+    await maybeWritePrepIfEmpty(firstLesson.id);
+  }
 
   revalidatePath("/students");
   redirect(`/students?student=${student.id}`);
@@ -1270,6 +1457,8 @@ export async function bindCalendarLessonStudent(formData: FormData) {
     data: { studentId: student.id, tagsJson: toJson(tags) },
   });
 
+  await maybeWritePrepIfEmpty(lesson.id);
+
   revalidatePath("/calendar");
   revalidatePath("/today");
   revalidatePath("/students");
@@ -1333,6 +1522,8 @@ export async function createStudentForCalendarLesson(formData: FormData) {
     where: { id: lesson.id },
     data: { studentId: student.id, tagsJson: toJson(tags) },
   });
+
+  await maybeWritePrepIfEmpty(lesson.id);
 
   revalidatePath("/calendar");
   revalidatePath("/today");

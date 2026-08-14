@@ -153,6 +153,7 @@ export default async function StudentsPage({
           openClassroom: t("openClassroom"),
           openPrep: t("openPrep"),
           openRoom: t("openRoom"),
+          lessonHistory: t("lessonHistory"),
           progress: t("progress"),
           strengths: common("strengths"),
           weaknesses: common("weaknesses"),

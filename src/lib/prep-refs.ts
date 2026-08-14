@@ -13,8 +13,10 @@ export type PrepRefs = {
   topics: string[];
   weaknesses: string[];
   vocab: string[];
-  /** Cloze sentences: ＿＿(hint), hover blank for answer */
+  /** Cloze sentences: ＿＿(hint), hover blank for answer — this lesson */
   vocabRecall: VocabRecallItem[];
+  /** Cloze generated with this prep; belongs on the following lesson */
+  nextVocabRecall: VocabRecallItem[];
 };
 
 export const emptyPrepRefs = (): PrepRefs => ({
@@ -26,6 +28,7 @@ export const emptyPrepRefs = (): PrepRefs => ({
   weaknesses: [],
   vocab: [],
   vocabRecall: [],
+  nextVocabRecall: [],
 });
 
 function parseVocabRecall(value: unknown): VocabRecallItem[] {
@@ -64,6 +67,7 @@ export function parsePrepRefs(value: string | null | undefined): PrepRefs {
         : [],
       vocab: Array.isArray(parsed.vocab) ? parsed.vocab.map(String) : [],
       vocabRecall: parseVocabRecall(parsed.vocabRecall),
+      nextVocabRecall: parseVocabRecall(parsed.nextVocabRecall),
     };
   } catch {
     return emptyPrepRefs();
@@ -79,6 +83,7 @@ export function hasPrepRefs(refs: PrepRefs) {
     refs.topics.length ||
     refs.weaknesses.length ||
     refs.vocab.length ||
-    refs.vocabRecall.length,
+    refs.vocabRecall.length ||
+    refs.nextVocabRecall.length,
   );
 }

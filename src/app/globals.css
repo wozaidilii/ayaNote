@@ -765,10 +765,21 @@ a {
 .list-row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.35rem;
   align-items: center;
   justify-content: flex-end;
   flex-shrink: 0;
+}
+
+.history-student-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.85rem;
+}
+
+.history-student-filter .chip {
+  text-decoration: none;
 }
 
 .slot-grid {
@@ -932,16 +943,6 @@ a {
 .month-cal-event.is-past {
   background: var(--green-soft);
   color: var(--green-text);
-}
-
-.month-cal-event.is-unassigned {
-  background: color-mix(in srgb, #c97800 16%, transparent);
-  color: #8a5a00;
-}
-
-.month-cal-event.is-busy {
-  background: color-mix(in srgb, var(--muted, #6b7280) 18%, transparent);
-  color: var(--muted);
 }
 
 .month-cal-event-time {
@@ -1618,10 +1619,11 @@ a {
 .classroom-meet-body {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   align-items: stretch;
 }
 
@@ -1647,13 +1649,32 @@ a {
 
 .classroom-stage {
   grid-area: main;
+  position: relative;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding: 0.85rem 1.1rem 1.1rem;
   height: 100%;
   color: var(--ink);
+}
+
+.classroom-stage-board {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.classroom-stage-board.is-parked {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  pointer-events: none;
 }
 
 .classroom-float-dock {
@@ -1725,11 +1746,117 @@ a {
   flex: 1;
   overflow: auto;
   min-height: 0;
+  min-width: 0;
+}
+
+.classroom-stage-split {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 0.65rem;
+  height: 100%;
+}
+
+.classroom-board-stack {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.classroom-teacher-prep {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.7rem 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--page);
+}
+
+.classroom-teacher-prep-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.classroom-teacher-prep-hint {
+  font-size: 11px;
+  margin: 0.2rem 0 0.65rem;
+}
+
+.classroom-teacher-prep-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0 0 0.7rem;
+}
+
+.classroom-teacher-prep-tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.classroom-teacher-prep-tab.is-active {
+  background: var(--ink);
+  color: var(--page);
+  border-color: var(--ink);
+}
+
+.classroom-teacher-prep-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.classroom-teacher-prep-block + .classroom-teacher-prep-block {
+  margin-top: 0.7rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+}
+
+.classroom-teacher-prep-block h3 {
+  margin: 0 0 0.3rem;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.classroom-teacher-prep-block p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.classroom-teacher-cloze {
+  margin: 0.35rem 0 0;
+  padding-left: 1.15rem;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.classroom-teacher-cloze-answer {
+  display: block;
+  color: var(--blue);
+  font-weight: 650;
+  font-size: 12px;
 }
 
 .classroom-board-wrap {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1743,9 +1870,11 @@ a {
 .classroom-tiptap {
   outline: none;
   min-height: 60vh;
+  max-width: 100%;
   font-size: 15px;
   line-height: 1.65;
   color: var(--ink);
+  overflow-wrap: break-word;
 }
 
 .classroom-meet-body.is-video-expanded .classroom-tiptap {
@@ -2009,6 +2138,15 @@ a {
     min-height: 55vh;
   }
 
+  .classroom-stage-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .classroom-teacher-prep {
+    max-height: 32vh;
+  }
+
   .classroom-tiptap {
     min-height: 50vh;
     font-size: 1.05rem;
@@ -2023,8 +2161,11 @@ a {
   }
 
   .classroom-doc-image {
-    max-width: 100%;
+    max-width: min(100%, 360px);
+    max-height: min(28vh, 220px);
+    width: auto;
     height: auto;
+    object-fit: contain;
     border-radius: 6px;
   }
 }
@@ -2033,6 +2174,7 @@ a {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   flex: 1;
 }
 
@@ -2047,9 +2189,14 @@ a {
   z-index: 2;
 }
 
+.classroom-tiptap img.classroom-doc-image,
 .classroom-doc-image {
-  max-width: 100%;
+  display: block;
+  max-width: min(100%, 480px);
+  max-height: min(32vh, 260px);
+  width: auto;
   height: auto;
+  object-fit: contain;
   border-radius: 6px;
   margin: 0.5rem 0;
 }
@@ -2228,18 +2375,20 @@ a {
   color: var(--green-text);
 }
 
-.day5-event.is-busy {
-  background: color-mix(in srgb, var(--muted, #6b7280) 18%, transparent);
-  border-color: color-mix(in srgb, var(--muted, #6b7280) 35%, var(--line));
-  color: var(--muted);
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
 .day5-event.is-unassigned {
   background: color-mix(in srgb, #c97800 16%, transparent);
   border-color: color-mix(in srgb, #c97800 40%, var(--line));
   color: #8a5a00;
+}
+
+.month-cal-event.is-unassigned {
+  background: color-mix(in srgb, #c97800 16%, transparent);
+  color: #8a5a00;
+}
+
+.month-cal-event.is-busy {
+  background: color-mix(in srgb, var(--muted, #6b7280) 18%, transparent);
+  color: var(--muted);
 }
 
 .unassigned-lesson {

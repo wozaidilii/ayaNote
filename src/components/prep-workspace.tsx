@@ -178,6 +178,8 @@ export function PrepWorkspace({
     refsNone: string;
     vocabRecallTitle: string;
     vocabRecallHint: string;
+    nextVocabRecallTitle: string;
+    nextVocabRecallHint: string;
     placeholderLine1: string;
     placeholderLine2: string;
     placeholderLine3: string;
@@ -553,6 +555,25 @@ export function PrepWorkspace({
                   {currentRefs.vocabRecall.map((item, i) => (
                     <ClozeLine
                       key={`${item.answer}-${i}-${item.blanked}`}
+                      item={item}
+                    />
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {currentRefs.nextVocabRecall.length > 0 && (
+              <div className="prep-vocab-recall">
+                <div className="prep-refs-title">
+                  {labels.nextVocabRecallTitle}
+                </div>
+                <p className="muted prep-vocab-recall-hint">
+                  {labels.nextVocabRecallHint}
+                </p>
+                <ol className="prep-cloze-list">
+                  {currentRefs.nextVocabRecall.map((item, i) => (
+                    <ClozeLine
+                      key={`next-${item.answer}-${i}-${item.blanked}`}
                       item={item}
                     />
                   ))}

@@ -94,6 +94,7 @@ type Labels = {
   openClassroom: string;
   openPrep: string;
   openRoom: string;
+  lessonHistory: string;
   progress: string;
   strengths: string;
   weaknesses: string;
@@ -450,44 +451,42 @@ function DetailPanel({
         </dl>
       </div>
 
-      {(student.nextLessonId || !student.hasUpcoming) && (
-        <div
-          className="students-quick-actions"
-          style={{ marginBottom: "1rem" }}
-        >
-          {student.nextLessonId ? (
-            <>
-              <a
-                className="btn sm"
-                href={`/classroom/${student.nextLessonId}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {labels.openClassroom}
-              </a>
-              <Link
-                className="btn secondary sm"
-                href={`/prep?lesson=${student.nextLessonId}`}
-              >
-                {labels.openPrep}
-              </Link>
-              <Link
-                className="btn ghost sm"
-                href={`/lessons/${student.nextLessonId}`}
-              >
-                {labels.openRoom}
-              </Link>
-            </>
-          ) : (
-            <span className="chip">{labels.noUpcoming}</span>
-          )}
-          {student.nextLessonLabel ? (
-            <span className="muted" style={{ fontSize: "0.85rem" }}>
-              {labels.nextLesson}: {student.nextLessonLabel}
-            </span>
-          ) : null}
-        </div>
-      )}
+      <div className="students-quick-actions" style={{ marginBottom: "1rem" }}>
+        <Link className="btn ghost sm" href={`/history?student=${student.id}`}>
+          {labels.lessonHistory}
+        </Link>
+        {student.nextLessonId ? (
+          <>
+            <a
+              className="btn sm"
+              href={`/classroom/${student.nextLessonId}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {labels.openClassroom}
+            </a>
+            <Link
+              className="btn secondary sm"
+              href={`/prep?lesson=${student.nextLessonId}`}
+            >
+              {labels.openPrep}
+            </Link>
+            <Link
+              className="btn ghost sm"
+              href={`/lessons/${student.nextLessonId}`}
+            >
+              {labels.openRoom}
+            </Link>
+          </>
+        ) : (
+          <span className="chip">{labels.noUpcoming}</span>
+        )}
+        {student.nextLessonLabel ? (
+          <span className="muted" style={{ fontSize: "0.85rem" }}>
+            {labels.nextLesson}: {student.nextLessonLabel}
+          </span>
+        ) : null}
+      </div>
 
       <form action={updateStudent}>
         <input type="hidden" name="studentId" value={student.id} />

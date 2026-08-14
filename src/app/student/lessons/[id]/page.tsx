@@ -134,8 +134,12 @@ export default async function StudentLessonSummaryPage({
               ) : null}
             </div>
           ) : null}
-          <h3>{common("nextFocus")}</h3>
-          <p>{lesson.summary.nextFocus || "—"}</p>
+          {lesson.summary.approved ? (
+            <>
+              <h3>{common("nextFocus")}</h3>
+              <p>{lesson.summary.nextFocus || "—"}</p>
+            </>
+          ) : null}
           {vocab.length > 0 && (
             <>
               <h3>{common("vocab")}</h3>
