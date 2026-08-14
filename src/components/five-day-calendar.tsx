@@ -214,7 +214,11 @@ export function FiveDayCalendar({
                   className="day5-col-body day5-col-body-bookable"
                   style={{ height: gridHeight }}
                   onClick={(e) => {
-                    if ((e.target as HTMLElement).closest("a.day5-event")) {
+                    if (
+                      (e.target as HTMLElement).closest(
+                        "a.day5-event, .day5-event.is-busy",
+                      )
+                    ) {
                       return;
                     }
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -277,20 +281,53 @@ export function FiveDayCalendar({
                     const past =
                       new Date(ev.endsAt).getTime() < nowMs ||
                       ev.status === "completed";
-                    return (
-                      <Link
-                        key={ev.id}
-                        href={`/classroom/${ev.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`day5-event ${past ? "is-past" : "is-upcoming"}`}
-                        style={{ top, height }}
-                        title={`${formatInTz(ev.startsAt, "HH:mm", timeZone)} ${ev.studentName}`}
-                      >
+                    const busy = ev.kind === "busy";
+                    const className = [
+                      "day5-event",
+                      busy
+                        ? "is-busy"
+                        : ev.unassigned
+                          ? "is-unassigned"
+                          : past
+                            ? "is-past"
+                            : "is-upcoming",
+                    ].join(" ");
+                    const title = `${formatInTz(ev.startsAt, "HH:mm", timeZone)} ${ev.studentName}`;
+                    const inner = (
+                      <>
                         <div className="day5-event-time">
                           {formatInTz(ev.startsAt, "HH:mm", timeZone)}
                         </div>
                         <div className="day5-event-name">{ev.studentName}</div>
+                      </>
+                    );
+                    if (busy) {
+                      return (
+                        <div
+                          key={ev.id}
+                          className={className}
+                          style={{ top, height }}
+                          title={title}
+                        >
+                          {inner}
+                        </div>
+                      );
+                    }
+                    return (
+                      <Link
+                        key={ev.id}
+                        href={
+                          ev.unassigned
+                            ? `/calendar?view=days&bind=${ev.id}#bind-${ev.id}`
+                            : `/classroom/${ev.id}`
+                        }
+                        target={ev.unassigned ? undefined : "_blank"}
+                        rel={ev.unassigned ? undefined : "noreferrer"}
+                        className={className}
+                        style={{ top, height }}
+                        title={title}
+                      >
+                        {inner}
                       </Link>
                     );
                   })}

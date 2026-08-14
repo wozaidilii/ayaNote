@@ -4,7 +4,18 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { addMinutes } from "date-fns";
-import { courseTypeLabel, generatePrepDraft, getAiProvider } from "@/lib/ai";
+import {
+  COURSE_TYPES,
+  courseTypeLabel,
+  generatePrepDraft,
+  getAiProvider,
+} from "@/lib/ai";
+import {
+  isCalendarInboxEmail,
+  isCalendarPlaceholderEmail,
+  listGoogleBusyIntervals,
+  syncTeacherCalendar,
+} from "@/lib/calendar-sync";
 import {
   buildQuizFromVocab,
   parseAnswersJson,
@@ -25,7 +36,11 @@ import { prisma } from "@/lib/db";
 import { createGuestId, setGuestSession } from "@/lib/guest-session";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
 import type { PrepRefs } from "@/lib/prep-refs";
-import { LESSON_MINUTES, blackoutDateFromYmd } from "@/lib/scheduling";
+import {
+  LESSON_MINUTES,
+  blackoutDateFromYmd,
+  intervalsOverlap,
+} from "@/lib/scheduling";
 import { requireStudent, requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, parseIsoOrLocal } from "@/lib/timezone";
 import { parseClassroomDoc, tiptapDocToPlainText } from "@/lib/classroom-doc";
@@ -52,7 +67,11 @@ export async function login(formData: FormData) {
   const student = await prisma.student.findFirst({
     where: { email, archivedAt: null },
   });
-  if (student?.passwordHash) {
+  if (
+    student?.passwordHash &&
+    !isCalendarInboxEmail(student.email) &&
+    !isCalendarPlaceholderEmail(student.email)
+  ) {
     const ok = await verifyPassword(password, student.passwordHash);
     if (ok) {
       await setAuthSession({
@@ -774,11 +793,20 @@ export async function createLessonForStudent(formData: FormData) {
   const student = await prisma.student.findFirst({
     where: { id: studentId, teacherId: teacher.id, archivedAt: null },
   });
-  if (!student) {
+  if (
+    !student ||
+    isCalendarInboxEmail(student.email) ||
+    isCalendarPlaceholderEmail(student.email)
+  ) {
     redirect(`${calendarHref}&err=schedule`);
   }
 
   const endsAt = addMinutes(start, LESSON_MINUTES);
+  const googleBusy = await listGoogleBusyIntervals(teacherRow, start, endsAt);
+  if (googleBusy.some((b) => intervalsOverlap(start, endsAt, b.start, b.end))) {
+    redirect(`${calendarHref}&err=conflict`);
+  }
+
   const conflict = await prisma.lesson.findFirst({
     where: {
       teacherId: teacher.id,
@@ -829,13 +857,27 @@ export async function createBookingRequest(formData: FormData) {
     );
   }
 
+  const requestedEnd = addMinutes(start, LESSON_MINUTES);
+  const googleBusy = await listGoogleBusyIntervals(
+    teacher,
+    start,
+    requestedEnd,
+  );
+  if (
+    googleBusy.some((b) =>
+      intervalsOverlap(start, requestedEnd, b.start, b.end),
+    )
+  ) {
+    throw new Error("That time is busy on Google Calendar");
+  }
+
   await prisma.bookingRequest.create({
     data: {
       teacherId: teacher.id,
       studentId: student.id,
       type,
       requestedStart: start,
-      requestedEnd: addMinutes(start, LESSON_MINUTES),
+      requestedEnd,
       note,
       status: "pending",
       lessonId:
@@ -1165,4 +1207,136 @@ export async function markHomeworkReviewed(formData: FormData) {
   if (hw.lessonId) {
     revalidatePath(`/lessons/${hw.lessonId}`);
   }
+}
+
+function calendarReturnHref(formData: FormData) {
+  const returnStart = String(formData.get("returnStart") ?? "");
+  const view = String(formData.get("view") ?? "days");
+  const qs = new URLSearchParams();
+  if (view === "month") qs.set("view", "month");
+  else qs.set("view", "days");
+  if (returnStart) qs.set("start", returnStart);
+  const q = qs.toString();
+  return q ? `/calendar?${q}` : "/calendar";
+}
+
+export async function syncGoogleCalendar() {
+  const teacher = await requireTeacher();
+  const result = await syncTeacherCalendar(teacher.id);
+  revalidatePath("/calendar");
+  revalidatePath("/today");
+  revalidatePath("/prep");
+  revalidatePath("/student/book");
+  if (!result.ok) {
+    const reason = result.reason === "not_connected" ? "not_connected" : "sync";
+    redirect(`/calendar?err=${reason}`);
+  }
+  redirect("/calendar?ok=synced");
+}
+
+export async function bindCalendarLessonStudent(formData: FormData) {
+  const teacher = await requireTeacher();
+  const href = calendarReturnHref(formData);
+  const lessonId = String(formData.get("lessonId") ?? "");
+  const studentId = String(formData.get("studentId") ?? "");
+  if (!lessonId || !studentId) {
+    redirect(`${href}&err=bind`);
+  }
+
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { student: true },
+  });
+  if (!lesson || lesson.teacherId !== teacher.id) {
+    redirect(`${href}&err=bind`);
+  }
+
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, teacherId: teacher.id, archivedAt: null },
+  });
+  if (
+    !student ||
+    isCalendarInboxEmail(student.email) ||
+    isCalendarPlaceholderEmail(student.email)
+  ) {
+    redirect(`${href}&err=bind`);
+  }
+
+  const tags = parseJsonArray(lesson.tagsJson).filter(
+    (t) => t !== "unassigned",
+  );
+  await prisma.lesson.update({
+    where: { id: lesson.id },
+    data: { studentId: student.id, tagsJson: toJson(tags) },
+  });
+
+  revalidatePath("/calendar");
+  revalidatePath("/today");
+  revalidatePath("/students");
+  revalidatePath("/prep");
+  redirect(`${href}&ok=bound`);
+}
+
+export async function createStudentForCalendarLesson(formData: FormData) {
+  const teacher = await requireTeacher();
+  const href = calendarReturnHref(formData);
+  const lessonId = String(formData.get("lessonId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const level = String(formData.get("level") ?? "N4");
+  const courseTypeRaw = String(formData.get("courseType") ?? "jlpt_n4");
+  const courseType = COURSE_TYPES.some((c) => c.value === courseTypeRaw)
+    ? courseTypeRaw
+    : "custom";
+
+  if (!lessonId || !name || !email || password.length < 4) {
+    redirect(`${href}&err=student`);
+  }
+
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacher.id) {
+    redirect(`${href}&err=bind`);
+  }
+
+  const taken = await prisma.student.findFirst({
+    where: { teacherId: teacher.id, email },
+  });
+  if (taken) {
+    redirect(`${href}&err=student_exists`);
+  }
+
+  const student = await prisma.student.create({
+    data: {
+      teacherId: teacher.id,
+      name,
+      email,
+      passwordHash: await hashPassword(password),
+      level,
+      courseType,
+      recordingConsent: false,
+    },
+  });
+
+  await ensureSampleLevelHomework({
+    studentId: student.id,
+    level,
+    courseType,
+  });
+
+  const tags = parseJsonArray(lesson.tagsJson).filter(
+    (t) => t !== "unassigned",
+  );
+  await prisma.lesson.update({
+    where: { id: lesson.id },
+    data: { studentId: student.id, tagsJson: toJson(tags) },
+  });
+
+  revalidatePath("/calendar");
+  revalidatePath("/today");
+  revalidatePath("/students");
+  revalidatePath("/prep");
+  redirect(`${href}&ok=bound`);
 }

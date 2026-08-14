@@ -1,3 +1,4 @@
+import { addDays } from "date-fns";
 import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { CalendarPlus } from "@/components/icons";
@@ -7,6 +8,7 @@ import {
 } from "@/components/student-book-calendar";
 import { PageHeading } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
+import { listGoogleBusyIntervals } from "@/lib/calendar-sync";
 import { prisma } from "@/lib/db";
 import { generateAvailableSlots } from "@/lib/scheduling";
 import {
@@ -77,7 +79,7 @@ export default async function StudentBookPage({
     timezone: timeZone,
   };
 
-  const [busyLessons, pendingAll] = await Promise.all([
+  const [busyLessons, pendingAll, googleBusy] = await Promise.all([
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
@@ -103,6 +105,7 @@ export default async function StudentBookPage({
         requestedEnd: true,
       },
     }),
+    listGoogleBusyIntervals(teacher, new Date(), addDays(new Date(), 14)),
   ]);
 
   const busy = [
@@ -111,6 +114,7 @@ export default async function StudentBookPage({
       start: b.requestedStart,
       end: b.requestedEnd,
     })),
+    ...googleBusy,
   ];
 
   // Anchor min-notice to real now (not week start), and show every free hour
@@ -147,6 +151,22 @@ export default async function StudentBookPage({
       endsAt: req.requestedEnd.toISOString(),
       kind: mine ? "pending" : "busy",
       label: mine ? t("yourPending") : t("busy"),
+    });
+  }
+  for (const interval of googleBusy) {
+    const overlapsLesson = busyLessons.some(
+      (l) => l.startsAt < interval.end && interval.start < l.endsAt,
+    );
+    const overlapsPending = pendingAll.some(
+      (b) => b.requestedStart < interval.end && interval.start < b.requestedEnd,
+    );
+    if (overlapsLesson || overlapsPending) continue;
+    blocks.push({
+      id: `gcal-${interval.start.toISOString()}`,
+      startsAt: interval.start.toISOString(),
+      endsAt: interval.end.toISOString(),
+      kind: "busy",
+      label: t("busy"),
     });
   }
 

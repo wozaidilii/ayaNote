@@ -10,6 +10,8 @@ export type CalendarLessonItem = {
   status: string;
   prepStatus?: string;
   hasSummary?: boolean;
+  unassigned?: boolean;
+  kind?: "lesson" | "busy";
 };
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -45,6 +47,8 @@ export function MonthCalendar({
     finished: string;
     upcoming: string;
     noLessonsDay: string;
+    unassigned: string;
+    bindStudent: string;
   };
 }) {
   const byDay = new Map<string, CalendarLessonItem[]>();
@@ -126,10 +130,18 @@ export function MonthCalendar({
                     const past =
                       new Date(ev.endsAt).getTime() < now ||
                       ev.status === "completed";
+                    const kindClass =
+                      ev.kind === "busy"
+                        ? "is-busy"
+                        : ev.unassigned
+                          ? "is-unassigned"
+                          : past
+                            ? "is-past"
+                            : "is-upcoming";
                     return (
                       <div
                         key={ev.id}
-                        className={`month-cal-event ${past ? "is-past" : "is-upcoming"}`}
+                        className={`month-cal-event ${kindClass}`}
                         title={`${formatInTz(ev.startsAt, "HH:mm", timeZone)} ${ev.studentName}`}
                       >
                         <span className="month-cal-event-time">
@@ -157,60 +169,79 @@ export function MonthCalendar({
             timeZone,
           )}
         </h3>
-        {dayLessons.length === 0 && (
-          <p className="muted">{labels.noLessonsDay}</p>
-        )}
-        {dayLessons.map((lesson) => {
-          const past =
-            new Date(lesson.endsAt).getTime() < now ||
-            lesson.status === "completed";
-          return (
-            <div className="list-row" key={lesson.id}>
-              <div>
-                <div style={{ fontWeight: 700 }}>
-                  {formatInTz(lesson.startsAt, "HH:mm", timeZone)}–
-                  {formatInTz(lesson.endsAt, "HH:mm", timeZone)} ·{" "}
-                  {lesson.studentName}
+        {(() => {
+          const detailLessons = dayLessons.filter(
+            (lesson) => lesson.kind !== "busy",
+          );
+          if (detailLessons.length === 0) {
+            return <p className="muted">{labels.noLessonsDay}</p>;
+          }
+          return detailLessons.map((lesson) => {
+            const past =
+              new Date(lesson.endsAt).getTime() < now ||
+              lesson.status === "completed";
+            return (
+              <div className="list-row" key={lesson.id}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {formatInTz(lesson.startsAt, "HH:mm", timeZone)}–
+                    {formatInTz(lesson.endsAt, "HH:mm", timeZone)} ·{" "}
+                    {lesson.studentName}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: "0.35rem",
+                      display: "flex",
+                      gap: "0.35rem",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span className={`chip ${past ? "done" : "soon"}`}>
+                      {past ? labels.finished : labels.upcoming}
+                    </span>
+                    {lesson.unassigned && (
+                      <span className="chip">{labels.unassigned}</span>
+                    )}
+                    {lesson.prepStatus && (
+                      <span className="chip">Prep: {lesson.prepStatus}</span>
+                    )}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    marginTop: "0.35rem",
-                    display: "flex",
-                    gap: "0.35rem",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span className={`chip ${past ? "done" : "soon"}`}>
-                    {past ? labels.finished : labels.upcoming}
-                  </span>
-                  {lesson.prepStatus && (
-                    <span className="chip">Prep: {lesson.prepStatus}</span>
+                <div style={{ display: "grid", gap: "0.35rem" }}>
+                  {lesson.unassigned ? (
+                    <Link
+                      className="btn"
+                      href={`/calendar?view=month&month=${focusYmd.slice(0, 7)}&day=${focusYmd}&bind=${lesson.id}#bind-${lesson.id}`}
+                    >
+                      {labels.bindStudent}
+                    </Link>
+                  ) : (
+                    <>
+                      {!past && (
+                        <Link
+                          className="btn secondary"
+                          href={`/prep?lesson=${lesson.id}#lesson-${lesson.id}`}
+                        >
+                          {labels.openPrep}
+                        </Link>
+                      )}
+                      <a
+                        className="btn ghost"
+                        href={`/classroom/${lesson.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {past || lesson.hasSummary
+                          ? labels.openRecord
+                          : labels.openLesson}
+                      </a>
+                    </>
                   )}
                 </div>
               </div>
-              <div style={{ display: "grid", gap: "0.35rem" }}>
-                {!past && (
-                  <Link
-                    className="btn secondary"
-                    href={`/prep?lesson=${lesson.id}#lesson-${lesson.id}`}
-                  >
-                    {labels.openPrep}
-                  </Link>
-                )}
-                <a
-                  className="btn ghost"
-                  href={`/classroom/${lesson.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {past || lesson.hasSummary
-                    ? labels.openRecord
-                    : labels.openLesson}
-                </a>
-              </div>
-            </div>
-          );
-        })}
+            );
+          });
+        })()}
       </div>
     </div>
   );

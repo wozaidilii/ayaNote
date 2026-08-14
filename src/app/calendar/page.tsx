@@ -1,15 +1,30 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { decideBooking } from "@/app/actions";
+import { decideBooking, syncGoogleCalendar } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { CalendarUnassignedPanel } from "@/components/calendar-unassigned-panel";
 import { FiveDayCalendar } from "@/components/five-day-calendar";
-import { CalendarDays, Check, Clock3, X, UiIcon } from "@/components/icons";
+import {
+  CalendarDays,
+  Check,
+  Clock3,
+  RefreshCw,
+  X,
+  UiIcon,
+} from "@/components/icons";
 import {
   MonthCalendar,
   type CalendarLessonItem,
 } from "@/components/month-calendar";
 import { PageHeading, PanelTitle } from "@/components/ui-heading";
+import {
+  isCalendarInboxEmail,
+  isCalendarPlaceholderEmail,
+  isUnassignedLessonTags,
+  listGoogleBusyIntervals,
+} from "@/lib/calendar-sync";
 import { prisma } from "@/lib/db";
+import { googleConfigured } from "@/lib/google";
 import { requireTeacher } from "@/lib/session";
 import {
   consecutiveYmds,
@@ -35,6 +50,7 @@ export default async function CalendarPage({
     start?: string;
     ok?: string;
     err?: string;
+    bind?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -99,7 +115,7 @@ export default async function CalendarPage({
   const rangeStart = view === "month" ? monthPaddedStart : daysRangeStart;
   const rangeEnd = view === "month" ? monthPaddedEnd : daysRangeEnd;
 
-  const [lessons, pending, students] = await Promise.all([
+  const [lessons, pending, students, googleBusy] = await Promise.all([
     prisma.lesson.findMany({
       where: {
         teacherId: teacher.id,
@@ -121,19 +137,63 @@ export default async function CalendarPage({
     prisma.student.findMany({
       where: { teacherId: teacher.id, archivedAt: null },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, email: true },
     }),
+    listGoogleBusyIntervals(teacherFull, rangeStart, rangeEnd),
   ]);
 
-  const calendarLessons: CalendarLessonItem[] = lessons.map((lesson) => ({
-    id: lesson.id,
-    startsAt: lesson.startsAt.toISOString(),
-    endsAt: lesson.endsAt.toISOString(),
-    studentName: lesson.student.name,
-    status: lesson.status,
-    prepStatus: lesson.prepStatus,
-    hasSummary: Boolean(lesson.summary),
-  }));
+  const realStudents = students.filter(
+    (s) =>
+      !isCalendarInboxEmail(s.email) && !isCalendarPlaceholderEmail(s.email),
+  );
+
+  const googleConnected = Boolean(teacherFull.googleRefreshToken);
+  const gcalReady = googleConfigured();
+
+  const calendarLessons: CalendarLessonItem[] = lessons.map((lesson) => {
+    const unassigned =
+      isUnassignedLessonTags(lesson.tagsJson) ||
+      isCalendarInboxEmail(lesson.student.email) ||
+      isCalendarPlaceholderEmail(lesson.student.email);
+    return {
+      id: lesson.id,
+      startsAt: lesson.startsAt.toISOString(),
+      endsAt: lesson.endsAt.toISOString(),
+      studentName: unassigned ? t("unassignedStudent") : lesson.student.name,
+      status: lesson.status,
+      prepStatus: lesson.prepStatus,
+      hasSummary: Boolean(lesson.summary),
+      unassigned,
+      kind: "lesson" as const,
+    };
+  });
+
+  const lessonBusyKeys = new Set(
+    lessons.map((l) => `${l.startsAt.toISOString()}|${l.endsAt.toISOString()}`),
+  );
+  for (const block of googleBusy) {
+    const key = `${block.start.toISOString()}|${block.end.toISOString()}`;
+    if (lessonBusyKeys.has(key)) continue;
+    const overlapsLesson = lessons.some(
+      (l) => l.startsAt < block.end && block.start < l.endsAt,
+    );
+    if (overlapsLesson) continue;
+    calendarLessons.push({
+      id: `busy-${block.start.toISOString()}`,
+      startsAt: block.start.toISOString(),
+      endsAt: block.end.toISOString(),
+      studentName: t("googleBusy"),
+      status: "scheduled",
+      kind: "busy",
+    });
+  }
+
+  const unmatched = lessons.filter(
+    (lesson) =>
+      isUnassignedLessonTags(lesson.tagsJson) ||
+      isCalendarInboxEmail(lesson.student.email) ||
+      isCalendarPlaceholderEmail(lesson.student.email),
+  );
 
   const locale = teacherFull.locale || "ja";
 
@@ -143,7 +203,26 @@ export default async function CalendarPage({
         icon={CalendarDays}
         title={t("title")}
         subtitle={t("subtitle")}
-        actions={<span className="chip">{timeZone}</span>}
+        actions={
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <span className="chip">{timeZone}</span>
+            {!gcalReady ? (
+              <span className="chip">{t("googleNotConfigured")}</span>
+            ) : googleConnected ? (
+              <form action={syncGoogleCalendar}>
+                <button className="btn" type="submit">
+                  <UiIcon icon={RefreshCw} size={15} />
+                  {t("syncGoogle")}
+                </button>
+              </form>
+            ) : (
+              <a className="btn" href="/api/google/connect">
+                <UiIcon icon={RefreshCw} size={15} />
+                {t("connectGoogle")}
+              </a>
+            )}
+          </div>
+        }
       />
 
       <div className="panel">
@@ -166,7 +245,103 @@ export default async function CalendarPage({
             {t("errSchedule")}
           </p>
         )}
+        {sp.ok === "synced" && (
+          <p className="chip done" style={{ marginTop: "0.75rem" }}>
+            {t("okSynced")}
+          </p>
+        )}
+        {sp.ok === "google_connected" && (
+          <p className="chip done" style={{ marginTop: "0.75rem" }}>
+            {t("okGoogleConnected")}
+          </p>
+        )}
+        {sp.ok === "bound" && (
+          <p className="chip done" style={{ marginTop: "0.75rem" }}>
+            {t("okBound")}
+          </p>
+        )}
+        {sp.err === "google_not_configured" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errGoogleNotConfigured")}
+          </p>
+        )}
+        {sp.err === "google_denied" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errGoogleDenied")}
+          </p>
+        )}
+        {sp.err === "google_oauth" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errGoogleOauth")}
+          </p>
+        )}
+        {sp.err === "not_connected" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errNotConnected")}
+          </p>
+        )}
+        {sp.err === "sync" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errSync")}
+          </p>
+        )}
+        {sp.err === "bind" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errBind")}
+          </p>
+        )}
+        {sp.err === "student" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errStudent")}
+          </p>
+        )}
+        {sp.err === "student_exists" && (
+          <p className="chip" style={{ marginTop: "0.75rem" }}>
+            {t("errStudentExists")}
+          </p>
+        )}
+        {googleConnected && teacherFull.googleConnectedEmail && (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            {t("googleConnectedAs", {
+              email: teacherFull.googleConnectedEmail,
+            })}
+          </p>
+        )}
       </div>
+
+      <CalendarUnassignedPanel
+        lessons={unmatched.map((lesson) => ({
+          id: lesson.id,
+          startsAt: lesson.startsAt.toISOString(),
+          endsAt: lesson.endsAt.toISOString(),
+          title: t("unassignedStudent"),
+        }))}
+        students={realStudents}
+        timeLabels={Object.fromEntries(
+          unmatched.map((lesson) => [
+            lesson.id,
+            `${formatInTz(lesson.startsAt, "yyyy-MM-dd HH:mm", timeZone)}–${formatInTz(lesson.endsAt, "HH:mm", timeZone)}`,
+          ]),
+        )}
+        bindId={sp.bind}
+        returnStart={view === "days" ? daysStart : todayYmd.slice(0, 7)}
+        view={view}
+        labels={{
+          title: t("unassignedTitle"),
+          hint: t("unassignedHint"),
+          pickExisting: t("pickExisting"),
+          createNew: t("createNewStudent"),
+          name: t("studentName"),
+          email: t("studentEmail"),
+          password: t("studentPassword"),
+          level: t("studentLevel"),
+          course: t("studentCourse"),
+          bind: t("bindStudent"),
+          createAndBind: t("createAndBind"),
+          selectStudentPlaceholder: t("selectStudentPlaceholder"),
+          noStudents: t("noStudents"),
+        }}
+      />
 
       {pending.length > 0 && (
         <div className="panel">
@@ -239,7 +414,7 @@ export default async function CalendarPage({
           <FiveDayCalendar
             days={weekDays}
             lessons={calendarLessons}
-            students={students}
+            students={realStudents}
             timeZone={timeZone}
             todayYmd={todayYmd}
             weekStartYmd={thisWeekStart}
@@ -280,6 +455,8 @@ export default async function CalendarPage({
               finished: t("finished"),
               upcoming: t("upcoming"),
               noLessonsDay: t("noLessonsDay"),
+              unassigned: t("unassignedStudent"),
+              bindStudent: t("bindStudent"),
             }}
           />
         )}

@@ -39,8 +39,17 @@ function parseHm(hm: string): { h: number; m: number } {
   return { h: h || 0, m: m || 0 };
 }
 
-function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
+export function intervalsOverlap(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date,
+) {
   return aStart < bEnd && bStart < aEnd;
+}
+
+function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
+  return intervalsOverlap(aStart, aEnd, bStart, bEnd);
 }
 
 function weekKey(d: Date, timeZone: string) {

@@ -934,6 +934,16 @@ a {
   color: var(--green-text);
 }
 
+.month-cal-event.is-unassigned {
+  background: color-mix(in srgb, #c97800 16%, transparent);
+  color: #8a5a00;
+}
+
+.month-cal-event.is-busy {
+  background: color-mix(in srgb, var(--muted, #6b7280) 18%, transparent);
+  color: var(--muted);
+}
+
 .month-cal-event-time {
   font-weight: 700;
 }
@@ -2224,6 +2234,36 @@ a {
   color: var(--muted);
   cursor: not-allowed;
   pointer-events: none;
+}
+
+.day5-event.is-unassigned {
+  background: color-mix(in srgb, #c97800 16%, transparent);
+  border-color: color-mix(in srgb, #c97800 40%, var(--line));
+  color: #8a5a00;
+}
+
+.unassigned-lesson {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.unassigned-lesson.is-focus {
+  outline: 2px solid color-mix(in srgb, #c97800 50%, var(--line));
+  outline-offset: 6px;
+  border-radius: 8px;
+}
+
+.unassigned-lesson-forms {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 800px) {
+  .unassigned-lesson-forms {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
 }
 
 .day5-event.is-mine {

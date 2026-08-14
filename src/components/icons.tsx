@@ -23,6 +23,7 @@ import {
   Sparkles,
   Users,
   Video,
+  RefreshCw,
   X,
 } from "lucide-react";
 
@@ -83,5 +84,6 @@ export {
   Sparkles,
   Users,
   Video,
+  RefreshCw,
   X,
 };

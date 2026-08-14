@@ -2,6 +2,10 @@ import { getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/app-shell";
 import { StudentsWorkspace } from "@/components/students-workspace";
 import { prisma } from "@/lib/db";
+import {
+  isCalendarInboxEmail,
+  isCalendarPlaceholderEmail,
+} from "@/lib/calendar-sync";
 import { requireTeacher } from "@/lib/session";
 import { formatInTz, normalizeTimezone, ymdInTz } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
@@ -54,42 +58,50 @@ export default async function StudentsPage({
   ]);
 
   const now = new Date();
-  const students = rows.map((student) => {
-    const upcoming = student.lessons
-      .filter((l) => l.status === "scheduled" && l.startsAt >= now)
-      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
-    return {
-      id: student.id,
-      name: student.name,
-      email: student.email,
-      level: student.level,
-      courseType: student.courseType,
-      goals: student.goals,
-      privateNotes: student.privateNotes,
-      recordingConsent: student.recordingConsent,
-      hasPassword: Boolean(student.passwordHash),
-      archivedAt: student.archivedAt?.toISOString() ?? null,
-      attendanceCount: student.progress?.attendanceCount ?? 0,
-      weaknesses: parseJsonArray(student.progress?.weaknessesJson),
-      strengths: parseJsonArray(student.progress?.strengthsJson),
-      topics: parseJsonArray(student.progress?.topicsCoveredJson),
-      progressNote: student.progress?.note ?? "",
-      startedAt: student.startedAt ? ymdInTz(student.startedAt, timeZone) : "",
-      pricePerLesson:
-        student.pricePerLesson != null ? String(student.pricePerLesson) : "",
-      currency: student.currency || "JPY",
-      lessonsPerWeek:
-        student.lessonsPerWeek != null ? String(student.lessonsPerWeek) : "",
-      priceNote: student.priceNote ?? "",
-      hasUpcoming: Boolean(upcoming),
-      nextLessonLabel: upcoming
-        ? formatInTz(upcoming.startsAt, "MMM d HH:mm", timeZone)
-        : "",
-      nextLessonId: upcoming?.id ?? null,
-      pendingHomework: student.homeworks.length,
-      loginUrl,
-    };
-  });
+  const students = rows
+    .filter(
+      (student) =>
+        !isCalendarInboxEmail(student.email) &&
+        !isCalendarPlaceholderEmail(student.email),
+    )
+    .map((student) => {
+      const upcoming = student.lessons
+        .filter((l) => l.status === "scheduled" && l.startsAt >= now)
+        .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
+      return {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        level: student.level,
+        courseType: student.courseType,
+        goals: student.goals,
+        privateNotes: student.privateNotes,
+        recordingConsent: student.recordingConsent,
+        hasPassword: Boolean(student.passwordHash),
+        archivedAt: student.archivedAt?.toISOString() ?? null,
+        attendanceCount: student.progress?.attendanceCount ?? 0,
+        weaknesses: parseJsonArray(student.progress?.weaknessesJson),
+        strengths: parseJsonArray(student.progress?.strengthsJson),
+        topics: parseJsonArray(student.progress?.topicsCoveredJson),
+        progressNote: student.progress?.note ?? "",
+        startedAt: student.startedAt
+          ? ymdInTz(student.startedAt, timeZone)
+          : "",
+        pricePerLesson:
+          student.pricePerLesson != null ? String(student.pricePerLesson) : "",
+        currency: student.currency || "JPY",
+        lessonsPerWeek:
+          student.lessonsPerWeek != null ? String(student.lessonsPerWeek) : "",
+        priceNote: student.priceNote ?? "",
+        hasUpcoming: Boolean(upcoming),
+        nextLessonLabel: upcoming
+          ? formatInTz(upcoming.startsAt, "MMM d HH:mm", timeZone)
+          : "",
+        nextLessonId: upcoming?.id ?? null,
+        pendingHomework: student.homeworks.length,
+        loginUrl,
+      };
+    });
 
   const levels = levelRows.map((l) => l.level).filter(Boolean);
 

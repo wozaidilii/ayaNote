@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { saveTeacherTimezone } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import {
+  CalendarDays,
   Clock3,
   LayoutDashboard,
   Settings,
@@ -12,6 +13,7 @@ import {
 } from "@/components/icons";
 import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getAiProvider } from "@/lib/ai";
+import { googleConfigured } from "@/lib/google";
 import { requireTeacher } from "@/lib/session";
 import { TIMEZONE_OPTIONS, normalizeTimezone } from "@/lib/timezone";
 
@@ -59,6 +61,27 @@ export default async function SettingsPage({
             {t("saveTimezone")}
           </button>
         </form>
+      </div>
+
+      <div className="panel">
+        <PanelTitle icon={CalendarDays}>{t("googleTitle")}</PanelTitle>
+        <p className="muted">{t("googleExplain")}</p>
+        {!googleConfigured() ? (
+          <p className="chip">{t("googleNotConfigured")}</p>
+        ) : teacher.googleRefreshToken ? (
+          <p className="chip done">
+            {t("googleConnectedAs", {
+              email: teacher.googleConnectedEmail || "Google",
+            })}
+          </p>
+        ) : (
+          <>
+            <p className="chip">{t("googleNotConnected")}</p>
+            <a className="btn secondary" href="/api/google/connect">
+              {t("connectGoogle")}
+            </a>
+          </>
+        )}
       </div>
 
       <div className="panel">

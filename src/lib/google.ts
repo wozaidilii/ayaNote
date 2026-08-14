@@ -3,6 +3,8 @@
  * Requires GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI.
  */
 
+import { SignJWT, jwtVerify } from "jose";
+
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.readonly",
@@ -11,8 +13,53 @@ const SCOPES = [
   "email",
 ].join(" ");
 
+function oauthSecret() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 16) {
+    return new TextEncoder().encode(
+      process.env.SESSION_SECRET ?? "ayanote-dev-session-secret-change-me",
+    );
+  }
+  return new TextEncoder().encode(secret);
+}
+
+export async function signGoogleConnectState(teacherId: string) {
+  return new SignJWT({ teacherId, purpose: "google_oauth" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("15m")
+    .sign(oauthSecret());
+}
+
+export async function verifyGoogleConnectState(
+  state: string,
+): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(state, oauthSecret());
+    if (payload.purpose !== "google_oauth") return null;
+    return typeof payload.teacherId === "string" ? payload.teacherId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function emailFromGoogleIdToken(idToken?: string) {
+  if (!idToken) return null;
+  try {
+    const part = idToken.split(".")[1];
+    if (!part) return null;
+    const json = Buffer.from(part, "base64url").toString("utf8");
+    const payload = JSON.parse(json) as { email?: unknown };
+    return typeof payload.email === "string" ? payload.email : null;
+  } catch {
+    return null;
+  }
+}
+
 export function googleConfigured() {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+  );
 }
 
 export function getGoogleRedirectUri() {
@@ -105,10 +152,19 @@ export type GoogleCalendarEvent = {
   description?: string;
   hangoutLink?: string;
   htmlLink?: string;
+  transparency?: string;
+  visibility?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
-  attendees?: Array<{ email?: string; displayName?: string; self?: boolean; organizer?: boolean }>;
-  conferenceData?: { entryPoints?: Array<{ entryPointType: string; uri: string }> };
+  attendees?: Array<{
+    email?: string;
+    displayName?: string;
+    self?: boolean;
+    organizer?: boolean;
+  }>;
+  conferenceData?: {
+    entryPoints?: Array<{ entryPointType: string; uri: string }>;
+  };
 };
 
 /** List timed events on primary calendar (singleEvents expanded). */
@@ -126,7 +182,7 @@ export async function listCalendarEvents(opts: {
     maxResults: String(opts.maxResults ?? 100),
     conferenceDataVersion: "1",
     fields:
-      "items(id,status,summary,description,hangoutLink,htmlLink,start,end,attendees(email,displayName,self,organizer),conferenceData)",
+      "items(id,status,summary,description,transparency,visibility,hangoutLink,htmlLink,start,end,attendees(email,displayName,self,organizer),conferenceData)",
   });
 
   const res = await fetch(
@@ -198,11 +254,18 @@ export async function createCalendarMeetEvent(opts: {
   const data = (await res.json()) as {
     id: string;
     hangoutLink?: string;
-    conferenceData?: { entryPoints?: Array<{ entryPointType: string; uri: string }> };
+    conferenceData?: {
+      entryPoints?: Array<{ entryPointType: string; uri: string }>;
+    };
   };
-  const meetFromEntry = data.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri;
+  const meetFromEntry = data.conferenceData?.entryPoints?.find(
+    (e) => e.entryPointType === "video",
+  )?.uri;
   return {
-    meetLink: data.hangoutLink || meetFromEntry || `https://meet.google.com/lookup/ayanote-${opts.fallbackId.slice(0, 10)}`,
+    meetLink:
+      data.hangoutLink ||
+      meetFromEntry ||
+      `https://meet.google.com/lookup/ayanote-${opts.fallbackId.slice(0, 10)}`,
     calendarEventId: data.id,
   };
 }
@@ -214,7 +277,8 @@ export async function updateCalendarEvent(opts: {
   end: Date;
   timeZone?: string;
 }) {
-  if (opts.eventId.startsWith("demo-") || opts.eventId.startsWith("fallback-")) return;
+  if (opts.eventId.startsWith("demo-") || opts.eventId.startsWith("fallback-"))
+    return;
   const timeZone = opts.timeZone || "Asia/Tokyo";
   await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(opts.eventId)}`,
@@ -240,12 +304,17 @@ export async function listRecentDriveDocs(opts: {
   folderId?: string | null;
   pageSize?: number;
 }) {
-  const qParts = ["mimeType = 'application/vnd.google-apps.document'", "trashed = false"];
+  const qParts = [
+    "mimeType = 'application/vnd.google-apps.document'",
+    "trashed = false",
+  ];
   if (opts.folderId) qParts.push(`'${opts.folderId}' in parents`);
 
   const textFilters: string[] = [];
   if (opts.nameContains) {
-    textFilters.push(`name contains '${opts.nameContains.replace(/'/g, "\\'")}'`);
+    textFilters.push(
+      `name contains '${opts.nameContains.replace(/'/g, "\\'")}'`,
+    );
   }
   if (opts.query) {
     textFilters.push(`fullText contains '${opts.query.replace(/'/g, "\\'")}'`);
@@ -259,15 +328,28 @@ export async function listRecentDriveDocs(opts: {
     fields: "files(id,name,createdTime,modifiedTime)",
     orderBy: "modifiedTime desc",
   });
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
-    headers: { Authorization: `Bearer ${opts.accessToken}` },
-  });
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?${params}`,
+    {
+      headers: { Authorization: `Bearer ${opts.accessToken}` },
+    },
+  );
   if (!res.ok) {
     console.error("Drive list failed", await res.text());
-    return [] as Array<{ id: string; name: string; createdTime?: string; modifiedTime?: string }>;
+    return [] as Array<{
+      id: string;
+      name: string;
+      createdTime?: string;
+      modifiedTime?: string;
+    }>;
   }
   const data = (await res.json()) as {
-    files?: Array<{ id: string; name: string; createdTime?: string; modifiedTime?: string }>;
+    files?: Array<{
+      id: string;
+      name: string;
+      createdTime?: string;
+      modifiedTime?: string;
+    }>;
   };
   return data.files ?? [];
 }
