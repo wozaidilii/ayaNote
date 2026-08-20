@@ -123,7 +123,26 @@ export async function refreshAccessToken(refreshToken: string) {
   return res.json() as Promise<{ access_token: string; expires_in: number }>;
 }
 
+function isInvalidGrantError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes("invalid_grant");
+}
+
+/** Drop stored OAuth tokens so the UI can prompt reconnect. */
+async function clearRevokedGoogleTokens(teacherId: string) {
+  const { prisma } = await import("@/lib/db");
+  await prisma.teacher.update({
+    where: { id: teacherId },
+    data: {
+      googleAccessToken: null,
+      googleRefreshToken: null,
+      googleTokenExpiry: null,
+    },
+  });
+}
+
 export async function getValidAccessToken(teacher: {
+  id?: string;
   googleAccessToken: string | null;
   googleRefreshToken: string | null;
   googleTokenExpiry: Date | null;
@@ -137,8 +156,20 @@ export async function getValidAccessToken(teacher: {
     return teacher.googleAccessToken;
   }
   if (!teacher.googleRefreshToken) return null;
-  const refreshed = await refreshAccessToken(teacher.googleRefreshToken);
-  return refreshed.access_token;
+  try {
+    const refreshed = await refreshAccessToken(teacher.googleRefreshToken);
+    return refreshed.access_token;
+  } catch (err) {
+    console.error("Google token refresh failed", err);
+    if (teacher.id && isInvalidGrantError(err)) {
+      try {
+        await clearRevokedGoogleTokens(teacher.id);
+      } catch (clearErr) {
+        console.error("Failed to clear revoked Google tokens", clearErr);
+      }
+    }
+    return null;
+  }
 }
 
 export function looksLikeMailbox(email: string | null | undefined) {

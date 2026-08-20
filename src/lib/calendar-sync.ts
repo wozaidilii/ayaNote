@@ -248,25 +248,30 @@ export async function listGoogleBusyIntervals(
   timeMin: Date,
   timeMax: Date,
 ): Promise<BusyInterval[]> {
-  const accessToken = await getValidAccessToken(teacher);
-  if (!accessToken) return [];
-  await persistGoogleAccessToken(teacher.id, teacher, accessToken);
+  try {
+    const accessToken = await getValidAccessToken(teacher);
+    if (!accessToken) return [];
+    await persistGoogleAccessToken(teacher.id, teacher, accessToken);
 
-  const events = await listCalendarEvents({
-    accessToken,
-    timeMin,
-    timeMax,
-    maxResults: 250,
-  });
+    const events = await listCalendarEvents({
+      accessToken,
+      timeMin,
+      timeMax,
+      maxResults: 250,
+    });
 
-  const busy: BusyInterval[] = [];
-  for (const event of events) {
-    const times = eventTimes(event);
-    if (!times) continue;
-    if (!isOpaqueBusy(event)) continue;
-    busy.push({ start: times.start, end: times.end });
+    const busy: BusyInterval[] = [];
+    for (const event of events) {
+      const times = eventTimes(event);
+      if (!times) continue;
+      if (!isOpaqueBusy(event)) continue;
+      busy.push({ start: times.start, end: times.end });
+    }
+    return busy;
+  } catch (err) {
+    console.error("Google busy lookup failed", err);
+    return [];
   }
-  return busy;
 }
 
 export async function syncTeacherCalendar(
