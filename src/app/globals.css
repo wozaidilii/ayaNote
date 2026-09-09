@@ -1339,18 +1339,24 @@ a {
 
 .classroom-page {
   min-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   padding: 0.65rem 0.85rem 1rem;
   max-width: none;
   margin: 0;
   background: var(--canvas);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .classroom-meet {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  min-height: calc(100vh - 1.3rem);
+  flex: 1;
+  min-height: 0;
   position: relative;
 }
 
@@ -1553,6 +1559,7 @@ a {
   gap: 0.5rem 0.75rem;
   padding: 0.65rem 0.95rem;
   margin: 0;
+  flex-shrink: 0;
   /* LiveKit [data-lk-theme] sets color: #fff; keep our light panel readable. */
   color: var(--ink);
 }
@@ -1612,6 +1619,7 @@ a {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   gap: 0.55rem;
   background: transparent;
 }
@@ -1620,11 +1628,13 @@ a {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0.75rem;
   flex: 1;
   min-height: 0;
   min-width: 0;
   align-items: stretch;
+  overflow: hidden;
 }
 
 .classroom-meet-body.is-solo:has(.classroom-float-dock),
@@ -1679,8 +1689,9 @@ a {
 
 .classroom-float-dock {
   grid-area: dock;
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
   align-self: start;
   display: flex;
   flex-direction: column;
@@ -1869,7 +1880,7 @@ a {
 
 .classroom-tiptap {
   outline: none;
-  min-height: 60vh;
+  min-height: 100%;
   max-width: 100%;
   font-size: 15px;
   line-height: 1.65;
@@ -2083,6 +2094,7 @@ a {
   .classroom-meet-body.is-call,
   .classroom-meet-body.is-video-expanded {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
     /* Board first on phones so students can co-write easily */
     grid-template-areas:
       "main"
@@ -2104,6 +2116,9 @@ a {
     align-items: center;
     max-height: 28vh;
     overflow: auto;
+    position: sticky;
+    top: auto;
+    bottom: 0;
   }
 
   .classroom-filmstrip-tiles {
@@ -2135,7 +2150,7 @@ a {
   }
 
   .classroom-stage {
-    min-height: 55vh;
+    min-height: 0;
   }
 
   .classroom-stage-split {
@@ -2148,7 +2163,7 @@ a {
   }
 
   .classroom-tiptap {
-    min-height: 50vh;
+    min-height: 100%;
     font-size: 1.05rem;
     line-height: 1.55;
   }
