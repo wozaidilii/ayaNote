@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccessibleLesson } from "@/lib/classroom-access";
 import {
   bindClassroomDocToPrep,
+  bindUpcomingClassroomDoc,
   mergeClassroomBoardSave,
   parseClassroomDoc,
   serializeClassroomDoc,
@@ -32,10 +33,13 @@ export async function GET(
   }
 
   const cloze = parsePrepRefs(access.lesson.prepDraft?.refsJson).vocabRecall;
-  const bound = bindClassroomDocToPrep(
-    parseClassroomDoc(access.lesson.classroomDoc),
-    cloze,
-  );
+  const existing = parseClassroomDoc(access.lesson.classroomDoc);
+  const isPast =
+    access.lesson.status === "completed" ||
+    access.lesson.status === "cancelled";
+  const bound = isPast
+    ? bindClassroomDocToPrep(existing, cloze)
+    : bindUpcomingClassroomDoc(existing, cloze);
   let updatedAt = access.lesson.updatedAt;
 
   if (bound.changed) {

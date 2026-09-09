@@ -10,14 +10,18 @@ import {
 } from "@/lib/classroom-access";
 import {
   bindClassroomDocToPrep,
+  bindUpcomingClassroomDoc,
   parseClassroomDoc,
   serializeClassroomDoc,
 } from "@/lib/classroom-doc";
 import { parsePrepRefs } from "@/lib/prep-refs";
 import { prisma } from "@/lib/db";
 import { livekitConfigured } from "@/lib/livekit";
+import { ensureNextLessonClozeFromLatestSummary } from "@/lib/next-lesson-cloze";
 import { sttConfigured } from "@/lib/stt";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
+
+export const maxDuration = 60;
 
 export default async function ClassroomPage({
   params,
@@ -81,12 +85,23 @@ export default async function ClassroomPage({
   const timeZone = normalizeTimezone(lesson.teacher.timezone);
   const isPast = lesson.status === "completed" || lesson.status === "cancelled";
 
-  const refs = parsePrepRefs(lesson.prepDraft?.refsJson);
-  const cloze = refs.vocabRecall;
-  const bound = bindClassroomDocToPrep(
-    parseClassroomDoc(lesson.classroomDoc),
-    cloze,
+  if (!isPast) {
+    await ensureNextLessonClozeFromLatestSummary(lesson.studentId);
+  }
+
+  const fresh = await prisma.lesson.findUnique({
+    where: { id: lesson.id },
+    include: { prepDraft: true },
+  });
+  const classroomDoc = fresh?.classroomDoc ?? lesson.classroomDoc;
+  const refs = parsePrepRefs(
+    fresh?.prepDraft?.refsJson ?? lesson.prepDraft?.refsJson,
   );
+  const cloze = refs.vocabRecall;
+  const existingDoc = parseClassroomDoc(classroomDoc);
+  const bound = isPast
+    ? bindClassroomDocToPrep(existingDoc, cloze)
+    : bindUpcomingClassroomDoc(existingDoc, cloze);
   const doc = bound.doc;
   if (bound.changed) {
     await prisma.lesson.update({

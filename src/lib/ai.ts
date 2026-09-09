@@ -723,3 +723,99 @@ Level-appropriate. If no usable vocab, return vocabRecall as [].`,
     return heuristicPrep(input);
   }
 }
+
+const clozeOnlySchema = z.object({
+  vocabRecall: z.array(vocabRecallItemSchema).max(8).default([]),
+});
+
+type LessonVocabRow = {
+  term: string;
+  reading?: string;
+  meaning?: string;
+};
+
+function heuristicClozeFromVocab(
+  vocab: LessonVocabRow[],
+  examples: string[],
+): VocabRecallItem[] {
+  const items: VocabRecallItem[] = [];
+  for (const row of vocab) {
+    if (items.length >= 6) break;
+    const term = row.term.trim();
+    if (!term) continue;
+    const hit = examples.find((s) => s.includes(term));
+    const blanked = hit
+      ? hit.replace(term, "＿＿")
+      : `仕事では「＿＿」を使います。`;
+    items.push({
+      blanked,
+      hint: (row.meaning || row.reading || term).trim(),
+      answer: term,
+    });
+  }
+  return items;
+}
+
+/** Cloze for the NEXT lesson, built from vocab actually taught today. */
+export async function generateClozeFromLessonVocab(input: {
+  studentName: string;
+  level: string;
+  courseType?: string;
+  vocab: LessonVocabRow[];
+  topics?: string[];
+  examples?: string[];
+}): Promise<VocabRecallItem[]> {
+  const vocab = input.vocab
+    .map((v) => ({
+      term: (v.term ?? "").trim(),
+      reading: (v.reading ?? "").trim(),
+      meaning: (v.meaning ?? "").trim(),
+    }))
+    .filter((v) => v.term.length > 0)
+    .slice(0, 15);
+  if (vocab.length === 0) return [];
+
+  const examples = (input.examples ?? []).map((s) => s.trim()).filter(Boolean);
+  const fallback = heuristicClozeFromVocab(vocab, examples);
+  const model = getModel();
+  if (!model) return fallback;
+
+  const course = courseTypeLabel(input.courseType || input.level);
+  const vocabLine = vocab
+    .map((v) =>
+      [v.term, v.reading && `(${v.reading})`, v.meaning]
+        .filter(Boolean)
+        .join(" "),
+    )
+    .join(" · ");
+
+  try {
+    const object = await generateJson(
+      model,
+      clozeOnlySchema,
+      `You write oral-warmup cloze sentences for the NEXT Japanese 1v1 lesson.
+Use ONLY today's taught terms as blanks. Prefer the business/formal form when both casual and business forms appear (e.g. サポートする not 手伝う).
+
+Student: ${input.studentName}
+Course: ${course}
+Level: ${input.level}
+Today's topics: ${(input.topics ?? []).join(" · ") || "n/a"}
+Today's vocab: ${vocabLine}
+Today's example sentences (optional): ${examples.slice(0, 8).join(" / ") || "n/a"}
+
+Return JSON with vocabRecall: 4–6 items.
+vocabRecall format (strict):
+- blanked: natural Japanese sentence with ONE blank written as ＿＿
+- hint: short meaning cue, NOT the answer
+- answer: the exact target word/phrase for ＿＿ (from today's vocab)
+Do not introduce new vocabulary. Workplace Japanese when the course is business.`,
+    );
+    const items = (object.vocabRecall ?? []).filter(
+      (v) => v.blanked.trim() && v.answer.trim(),
+    );
+    return items.length > 0 ? items : fallback;
+  } catch (err) {
+    console.error("AI cloze failed:", err instanceof Error ? err.message : err);
+    return fallback;
+  }
+}

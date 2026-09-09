@@ -39,11 +39,7 @@ import {
 import { prisma } from "@/lib/db";
 import { createGuestId, setGuestSession } from "@/lib/guest-session";
 import { createInviteToken, inviteExpiry } from "@/lib/invite";
-import {
-  parsePrepRefs,
-  type PrepRefs,
-  type VocabRecallItem,
-} from "@/lib/prep-refs";
+import { parsePrepRefs, type PrepRefs } from "@/lib/prep-refs";
 import {
   LESSON_MINUTES,
   blackoutDateFromYmd,
@@ -56,7 +52,9 @@ import {
   parseClassroomDoc,
   serializeClassroomDoc,
   tiptapDocToPlainText,
+  writeRecallClozeToBoard,
 } from "@/lib/classroom-doc";
+import { materializeNextLessonClozeFromSummary } from "@/lib/next-lesson-cloze";
 import { parseJsonArray, toJson } from "@/lib/utils";
 
 export async function login(formData: FormData) {
@@ -286,6 +284,11 @@ export async function approveSummary(formData: FormData) {
     vocabJson: lesson.summary.vocabJson,
     homeworkText: homework,
   });
+  try {
+    await materializeNextLessonClozeFromSummary(lessonId);
+  } catch (err) {
+    console.error("next-lesson cloze failed", lessonId, err);
+  }
 
   const vocab = (() => {
     try {
@@ -413,9 +416,9 @@ async function writePrepDraftForLesson(lessonId: string) {
   const existingRefs = parsePrepRefs(lesson.prepDraft?.refsJson);
   const priorRefs = parsePrepRefs(priorLesson?.prepDraft?.refsJson);
   const thisCloze =
-    existingRefs.vocabRecall.length > 0
-      ? existingRefs.vocabRecall
-      : priorRefs.nextVocabRecall;
+    priorRefs.nextVocabRecall.length > 0
+      ? priorRefs.nextVocabRecall
+      : existingRefs.vocabRecall;
 
   const generated = await generatePrepDraft({
     studentName: lesson.student.name,
@@ -438,7 +441,10 @@ async function writePrepDraftForLesson(lessonId: string) {
     weaknesses: weaknesses.slice(0, 6),
     vocab: bankVocab.slice(0, 10),
     vocabRecall: thisCloze,
-    nextVocabRecall: generatedCloze ?? [],
+    nextVocabRecall:
+      existingRefs.nextVocabRecall.length > 0
+        ? existingRefs.nextVocabRecall
+        : (generatedCloze ?? []),
   };
 
   await prisma.prepDraft.upsert({
@@ -447,71 +453,22 @@ async function writePrepDraftForLesson(lessonId: string) {
     update: { ...draft, refsJson: toJson(refs), status: "draft" },
   });
 
-  await pushClozeToNextLesson({
-    studentId: lesson.studentId,
-    afterStartsAt: lesson.startsAt,
-    exceptLessonId: lessonId,
-    cloze: generatedCloze ?? [],
-  });
-
-  const bound = bindClassroomDocToPrep(
-    parseClassroomDoc(lesson.classroomDoc),
-    thisCloze,
-  );
+  const canSeedBoard =
+    lesson.status === "scheduled" || lesson.status === "in_progress";
+  const bound = canSeedBoard
+    ? writeRecallClozeToBoard(parseClassroomDoc(lesson.classroomDoc), thisCloze)
+    : null;
   await prisma.lesson.update({
     where: { id: lessonId },
     data: {
       prepStatus: "draft",
-      ...(bound.changed
+      ...(bound?.changed
         ? { classroomDoc: serializeClassroomDoc(bound.doc) }
         : {}),
     },
   });
 
   return { lessonId, draft, refs };
-}
-
-async function pushClozeToNextLesson(opts: {
-  studentId: string;
-  afterStartsAt: Date;
-  exceptLessonId: string;
-  cloze: VocabRecallItem[];
-}) {
-  const next = await prisma.lesson.findFirst({
-    where: {
-      studentId: opts.studentId,
-      id: { not: opts.exceptLessonId },
-      status: { in: ["scheduled", "in_progress"] },
-      startsAt: { gt: opts.afterStartsAt },
-    },
-    orderBy: { startsAt: "asc" },
-    include: { prepDraft: true },
-  });
-  if (!next) return;
-
-  const nextRefs = parsePrepRefs(next.prepDraft?.refsJson);
-  nextRefs.vocabRecall = opts.cloze;
-  await prisma.prepDraft.upsert({
-    where: { lessonId: next.id },
-    create: {
-      lessonId: next.id,
-      refsJson: toJson(nextRefs),
-      status: "draft",
-    },
-    update: { refsJson: toJson(nextRefs) },
-  });
-  const bound = bindClassroomDocToPrep(
-    parseClassroomDoc(next.classroomDoc),
-    opts.cloze,
-  );
-  if (bound.changed) {
-    await prisma.lesson.update({
-      where: { id: next.id },
-      data: { classroomDoc: serializeClassroomDoc(bound.doc) },
-    });
-  }
-  revalidatePath(`/classroom/${next.id}`);
-  revalidatePath(`/lessons/${next.id}`);
 }
 
 function revalidatePrepSurfaces(lessonIds: string[] = []) {

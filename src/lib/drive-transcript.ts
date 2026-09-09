@@ -7,6 +7,7 @@ import {
   listRecentDriveDocs,
 } from "@/lib/google";
 import { materializeLessonHomework } from "@/lib/materialize-homework";
+import { materializeNextLessonClozeFromSummary } from "@/lib/next-lesson-cloze";
 import { revalidateStudentPortal } from "@/lib/revalidate-student";
 import { toJson } from "@/lib/utils";
 
@@ -295,6 +296,11 @@ export async function applyTranscriptToLesson(opts: {
     vocabJson: data.vocabJson,
     homeworkText: data.homework,
   });
+  try {
+    await materializeNextLessonClozeFromSummary(opts.lessonId);
+  } catch (err) {
+    console.error("next-lesson cloze failed", opts.lessonId, err);
+  }
   revalidateStudentPortal(opts.lessonId);
 
   return summary;

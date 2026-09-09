@@ -196,17 +196,142 @@ export function hasClassroomBodyText(
     .some((line) => line.length > 0 && !PREP_SECTION_TITLES.has(line));
 }
 
+function headingText(node: TiptapNode): string {
+  return (node.content ?? [])
+    .map((child) => child.text ?? "")
+    .join("")
+    .trim();
+}
+
+function paragraphText(node: TiptapNode): string {
+  const inner: string[] = [];
+  for (const child of node.content ?? []) {
+    if (child.type === "text" && child.text) inner.push(child.text);
+    else if (child.content) {
+      for (const nested of child.content) {
+        if (nested.type === "text" && nested.text) inner.push(nested.text);
+      }
+    }
+  }
+  return inner.join("").trim();
+}
+
 function headingTexts(doc: TiptapDoc): string[] {
   const titles: string[] = [];
   for (const node of doc.content ?? []) {
     if (node.type !== "heading") continue;
-    const text = (node.content ?? [])
-      .map((child) => child.text ?? "")
-      .join("")
-      .trim();
+    const text = headingText(node);
     if (text) titles.push(text);
   }
   return titles;
+}
+
+function isBlankParagraph(node: TiptapNode): boolean {
+  if (node.type !== "paragraph") return false;
+  if ((node.content ?? []).some((child) => child.type === "image")) {
+    return false;
+  }
+  return paragraphText(node).length === 0;
+}
+
+function looksLikeClozeParagraph(node: TiptapNode): boolean {
+  if (node.type !== "paragraph") return false;
+  const text = paragraphText(node);
+  return /＿|_/.test(text) || /（.+）/.test(text) || /\(.+\)/.test(text);
+}
+
+/** True when the shared board already shows this lesson's cloze sentences. */
+export function boardShowsCloze(
+  doc: TiptapDoc | null | undefined,
+  cloze: VocabRecallItem[] | null | undefined,
+): boolean {
+  const items = (cloze ?? []).filter((item) => item.blanked.trim());
+  if (items.length === 0) return true;
+  const plain = tiptapDocToPlainText(doc);
+  if (!plain) return false;
+  const hits = items.filter((item) => plain.includes(item.blanked.trim()));
+  return hits.length >= Math.min(2, items.length);
+}
+
+/**
+ * Drop the Recall heading and cloze lines so we can rewrite them.
+ * Teacher notes that are not cloze lines stay on the board.
+ */
+function restAfterRecallCloze(doc: TiptapDoc): TiptapNode[] {
+  const rest: TiptapNode[] = [];
+  let skippingRecall = false;
+  for (const node of doc.content ?? []) {
+    if (node.type === "heading" && headingText(node) === "Recall") {
+      skippingRecall = true;
+      continue;
+    }
+    if (skippingRecall) {
+      if (node.type === "heading") {
+        skippingRecall = false;
+        rest.push(node);
+        continue;
+      }
+      if (isBlankParagraph(node) || looksLikeClozeParagraph(node)) {
+        continue;
+      }
+      skippingRecall = false;
+      rest.push(node);
+      continue;
+    }
+    rest.push(node);
+  }
+  while (rest.length > 0 && isBlankParagraph(rest[0]!)) rest.shift();
+  while (rest.length > 0 && isBlankParagraph(rest[rest.length - 1]!)) {
+    rest.pop();
+  }
+  return rest;
+}
+
+/**
+ * Put this lesson's cloze on the shared board (student + teacher).
+ * Replaces the Recall section; keeps other notes and images.
+ */
+export function writeRecallClozeToBoard(
+  existing: TiptapDoc | null | undefined,
+  cloze: VocabRecallItem[] | null | undefined,
+): { doc: TiptapDoc; changed: boolean } {
+  const items = cloze ?? [];
+  if (items.length === 0) {
+    const doc = existing ?? emptyClassroomDoc();
+    return { doc, changed: false };
+  }
+  const seeded = seedClassroomDocFromCloze(items);
+  if (!existing) {
+    return { doc: seeded, changed: true };
+  }
+  const rest = restAfterRecallCloze(existing).filter(
+    (node) => node.type !== "image",
+  );
+  const doc = appendImageNodes(
+    {
+      type: "doc",
+      content: rest.length > 0 ? [...seeded.content, ...rest] : seeded.content,
+    },
+    extractImageNodes(existing),
+  );
+  return {
+    doc,
+    changed: serializeClassroomDoc(existing) !== serializeClassroomDoc(doc),
+  };
+}
+
+/** Upcoming class: write cloze onto the board unless it is already there. */
+export function bindUpcomingClassroomDoc(
+  existing: TiptapDoc | null | undefined,
+  cloze: VocabRecallItem[] | null | undefined,
+): { doc: TiptapDoc; changed: boolean } {
+  if (boardShowsCloze(existing, cloze)) {
+    return {
+      doc: existing ?? seedClassroomDocFromCloze(cloze),
+      changed: false,
+    };
+  }
+  return writeRecallClozeToBoard(existing, cloze);
 }
 
 function isLegacyPrepBoard(doc: TiptapDoc | null | undefined): boolean {
@@ -246,6 +371,6 @@ export function mergeClassroomBoardSave(
   if (hasClassroomBodyText(incoming) && !isLegacyPrepBoard(incoming)) {
     return incoming;
   }
-  const bound = bindClassroomDocToPrep(stored, cloze);
+  const bound = writeRecallClozeToBoard(stored, cloze);
   return appendImageNodes(bound.doc, extractImageNodes(incoming));
 }
