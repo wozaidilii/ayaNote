@@ -6,10 +6,12 @@ import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { parseQuizJson } from "@/lib/homework-quiz";
+import { ensureLessonHomeworkFromSummaries } from "@/lib/materialize-homework";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 
 export default async function StudentHomeworkListPage() {
   const active = await getActiveStudent();
+  await ensureLessonHomeworkFromSummaries(active.id);
   const [t, common, student] = await Promise.all([
     getTranslations("studentHome"),
     getTranslations("common"),

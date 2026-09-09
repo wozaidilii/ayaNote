@@ -21,15 +21,15 @@ import {
   notifyBookingSubmitted,
 } from "@/lib/booking-email";
 import {
-  buildQuizFromVocab,
   parseAnswersJson,
   parseQuizJson,
   scoreQuiz,
   serializeAnswers,
-  serializeQuiz,
 } from "@/lib/homework-quiz";
 import { ensureSampleLevelHomework } from "@/lib/ensure-sample-homework";
 import { applyTranscriptToLesson } from "@/lib/drive-transcript";
+import { materializeLessonHomework } from "@/lib/materialize-homework";
+import { revalidateStudentPortal } from "@/lib/revalidate-student";
 import {
   clearAuthSession,
   hashPassword,
@@ -280,7 +280,13 @@ export async function approveSummary(formData: FormData) {
     },
   });
 
-  // Materialize homework entity (status source of truth) + vocab quiz
+  await materializeLessonHomework({
+    lessonId,
+    studentId: lesson.studentId,
+    vocabJson: lesson.summary.vocabJson,
+    homeworkText: homework,
+  });
+
   const vocab = (() => {
     try {
       return JSON.parse(lesson.summary.vocabJson) as Array<{
@@ -292,51 +298,6 @@ export async function approveSummary(formData: FormData) {
       return [];
     }
   })();
-
-  const quiz = buildQuizFromVocab(vocab);
-  const instructions =
-    homework.trim() ||
-    (quiz.length > 0
-      ? `Vocabulary quiz · ${quiz.length} questions from today's lesson`
-      : "");
-
-  if (instructions || quiz.length > 0) {
-    const existingHw = await prisma.homework.findUnique({
-      where: { lessonId },
-      select: { status: true },
-    });
-    const keepStatus =
-      existingHw?.status === "done" || existingHw?.status === "reviewed"
-        ? existingHw.status
-        : "assigned";
-    const kind = quiz.length > 0 ? "quiz" : "text";
-    await prisma.homework.upsert({
-      where: { lessonId },
-      create: {
-        lessonId,
-        studentId: lesson.studentId,
-        title: quiz.length > 0 ? "Vocabulary quiz" : "Homework",
-        instructions,
-        kind,
-        quizJson: serializeQuiz(quiz),
-        answersJson: "[]",
-        score: null,
-        status: "assigned",
-        source: "ai_summary",
-      },
-      update: {
-        title: quiz.length > 0 ? "Vocabulary quiz" : "Homework",
-        instructions,
-        kind,
-        quizJson: serializeQuiz(quiz),
-        source: "ai_summary",
-        status: keepStatus,
-        ...(keepStatus === "assigned"
-          ? { answersJson: "[]", score: null, completedAt: null }
-          : {}),
-      },
-    });
-  }
 
   const grammar = (() => {
     try {
@@ -410,8 +371,7 @@ export async function approveSummary(formData: FormData) {
 
   revalidatePath(`/lessons/${lessonId}`);
   revalidatePath(`/students/${lesson.studentId}`);
-  revalidatePath("/student/history");
-  revalidatePath(`/student/lessons/${lessonId}`);
+  revalidateStudentPortal(lessonId);
 }
 
 async function writePrepDraftForLesson(lessonId: string) {
@@ -854,8 +814,7 @@ export async function decideBooking(formData: FormData) {
   revalidatePath("/availability");
   revalidatePath("/today");
   revalidatePath("/calendar");
-  revalidatePath("/student");
-  revalidatePath("/student/book");
+  revalidateStudentPortal();
 }
 
 /** Teacher schedules a 60-minute lesson directly from the calendar. */
@@ -927,8 +886,8 @@ export async function createLessonForStudent(formData: FormData) {
   revalidatePath("/availability");
   revalidatePath("/today");
   revalidatePath("/calendar");
-  revalidatePath("/student");
   revalidatePath("/students");
+  revalidateStudentPortal(created.id);
   redirect(`${calendarHref}&ok=scheduled`);
 }
 
@@ -1341,7 +1300,7 @@ export async function syncGoogleCalendar() {
   revalidatePath("/calendar");
   revalidatePath("/today");
   revalidatePath("/prep");
-  revalidatePath("/student/book");
+  revalidateStudentPortal();
   if (!result.ok) {
     const reason = result.reason === "not_connected" ? "not_connected" : "sync";
     redirect(`/calendar?err=${reason}`);
@@ -1391,6 +1350,7 @@ export async function bindCalendarLessonStudent(formData: FormData) {
   revalidatePath("/today");
   revalidatePath("/students");
   revalidatePath("/prep");
+  revalidateStudentPortal(lesson.id);
   redirect(`${href}&ok=bound`);
 }
 
@@ -1457,5 +1417,6 @@ export async function createStudentForCalendarLesson(formData: FormData) {
   revalidatePath("/today");
   revalidatePath("/students");
   revalidatePath("/prep");
+  revalidateStudentPortal(lesson.id);
   redirect(`${href}&ok=bound`);
 }

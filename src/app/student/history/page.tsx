@@ -6,11 +6,13 @@ import { EmptyState, PageHeading } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
 import { parseQuizJson } from "@/lib/homework-quiz";
+import { ensureLessonHomeworkFromSummaries } from "@/lib/materialize-homework";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
 export default async function StudentHistoryPage() {
   const active = await getActiveStudent();
+  await ensureLessonHomeworkFromSummaries(active.id);
   const [t, common, student] = await Promise.all([
     getTranslations("studentHistory"),
     getTranslations("common"),
@@ -19,7 +21,14 @@ export default async function StudentHistoryPage() {
       include: {
         teacher: { select: { timezone: true } },
         lessons: {
-          where: { status: "completed" },
+          where: {
+            status: { not: "cancelled" },
+            OR: [
+              { status: "completed" },
+              { endsAt: { lt: new Date() } },
+              { summary: { isNot: null } },
+            ],
+          },
           include: { summary: true, homeworks: true },
           orderBy: { startsAt: "desc" },
         },
@@ -135,6 +144,14 @@ export default async function StudentHistoryPage() {
                   ) : null}
                 </div>
                 <div className="list-row-actions">
+                  {lesson.summary ? (
+                    <a
+                      className="btn secondary sm"
+                      href={`/student/lessons/${lesson.id}`}
+                    >
+                      {t("openSummary")}
+                    </a>
+                  ) : null}
                   <a
                     className="btn secondary sm"
                     href={`/classroom/${lesson.id}`}

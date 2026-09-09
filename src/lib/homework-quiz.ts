@@ -94,7 +94,7 @@ function buildChoices(correct: string, distractors: string[]) {
 
 /**
  * Build JLPT-style MCQ items from lesson vocab.
- * Returns [] if fewer than 3 usable vocab items.
+ * Returns [] when there are no usable terms.
  */
 export function buildQuizFromVocab(vocab: VocabForQuiz[]): QuizQuestion[] {
   const usable = vocab
@@ -105,7 +105,7 @@ export function buildQuizFromVocab(vocab: VocabForQuiz[]): QuizQuestion[] {
     }))
     .filter((v) => v.term.length > 0);
 
-  if (usable.length < 3) return [];
+  if (usable.length === 0) return [];
 
   const readingPool = uniqueNonEmpty(
     usable.map((v) => v.reading).filter(Boolean),

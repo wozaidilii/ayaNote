@@ -60,6 +60,21 @@ function nameFromBracketTitle(summary?: string) {
   return m?.[1]?.trim() || null;
 }
 
+/** "kaiさん" / "Kai" / "kai" should match the same student. */
+export function normalizeStudentLabel(value: string) {
+  return value
+    .normalize("NFKC")
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/(さん|さま|様|君|くん|ちゃん|殿)$/u, "")
+    .toLowerCase();
+}
+
+export function studentLabelsMatch(a: string, b: string) {
+  const left = normalizeStudentLabel(a);
+  const right = normalizeStudentLabel(b);
+  return Boolean(left && right && left === right);
+}
+
 function emailLocalName(email: string) {
   const local = email.split("@")[0] ?? email;
   return local.replace(/[._]+/g, " ").trim() || email;
@@ -173,17 +188,27 @@ async function matchRealStudent(teacherId: string, event: GoogleCalendarEvent) {
     displayName !== "未指定" &&
     displayName !== "Calendar guest"
   ) {
-    const byName = await prisma.student.findFirst({
+    const roster = await prisma.student.findMany({
       where: {
         teacherId,
         archivedAt: null,
-        name: { equals: displayName, mode: "insensitive" },
         NOT: {
           email: { endsWith: `@${PLACEHOLDER_DOMAIN}` },
         },
       },
+      select: { id: true, name: true, email: true },
     });
-    if (byName) return byName;
+    const matched = roster.find((student) => {
+      const local = emailLocalName(student.email);
+      return (
+        studentLabelsMatch(student.name, displayName) ||
+        studentLabelsMatch(local, displayName) ||
+        studentLabelsMatch(student.email, displayName)
+      );
+    });
+    if (matched) {
+      return prisma.student.findUnique({ where: { id: matched.id } });
+    }
   }
 
   return null;

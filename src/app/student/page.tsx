@@ -10,6 +10,7 @@ import {
 import { PageHeading, PanelTitle } from "@/components/ui-heading";
 import { getActiveStudent } from "@/lib/active-student";
 import { prisma } from "@/lib/db";
+import { ensureLessonHomeworkFromSummaries } from "@/lib/materialize-homework";
 import { formatInTz, normalizeTimezone } from "@/lib/timezone";
 import { parseJsonArray } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ export default async function StudentHomePage() {
     getTranslations("common"),
     getActiveStudent(),
   ]);
+  await ensureLessonHomeworkFromSummaries(active.id);
 
   const student = await prisma.student.findFirstOrThrow({
     where: { id: active.id },
@@ -31,9 +33,11 @@ export default async function StudentHomePage() {
         take: 3,
       },
       lessons: {
-        where: { status: "scheduled", startsAt: { gte: new Date() } },
+        where: {
+          status: { in: ["scheduled", "in_progress"] },
+        },
         orderBy: { startsAt: "asc" },
-        take: 1,
+        take: 12,
       },
       homeworks: {
         where: { status: "assigned" },
@@ -43,10 +47,22 @@ export default async function StudentHomePage() {
     },
   });
 
-  const next = student.lessons[0];
+  const now = new Date();
+  const graceMs = 30 * 60_000;
+  const live = student.lessons.filter(
+    (lesson) =>
+      lesson.startsAt <= now &&
+      lesson.endsAt.getTime() + graceMs >= now.getTime(),
+  );
+  const upcoming = student.lessons.filter((lesson) => lesson.startsAt > now);
+  const featured = live[0] ?? upcoming[0] ?? null;
+  const moreUpcoming = upcoming.filter((lesson) => lesson.id !== featured?.id);
   const timeZone = normalizeTimezone(student.teacher.timezone);
   const homeworkLine =
     student.homeworks[0]?.title || student.homeworks[0]?.instructions || "";
+  const featuredIsLive = Boolean(
+    featured && live.some((lesson) => lesson.id === featured.id),
+  );
 
   return (
     <AppShell active="home" personName={student.name}>
@@ -62,18 +78,20 @@ export default async function StudentHomePage() {
 
       <div className="grid-2">
         <div className="panel">
-          <PanelTitle icon={CalendarPlus}>{t("next")}</PanelTitle>
-          {next ? (
+          <PanelTitle icon={CalendarPlus}>
+            {featuredIsLive ? t("now") : t("next")}
+          </PanelTitle>
+          {featured ? (
             <>
               <p style={{ fontSize: "1.2rem", fontWeight: 700 }}>
-                {formatInTz(next.startsAt, "yyyy-MM-dd HH:mm", timeZone)}
+                {formatInTz(featured.startsAt, "yyyy-MM-dd HH:mm", timeZone)}
                 <span className="muted" style={{ fontWeight: 500 }}>
                   {" "}
-                  – {formatInTz(next.endsAt, "HH:mm", timeZone)}
+                  – {formatInTz(featured.endsAt, "HH:mm", timeZone)}
                 </span>
               </p>
               <p>
-                <strong>{t("status")}:</strong> {next.status}
+                <strong>{t("status")}:</strong> {featured.status}
               </p>
               <p>
                 <strong>{t("whatNext")}:</strong> {homeworkLine || "—"}
@@ -92,7 +110,7 @@ export default async function StudentHomePage() {
               <p>
                 <a
                   className="btn"
-                  href={`/classroom/${next.id}`}
+                  href={`/classroom/${featured.id}`}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -103,6 +121,17 @@ export default async function StudentHomePage() {
             </>
           ) : (
             <p className="muted">{t("noUpcoming")}</p>
+          )}
+          {moreUpcoming.length > 0 && (
+            <div style={{ marginTop: "1rem" }}>
+              <h3>{t("upcoming")}</h3>
+              {moreUpcoming.map((lesson) => (
+                <p key={lesson.id} style={{ margin: "0.35rem 0" }}>
+                  {formatInTz(lesson.startsAt, "yyyy-MM-dd HH:mm", timeZone)} –{" "}
+                  {formatInTz(lesson.endsAt, "HH:mm", timeZone)}
+                </p>
+              ))}
+            </div>
           )}
           {student.bookingRequests.length > 0 && (
             <div style={{ marginTop: "1rem" }}>

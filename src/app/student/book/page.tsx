@@ -14,6 +14,7 @@ import { generateAvailableSlots } from "@/lib/scheduling";
 import {
   consecutiveYmds,
   dayBoundsInTz,
+  formatInTz,
   normalizeTimezone,
   shiftYmd,
   startOfWeekMondayYmd,
@@ -171,7 +172,9 @@ export default async function StudentBookPage({
   }
 
   const studentUpcoming = student.lessons.filter(
-    (l) => l.status === "scheduled" && l.startsAt >= new Date(),
+    (l) =>
+      (l.status === "scheduled" || l.status === "in_progress") &&
+      l.endsAt.getTime() >= now.getTime() - 30 * 60_000,
   );
 
   return (
@@ -185,6 +188,28 @@ export default async function StudentBookPage({
           </>
         }
       />
+
+      {studentUpcoming.length > 0 ? (
+        <div className="panel">
+          <h2 style={{ marginTop: 0 }}>{t("confirmedLessons")}</h2>
+          {studentUpcoming.map((lesson) => (
+            <div className="list-row" key={lesson.id}>
+              <div>
+                <div style={{ fontWeight: 700 }}>
+                  {formatInTz(lesson.startsAt, "yyyy-MM-dd HH:mm", timeZone)} –{" "}
+                  {formatInTz(lesson.endsAt, "HH:mm", timeZone)}
+                </div>
+                <div className="muted">{t("yourLesson")}</div>
+              </div>
+              <div className="list-row-actions">
+                <a className="btn sm" href={`/classroom/${lesson.id}`}>
+                  {t("yourLesson")}
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="panel">
         <span className="pixel-banner">{t("slotRule")}</span>

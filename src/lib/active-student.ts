@@ -22,12 +22,16 @@ export async function getActiveStudentOrNull() {
 }
 
 export async function listActiveStudentsForTeacher(teacherId: string) {
+  const now = new Date();
   return prisma.student.findMany({
     where: { teacherId, archivedAt: null },
     orderBy: { name: "asc" },
     include: {
       lessons: {
-        where: { status: "scheduled", startsAt: { gte: new Date() } },
+        where: {
+          status: { in: ["scheduled", "in_progress"] },
+          endsAt: { gte: new Date(now.getTime() - 30 * 60_000) },
+        },
         orderBy: { startsAt: "asc" },
         take: 1,
       },

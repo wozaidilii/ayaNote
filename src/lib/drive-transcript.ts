@@ -6,6 +6,8 @@ import {
   getValidAccessToken,
   listRecentDriveDocs,
 } from "@/lib/google";
+import { materializeLessonHomework } from "@/lib/materialize-homework";
+import { revalidateStudentPortal } from "@/lib/revalidate-student";
 import { toJson } from "@/lib/utils";
 
 export type DriveFetchStatus =
@@ -256,7 +258,7 @@ export async function applyTranscriptToLesson(opts: {
         ? "imported"
         : "manual";
 
-  await prisma.lesson.update({
+  const lesson = await prisma.lesson.update({
     where: { id: opts.lessonId },
     data: {
       status: "completed",
@@ -284,7 +286,17 @@ export async function applyTranscriptToLesson(opts: {
         },
       },
     },
+    select: { studentId: true },
   });
+
+  await materializeLessonHomework({
+    lessonId: opts.lessonId,
+    studentId: lesson.studentId,
+    vocabJson: data.vocabJson,
+    homeworkText: data.homework,
+  });
+  revalidateStudentPortal(opts.lessonId);
+
   return summary;
 }
 
