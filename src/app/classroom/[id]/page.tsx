@@ -86,7 +86,11 @@ export default async function ClassroomPage({
   const isPast = lesson.status === "completed" || lesson.status === "cancelled";
 
   if (!isPast) {
-    await ensureNextLessonClozeFromLatestSummary(lesson.studentId);
+    try {
+      await ensureNextLessonClozeFromLatestSummary(lesson.studentId);
+    } catch (err) {
+      console.error("ensure next-lesson cloze failed", lesson.id, err);
+    }
   }
 
   const fresh = await prisma.lesson.findUnique({

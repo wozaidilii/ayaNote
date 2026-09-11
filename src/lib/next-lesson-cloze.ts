@@ -74,6 +74,8 @@ export async function pushClozeToNextLesson(opts: {
   afterStartsAt: Date;
   exceptLessonId: string;
   cloze: VocabRecallItem[];
+  /** Default true. Must be false during page render. */
+  revalidate?: boolean;
 }) {
   if (opts.cloze.length === 0) return null;
 
@@ -111,14 +113,19 @@ export async function pushClozeToNextLesson(opts: {
       data: { classroomDoc: serializeClassroomDoc(bound.doc) },
     });
   }
-  revalidatePath(`/classroom/${next.id}`);
-  revalidatePath(`/lessons/${next.id}`);
-  revalidatePath("/prep");
+  if (opts.revalidate !== false) {
+    revalidatePath(`/classroom/${next.id}`);
+    revalidatePath(`/lessons/${next.id}`);
+    revalidatePath("/prep");
+  }
   return next.id;
 }
 
 /** After a lesson is summarized, write cloze for the following class from today's vocab. */
-export async function materializeNextLessonClozeFromSummary(lessonId: string) {
+export async function materializeNextLessonClozeFromSummary(
+  lessonId: string,
+  opts?: { revalidate?: boolean },
+) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: {
@@ -146,6 +153,7 @@ export async function materializeNextLessonClozeFromSummary(lessonId: string) {
       afterStartsAt: lesson.startsAt,
       exceptLessonId: lesson.id,
       cloze: existingCloze,
+      revalidate: opts?.revalidate,
     });
     return { cloze: existingCloze, nextLessonId };
   }
@@ -186,6 +194,7 @@ export async function materializeNextLessonClozeFromSummary(lessonId: string) {
     afterStartsAt: lesson.startsAt,
     exceptLessonId: lesson.id,
     cloze,
+    revalidate: opts?.revalidate,
   });
 
   return { cloze, nextLessonId };
@@ -230,6 +239,7 @@ export async function ensureNextLessonClozeFromLatestSummary(
       afterStartsAt: last.startsAt,
       exceptLessonId: last.id,
       cloze: nextCloze,
+      revalidate: false,
     });
     return {
       updated: Boolean(nextLessonId) && !boardShowsCloze(nextDoc, nextCloze),
@@ -242,10 +252,13 @@ export async function ensureNextLessonClozeFromLatestSummary(
       afterStartsAt: last.startsAt,
       exceptLessonId: last.id,
       cloze: existing,
+      revalidate: false,
     });
     return { updated: Boolean(nextLessonId), cloze: existing };
   }
 
-  const result = await materializeNextLessonClozeFromSummary(last.id);
+  const result = await materializeNextLessonClozeFromSummary(last.id, {
+    revalidate: false,
+  });
   return { updated: result.cloze.length > 0, cloze: result.cloze };
 }
