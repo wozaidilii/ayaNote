@@ -66,7 +66,7 @@ function toPrepCloze(
       answer: item.answer.trim(),
     }))
     .filter((item) => item.blanked && item.answer)
-    .slice(0, 8);
+    .slice(0, 15);
 }
 
 export async function pushClozeToNextLesson(opts: {

@@ -725,7 +725,7 @@ Level-appropriate. If no usable vocab, return vocabRecall as [].`,
 }
 
 const clozeOnlySchema = z.object({
-  vocabRecall: z.array(vocabRecallItemSchema).max(8).default([]),
+  vocabRecall: z.array(vocabRecallItemSchema).max(15).default([]),
 });
 
 type LessonVocabRow = {
@@ -740,7 +740,7 @@ function heuristicClozeFromVocab(
 ): VocabRecallItem[] {
   const items: VocabRecallItem[] = [];
   for (const row of vocab) {
-    if (items.length >= 6) break;
+    if (items.length >= 15) break;
     const term = row.term.trim();
     if (!term) continue;
     const hit = examples.find((s) => s.includes(term));
@@ -754,6 +754,29 @@ function heuristicClozeFromVocab(
     });
   }
   return items;
+}
+
+function clozeTermKey(value: string) {
+  return value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+}
+
+/** Prefer AI sentences, then fill remaining taught terms up to 15. */
+function mergeClozeWithVocab(
+  generated: VocabRecallItem[],
+  fallback: VocabRecallItem[],
+  vocabCount: number,
+): VocabRecallItem[] {
+  const target = Math.min(15, vocabCount);
+  const out: VocabRecallItem[] = [];
+  const seen = new Set<string>();
+  for (const item of [...generated, ...fallback]) {
+    if (out.length >= target) break;
+    const key = clozeTermKey(item.answer);
+    if (!item.blanked.trim() || !item.answer.trim() || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
 }
 
 /** Cloze for the NEXT lesson, built from vocab actually taught today. */
@@ -801,9 +824,9 @@ Course: ${course}
 Level: ${input.level}
 Today's topics: ${(input.topics ?? []).join(" · ") || "n/a"}
 Today's vocab: ${vocabLine}
-Today's example sentences (optional): ${examples.slice(0, 8).join(" / ") || "n/a"}
+Today's example sentences (optional): ${examples.slice(0, 15).join(" / ") || "n/a"}
 
-Return JSON with vocabRecall: 4–6 items.
+Return JSON with vocabRecall: one item per taught term, ${Math.min(15, vocab.length)} items (10–15 when today's vocab is that long).
 vocabRecall format (strict):
 - blanked: natural Japanese sentence with ONE blank written as ＿＿
 - hint: short meaning cue, NOT the answer
@@ -813,7 +836,7 @@ Do not introduce new vocabulary. Workplace Japanese when the course is business.
     const items = (object.vocabRecall ?? []).filter(
       (v) => v.blanked.trim() && v.answer.trim(),
     );
-    return items.length > 0 ? items : fallback;
+    return mergeClozeWithVocab(items, fallback, vocab.length);
   } catch (err) {
     console.error("AI cloze failed:", err instanceof Error ? err.message : err);
     return fallback;

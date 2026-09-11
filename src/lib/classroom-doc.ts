@@ -250,7 +250,11 @@ export function boardShowsCloze(
   const plain = tiptapDocToPlainText(doc);
   if (!plain) return false;
   const hits = items.filter((item) => plain.includes(item.blanked.trim()));
-  return hits.length >= Math.min(2, items.length);
+  const needed = Math.min(
+    items.length,
+    Math.max(2, Math.ceil(items.length * 0.6)),
+  );
+  return hits.length >= needed;
 }
 
 /**

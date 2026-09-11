@@ -47,7 +47,7 @@ function parseVocabRecall(value: unknown): VocabRecallItem[] {
     const hint = String(row.hint ?? "").trim() || answer;
     items.push({ blanked, hint, answer });
   }
-  return items.slice(0, 8);
+  return items.slice(0, 15);
 }
 
 export function parsePrepRefs(value: string | null | undefined): PrepRefs {
